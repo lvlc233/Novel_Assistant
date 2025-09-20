@@ -1,12 +1,19 @@
 # Novel_Assistant
 This is a multi-agent novel-writing assistant. While you converse with an intelligent AI, you can create your story—and it remembers your habits, co-authoring with you every step of the way. This project is my graduation thesis and a gift for a dear friend.
 # 补充:
-  项目还在持续进行
+  项目还在持续进行,暂时不可直接运行
 # 介绍:
 该系统由三大个Agent组成,分别是:
   - 门面Agent
+    主要与用户交互的Agent,提供`沟通`,`文档读写`,`任务分配:(推荐生成,记忆,KD)的调控`的任务。
   - 记忆Agent
+    负责
+    - 长期记忆整理
+    - 工作记忆生成
+    - 记忆相关的存储与读取操作
   - 知识Agent
+    负责
+    - 
 尽管在项目中你们会发现有许多的LLM调用,但是总的来说,这些模型都是为了构建这三个核心的Agent而存在
 # 架构说明
 注意,该结构中的内容随时可能会发生增加、修改或者减少,但总的来说如图所示。
