@@ -67,3 +67,32 @@ This is a multi-agent novel-writing assistant. While you converse with an intell
   - pg
   - neo4j
   - milvus
+# 更新日志
+**`当前进度`**:已经初始化整个项目结构,主要有三个模块:`agents`,`common`,`utils`
+
+- 其中`agents`:存储可独立运行的Agent,当前有完成了`提示词推荐Agent(未整理)`, `记忆管理Agent(初步最简单demo)`,`门面Agent(没开始xixi)`,每一个Agent包包括`state`:用于存储`状态`,`LLM格式输出器`。`node`:用于节点和工具,`graph`:图的构建。
+
+- 其中`common`:存储系统的支撑建设及其定义,包括`context(上下文)`,`KD(知识数据)`,`memory(记忆)`,`prompts(存储提示词)`,`store(持久化相关的)`
+
+- 其中`utils`:存储一些通用工具。
+
+补充:上述`conmmon`模块可能会在后续的版本中有比较大的更新
+
+**`已完成内容`**:
+- `utils`中的雪花id生成
+- `common`中的`store`的抽象定义(解耦表,操作和客户端)、定义了基础的CRUD的操作枚举、定义了长期,短期,工作记忆,KD索引和文档的表定义、sqlite,pg的具体实现。
+- `common`中的`prompts`初步定义推荐Agent的提示词(待优化),反思、语义和场景提取的提示词(待优化),
+- `common`中的`model_load`的初定义,用于实现用户高可以配的模型定义
+- `common`中的`memory`中的基础、反思、知识和场景记忆的定义-->注意,长短期记忆等这是相对于上下文而存在的。5
+- `common`中的`KD`的初定义(极简)
+- `common`中的`context`的初定义
+- `agents`中的`提示词推荐Agent`初完成
+- `agents`中的`记忆管理Agent`初完成
+
+
+**`下一步计划`**:
+- 打通`memory`、`store`和`记忆管理Agent`
+- 初步实现`门面Agent`
+
+
+
