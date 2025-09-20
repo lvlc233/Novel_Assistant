@@ -3,6 +3,53 @@
     短推导省略:当你使用一个抽象概念并做出概念的解释时,请省略掉抽象的概念直接给出详细的解释说明
         例如: 提取上下文中的人物关系,人物关系包括,家族,地位,关系等--->提取上下文中人物之间的家庭,地位等关系
 """
+from langchain_core.prompts import ChatPromptTemplate,MessagesPlaceholder
+
+
+#
+Context_to_System_Prompt="""
+与此同时你记得
+<长期记忆>{long_mem}</长期记忆>
+<工作记忆>{work_mem}</工作记忆>
+并搜索到
+<知识数据>{knowledge_data}</知识数据>
+"""
+
+
+def Facade_Agent_Prompt_Template()->ChatPromptTemplate:
+    """
+        门面Agent的完整提示词模板:
+        context_system:上下文系统提示词,包含了上下文的长期记忆,工作记忆,知识数据等
+        history:上下文的历史记录,包含了用户的输入和Agent的输出
+        input:用户的输入
+        ---
+         ("system", ""
+            你,小说家,现在来了一名新的小说家,你将作为副笔和他一同进行小说创作;
+            你,了解你还记得什么,不记得什么;当你在<长期记忆>,<工作记忆>和<历史记录>中都找不到相关的信息时,说明你忘记了;
+            当你忘记时,或许<知识数据>中会有相关数据;
+            当你忘记时,你将大胆的向用户坦白你忘记某些事情,不怕被指责,你相信用户会友好的向你提供帮助;
+            {context_system}
+        ""),
+        MessagesPlaceholder("history"),
+        ("human", "{input}"),
+
+    """
+    return ChatPromptTemplate.from_messages([
+    ("system", """
+     你,小说家,现在来了一名新的小说家,你将作为副笔和他一同进行小说创作;
+     你,了解你还记得什么,不记得什么;当你在<长期记忆>,<工作记忆>和<历史记录>中都找不到相关的信息时,说明你忘记了;
+     当你忘记时,或许<知识数据>中会有相关数据;
+     当你忘记时,你将大胆的向用户坦白你忘记某些事情,不怕被指责,你相信用户会友好的向你提供帮助;
+    {context_system}
+    """),
+    MessagesPlaceholder("history"),
+    ("human", "{input}"),
+])
+
+
+
+
+
 
 
 # Agent的系统提示词

@@ -2,8 +2,9 @@ from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
 from typing import List
 from langchain_core.messages import AnyMessage
-from .memory import BaseMemory
-from .KD import KD
+from common.memory import BaseMemory
+from common.KD import KD
+from common.prompts import Context_to_System_Prompt
 
 
 
@@ -58,4 +59,26 @@ class Context():
     """
     metadata:dict = field(default_factory=dict)
     
- 
+    def _to_dict(self)->dict:
+        """
+        转换为上下文字典
+        """ 
+        return {
+            "long_mem":  [m.to_context_dict() for m in self.long_term_memory],
+            "work_mem":  [m.to_context_dict() for m in self.work_memory],
+            "history":   self.short_term_memory,          # List[AnyMessage] 直接给 MessagesPlaceholder
+            "knowledge_data": self.knowledge_data or "无",
+        }
+    def to_system_prompt_dict(self)->dict:
+        """
+        转换为上下文系统提示词
+        返回:
+            context_system:长期记忆,工作记忆,知识数据
+        """
+        return {"context_system":Context_to_System_Prompt.format(**self._to_dict())}
+    def to_history_dict(self):
+        """"
+        转化为上下文历史记录
+            history:上下文的历史记录,包含了用户的输入和Agent的输出
+        """
+        return {"history":self.short_term_memory}

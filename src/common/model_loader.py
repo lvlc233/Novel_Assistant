@@ -5,19 +5,18 @@ from typing import List
 from dotenv import load_dotenv
 import os
 load_dotenv()
-model_name = os.getenv("Prompt_Recommendation_Agent_LLM_Model_Name")
-# 提示词推荐AgentLLM模型加载
-# 定义schema
-
-
-class OutputStructure(BaseModel):
-    """输出数据结构"""
-    suggestions: List[str] = Field(description="建议列表")
+prompt_recommendation_agent_model_name = os.getenv("Prompt_Recommendation_Agent_LLM_Model_Name")
+memory_manager_agent_model_name = os.getenv("Memory_Manager_Agent_LLM_Model_Name")
+facade_agent_model_name = os.getenv("Facade_Agent_LLM_Model_Name")
 
 # 提示词推荐LLM模型加载
 prompt_recommendation_agent_model = ChatOpenAI(
-    model_name=model_name).with_structured_output(OutputStructure)
+    model_name=prompt_recommendation_agent_model_name)
 
 #记忆管理LLM模型加载
 memory_manager_agent_model = ChatOpenAI(
-    model_name=model_name)
+    model_name=memory_manager_agent_model_name)
+
+#门面AgentLLM模型加载
+facade_agent_model = ChatOpenAI(
+    model_name=facade_agent_model_name)

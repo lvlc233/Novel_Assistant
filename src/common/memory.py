@@ -13,7 +13,6 @@ class MemoryType(Enum):
         ContextualMemory: 场景记忆
     具体解释看具体实现
     """
- 
     SemanticMemory  = "Semantic memory is the store of facts, concepts, laws, and other similar content."
 
     ReflectionMemory = "Reflection memory consists of the operating rules governing the agent’s own actions."
@@ -36,6 +35,18 @@ class BaseMemory:
         self.memory_id = generate_id()
         if self.metadata is None:          # 兜底：None → 空 dict
             self.metadata = {}
+    def to_context_dict(self):
+        """
+        转换为上下文字典
+        """
+        return {
+            "memory_id": self.memory_id, 
+            "content": self.content,
+            "type": self.type._name_,
+            "description": self.type.value,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 @dataclass_json
 @dataclass
