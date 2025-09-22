@@ -68,6 +68,16 @@ class DocumentTable(Table):
         "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         "is_remove": "BOOLEAN DEFAULT FALSE"
     }
+# 历史记录表
+class SessionHistoryTable(Table):
+    name = "session_history_table"
+    columns = {
+        "session_id": "TEXT PRIMARY KEY",
+        "title": "TEXT",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "is_remove": "BOOLEAN DEFAULT FALSE"
+    }
 
 
 

@@ -1,0 +1,183 @@
+/* 文档编辑器专用样式 */
+
+/* 文档编辑器样式 */
+.document-editor {
+  position: fixed;
+  top: 2vh;
+  right: 1vw;
+  width: 73vw;
+  height: 96vh;
+  border-radius: 8px;/*?似乎不起作用*/
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  display: flex;
+  /* flex-direction: column; */
+ transition: all 0.35s cubic-bezier(0.7, 0.5, 0.2, 0.7);
+  border: 3px double #000000;
+}
+
+/* 聊天展开时的状态 */
+.document-editor.chat-expanded {
+  width: 73vw;
+}
+
+/* 聊天收起时的状态 - 几乎占据整个屏幕 */
+.document-editor.chat-collapsed {
+  width: calc(100vw - 2vw);   /* 100% 视口宽 - 左右 1vw 留白 */
+}
+
+/* 编辑区域 */
+.document-content {
+  flex: 1;
+  padding: 26px 60px;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* 文档头部容器 - 三栏布局：左边留白+中间标题+右边状态栏 */
+.document-header-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 5px;
+  padding-bottom: 16px;
+  border-bottom: 1.25px solid #c0c0c0;
+}
+
+/* 左边留白区域 */
+.header-left-spacer {
+  flex: 1;
+}
+
+/* 中间标题包装器 */
+.document-title-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+/* 小说标题 - 居中显示 */
+.document-title {
+  text-align: center;
+  width: 100%;
+}
+
+/* 文档标题输入框 */
+.document-title-input {
+  background: transparent;
+  outline: none;
+  font-size: 26px;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+  width: 100%;
+  min-width: 300px; /* 设置最小宽度 */
+  max-width: 1000px; /* 设置最大宽度以支持长标题 */
+  padding: 12px 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+/* 文档标题输入框无文本 */
+.document-title-input::placeholder {
+  color: #7b8089;
+  font-weight: 400;
+}
+/* 文本输入区域 */
+.document-textarea {
+  width: 100%;
+  flex: 1;
+  /* border: none; */
+  outline: none;
+  resize: none;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 18px;
+  line-height: 1.8;
+  color: #374151;
+  background-image: repeating-linear-gradient(
+    transparent 0,
+    transparent calc(1.8em - 1px),
+    #cccccc calc(1.8em - 1px),
+    #cccccc calc(1.8em - 0.8px),
+    transparent calc(1.8em - 0.8px),
+    transparent calc(1.8em - 0.6px),
+    #cccccc calc(1.8em - 0.6px),
+    #cccccc calc(1.8em - 0.4px),
+    transparent calc(1.8em - 0.4px),
+    transparent calc(1.8em - 0.2px),
+    #cccccc calc(1.8em - 0.2px),
+    #cccccc 1.8em,
+    transparent 1.8em
+  );
+  background-size: 100% 1.8em;
+  background-attachment: local;
+  scrollbar-width: none;
+}
+
+/* .document-textarea::-webkit-scrollbar {
+  /* display: none; */
+/* }  */
+/* 无内容时文本区域 */
+.document-textarea::placeholder {
+  color: #9ca3af;
+  font-style: normal;
+}
+
+/* 状态栏 - 右侧垂直居中，与左边留白等宽 */
+.status-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  font-size: 13px;
+
+}
+/* 版本 */
+.version-info {
+  font-size: 12px;
+  font-weight: 400;
+  color: #868991;
+}
+/* 统计字数的样式 */
+.word-count,
+.line-count {
+  font-weight: 500;
+  color: #838383;
+}
+
+/* 悬浮保存按钮 - 右下角固定位置 */
+.floating-save-button {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #111827;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+/* 保存状态 */
+.save-status {
+  font-size: 14px;
+  padding: 2px 6px;
+  font-weight: 425;
+}
+
+.save-status.saved {
+  color: #2f353e;
+}
+
+.save-status.unsaved {
+  background: #fef2f2;
+  color: #dc2626;
+}

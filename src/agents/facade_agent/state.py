@@ -9,3 +9,5 @@ class FacadeAgentState():
     """
     context: Context = field(default_factory=Context)
     user_input: str = ""
+    document_index: str = ""
+    document_chunk: str = ""
