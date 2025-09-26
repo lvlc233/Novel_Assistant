@@ -153,3 +153,104 @@ Work_Memory_Context_To_System_Messages_Prompt = """
         {work_memory}
     </Work-Memory> 
 """
+
+
+
+"""
+文档特征化(demo)
+"""
+def Extract_Info_Prompt_Template()->ChatPromptTemplate:
+    """
+        文档信息提取的初级模板
+        document:文档对象
+        ---
+        return: 文档信息提取的初级模板
+
+    """
+    return ChatPromptTemplate.from_messages([
+    ("system", """
+        你将以该模板:
+        根据这个模板提取文章信息,输出的时候以英文名词输出,若某些属性不存在,则可以直接省略
+        <模板>
+        章节
+        角色（Role）
+            名字（Name）
+            性格（Personality）
+                行为（Behavior）
+                话语（Speech Style）
+            道具（Item）
+                名词（Name）
+                作用（Effect）
+                数量（Quantity）
+                耐久（Durability）
+                时效（Duration）
+            职业（Profession）
+                是否唯一（Is Unique）
+                职业名称（Profession Name）
+
+            技能（Skill）
+                名词（Name）
+                效果（Effect）
+                背景设定（Background）
+                主要经历（Main Experiences）
+            经历副本（Instance）
+                收获（Rewards）
+            人物关系（Relationships）
+                人物（Character）
+                关系（Relationship）
+        环境设定（Environment）
+            环境名称（Environment Name）
+            发生事件（Event）
+            时间节点（Timeline Node）
+        </模板>
+        这是文章{document}
+        输出格式:
+            dict<str,dict<str,str>>"外层key是随机字符串,内层key是特征,value是特征值"
+    """),
+])
+def Reduce_Extract_Info_Prompt_Template()->ChatPromptTemplate:
+    """
+        合并处理文档信息提取的模板
+        sub_features:List['FeatureCard']
+        ---
+        return: 合并处理文档信息提取的模板
+
+    """
+    return ChatPromptTemplate.from_messages([
+    ("system", """
+        你将收到一系列的模板:
+        特征信息,你需要将其整理去重合并,并保持原始的模板,并最终返回一个特征
+                <模板>
+        章节
+        角色（Role）
+            名字（Name）
+            性格（Personality）
+                行为（Behavior）
+                话语（Speech Style）
+            道具（Item）
+                名词（Name）
+                作用（Effect）
+                数量（Quantity）
+                耐久（Durability）
+                时效（Duration）
+            职业（Profession）
+                是否唯一（Is Unique）
+                职业名称（Profession Name）
+
+            技能（Skill）
+                名词（Name）
+                效果（Effect）
+                背景设定（Background）
+                主要经历（Main Experiences）
+            经历副本（Instance）
+                收获（Rewards）
+            人物关系（Relationships）
+                人物（Character）
+                关系（Relationship）
+        环境设定（Environment）
+            环境名称（Environment Name）
+            发生事件（Event）
+            时间节点（Timeline Node）
+        </模板>
+        {sub_features} 
+    """),])
