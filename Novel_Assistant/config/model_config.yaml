@@ -1,0 +1,24 @@
+# 模型配置(key可以是节点名)
+chat:
+  # 模型别名
+  model_name: "siliconflow:Qwen/Qwen3-30B-A3B-Instruct-2507"
+  base_url: "https://api.siliconflow.cn/v1"
+  api_key: "sk-ealzunszydvqahiynthhvesagiwkdefhgvsxbsxmbfcyurkm"
+  # 其他配置
+  config: 
+    temperature: 0
+    top_p: 0
+    top_k: 0
+    max_tokens: 2048
+
+default:
+  # 模型别名
+  model_name: "siliconflow:Pro/deepseek-ai/DeepSeek-V3"
+  base_url: "https://api.siliconflow.cn/v1"
+  api_key: "sk-ealzunszydvqahiynthhvesagiwkdefhgvsxbsxmbfcyurkm"
+  # 其他配置
+  config: 
+    temperature: 0
+    top_p: 0
+    top_k: 0
+    max_tokens: 2048
