@@ -57,6 +57,25 @@ This is a multi-agent novel-writing assistant. While you converse with an intell
 
 
 
+# 代码结构
+## 后端部分
+```
+src
+├── api
+├── common
+│   ├── config
+│   ├── context.py
+│   ├── decorator.py
+│   ├── memory.py
+│   ├── models
+│   ├── prompts.py
+│   ├── store.py
+│   └── utils.py
+├── core
+│   └── agent
+└── main.py
+```
+
 # 技术栈
 ### 前端(尚未开始)
   - react.js

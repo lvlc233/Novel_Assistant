@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..loader import ConfigLoader, LoadError
 
-
 class NodeModelItem(BaseModel):
     """单个节点的模型配置。
 
@@ -66,7 +65,6 @@ class NodeModelItem(BaseModel):
         "frozen": True,  
     }
 
-
 class ModelConfig(BaseModel):
     """模型配置主对象。
 
@@ -82,13 +80,18 @@ class ModelConfig(BaseModel):
     
     @cached_property
     def node_to_model_name(self) -> Dict[str, str]:
-        """节点名到模型别名映射（必有）。"""
+        """节点名到模型名映射。"""
         return {item.node_name: item.model_name for item in self.nodes_config}
 
     @cached_property
     def node_to_base_url(self) -> Dict[str, str]:
         """key到模型服务地址映射（必有）。"""
         return {item.node_name: item.base_url for item in self.nodes_config}
+
+    @cached_property
+    def node_to_api_key(self) -> Dict[str, str]:
+        """节点名到模型服务密钥映射。"""
+        return {item.node_name: item.api_key for item in self.nodes_config}
 
     @cached_property
     def node_to_config(self) -> Dict[str, Dict[str, Any]]:
@@ -105,11 +108,15 @@ class ModelConfig(BaseModel):
             return self.node_to_base_url.get("default")
         return self.node_to_base_url.get(key)
 
+    def get_api_key(self, key: str|None=None) -> Optional[str]:
+        if key not in self.node_to_api_key or key is None:
+            return self.node_to_api_key.get("default")
+        return self.node_to_api_key.get(key)
+
     def get_config(self, key: str|None=None) -> Dict[str, Any]:
         if key not in self.node_to_config or key is None:
             return self.node_to_config.get("default", {})
         return self.node_to_config.get(key, {})
-
 
 class ModelConfigLoader(ConfigLoader):
     """模型配置加载器。
@@ -118,11 +125,9 @@ class ModelConfigLoader(ConfigLoader):
     若存在除节点对象之外的其他顶层键（例如别的配置来源），本加载器将忽略之。
     """
 
-    def load_config(self, filename: Optional[str] = None) -> ModelConfig:
-        if not filename:
-            filename = "model_config"
+    def load_config(self) -> ModelConfig:
 
-        file_path = self._get_config_file_path(filename)
+        file_path = self._get_config_file_path(filename="model_config")
         try:
             raw = self._load_yaml_file(file_path) or {}
 
@@ -151,27 +156,11 @@ class ModelConfigLoader(ConfigLoader):
             raise LoadError(f"创建模型配置对象失败: {e}")
 
 
-def load_default_model_config() -> ModelConfig:
-    loader = get_global_model_config_loader()
-    return loader.load_config()
-
-
 # 全局配置加载器实例
-_global_model_config_loader: Optional[ModelConfigLoader] = None
 
-
-def get_global_model_config_loader(config_dir: Optional[str] = None) -> ModelConfigLoader:
-    """获取全局模型配置加载器实例。"""
-    global _global_model_config_loader
-    if _global_model_config_loader is None:
-        _global_model_config_loader = ModelConfigLoader(config_dir)
-    return _global_model_config_loader
+global_model_config= ModelConfigLoader().load_config()
 
 
 __all__ = [
-    "NodeModelItem",
-    "ModelConfig",
-    "ModelConfigLoader",
-    "load_default_model_config",
-    "get_global_model_config_loader",
+    "global_model_config",
 ]

@@ -27,3 +27,7 @@ def node(
         )
         return func
     return _decorator
+
+__all__ = [
+    "node",
+]

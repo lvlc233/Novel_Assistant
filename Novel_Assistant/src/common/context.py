@@ -3,7 +3,6 @@ from dataclasses_json import dataclass_json, config
 from typing import List
 from langchain_core.messages import AnyMessage
 from common.memory import BaseMemory
-from common.KD import KD
 from common.prompts import Context_to_System_Prompt
 
 
@@ -53,7 +52,7 @@ class Context():
             缓存:提供检索的实际文档,并且考虑到跨会话需求,缓存建立在整个程序的启动到结束的生命周期里
     """
     # AIMessages中
-    knowledge_data:str|KD|None = None
+    knowledge_data:str|None = None
     """
     元数据
     """

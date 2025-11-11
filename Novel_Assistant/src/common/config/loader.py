@@ -3,8 +3,6 @@
 
 提供YAML配置文件的加载
 """
-import logging
-from tkinter import N
 import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -28,12 +26,10 @@ class ConfigLoader:
             config_dir: 配置文件目录，默认为项目根目录下的config文件夹
         """
         if config_dir is None:
-            # 默认配置目录：项目根目录/config
             project_root = Path(__file__).parent.parent.parent.parent
-            config_dir = project_root / "config"
+            config_dir = project_root / "src"/"config"
         
         self.config_dir = Path(config_dir)
-        print
         # 确保配置目录存在
         if not self.config_dir.exists():
             raise LoadError(f"配置目录不存在: {self.config_dir}")
@@ -60,7 +56,7 @@ class ConfigLoader:
         except Exception as e:
             raise LoadError(f"加载配置文件失败: path={file_path}, type={type(e).__name__}, err={e}")
     
-    def load_config(self,  filename: str|None = None) -> Any:...
+    def load_config(self) -> Any:...
 
     def validate_config_file(self, filename: str|None ) -> bool:
         """验证配置文件格式是否正确

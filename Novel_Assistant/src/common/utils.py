@@ -5,8 +5,7 @@ from typing import Union
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_qwq import ChatQwen, ChatQwQ
-
+from common.config.agent.model_configs import global_model_config
 
 def normalize_region(region: str) -> str | None:
     """Normalize region aliases to standard values.
@@ -57,30 +56,27 @@ def get_message_text(msg: BaseMessage) -> str:
 
 
 def load_chat_model(
-    fully_specified_name: str,
-) -> Union[BaseChatModel, ChatQwQ, ChatQwen]:
-    """Load a chat model from a fully specified name.
+    node_name: str|None = None,
+) -> Union[BaseChatModel]:
+    """Load a chat model from a model name.
 
     Args:
-        fully_specified_name (str): String in the format 'provider:model'.
+        model_name (str): String in the format 'provider:model'.
     """
-    provider, model = fully_specified_name.split(":", maxsplit=1)
-    provider_lower = provider.lower()
+    if not node_name or node_name not in [k.node_name for k in global_model_config.nodes_config]:
+        node_name = "default"
+    model_name = global_model_config.get_model_name(node_name)
+    api_key = global_model_config.get_api_key(node_name)
+    base_url = global_model_config.get_base_url(node_name)
+    config = global_model_config.get_config(node_name)
 
-    # Handle Qwen models specially with dashscope integration
-    if provider_lower == "qwen":
-        from .models import create_qwen_model
-
-        return create_qwen_model(model)
-
-    # Handle SiliconFlow models
-    if provider_lower == "siliconflow":
-        from .models import create_siliconflow_model
-
-        return create_siliconflow_model(model)
-
-    # Use standard langchain initialization for other providers
-    return init_chat_model(model, model_provider=provider)
+    return init_chat_model(
+        model=model_name,
+        model_provider="openai",
+        api_key=api_key,
+        base_url=base_url,
+        **config,
+    )
 
 
 def messages_to_plain(messages: list[BaseMessage]) -> SystemMessage:
