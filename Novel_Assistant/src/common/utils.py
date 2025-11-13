@@ -145,7 +145,35 @@ def get_run_id_for_node(kwargs: dict):
         parent_run_id = "None"
     return current_run_id, parent_run_id
 
+from typing import Any, Mapping
+from dataclasses import is_dataclass, asdict
 
+def _safe_to_dict(obj: Any) -> dict:
+    if obj is None:
+        return {}
+    # Pydantic v2
+    if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
+        try:
+            return obj.model_dump()
+        except Exception:
+            pass
+    # Pydantic v1
+    if hasattr(obj, "dict") and callable(getattr(obj, "dict")):
+        try:
+            return obj.dict()
+        except Exception:
+            pass
+    # 映射
+    if isinstance(obj, Mapping):
+        return dict(obj)
+    # dataclass
+    if is_dataclass(obj):
+        return asdict(obj)
+    # 普通对象
+    if hasattr(obj, "__dict__"):
+        return dict(obj.__dict__)
+    # 兜底：转字符串
+    return {"value": str(obj)}
 """
 基于RecursiveCharacterTextSplitter的章节文档切割器
 支持按章节格式切割文档，并保留章节信息和行号

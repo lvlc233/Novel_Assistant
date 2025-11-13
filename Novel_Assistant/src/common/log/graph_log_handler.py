@@ -4,14 +4,15 @@
 """
 
 import json
+import copy
 from typing import cast
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.load import dumpd
 from langchain_core.messages import AIMessage
 
-from common.config.log.log import graph_logger, llm_logger
-from common.utils import get_run_id_for_node, pick_msg_fields, value_colour_for_dict
+from common.log.log import graph_logger, llm_logger
+from common.utils import get_run_id_for_node, pick_msg_fields, value_colour_for_dict,_safe_to_dict
 
 
 class NodeLogHandler(BaseCallbackHandler):
@@ -31,22 +32,33 @@ class NodeLogHandler(BaseCallbackHandler):
 
         # 以下处理的原因是防止系统状态被修改
         # 获取其他状态
-        other_state = {k: v for k, v in inputs.__dict__.items() if k != "messages"}
-        # 对other_state中的内容上色
-        other_state = value_colour_for_dict(other_state, colour="green")
+        state_dict = _safe_to_dict(inputs)
+        other_state = {k: v for k, v in state_dict.items() if k != "messages"}
+        # 对 other_state 进行深拷贝后上色，避免修改原始对象
+        other_state_colored = value_colour_for_dict(copy.deepcopy(other_state), colour="green")
 
-        messages = [
-            pick_msg_fields(
-                dumpd(m).get("kwargs"), content="content", type="type", id="id"
-            )
-            for m in inputs.messages
-        ]
-        # 对messages中的内容上色
-        for msg in messages:
-            msg = value_colour_for_dict(msg, colour="green")
+        # 安全构造 messages：先判断 inputs 是否包含消息并且消息有效
+        messages = []
+        if getattr(inputs, "messages", None):
+            for m in inputs.messages:
+                data = dumpd(m)
+                kw = data.get("kwargs")
+                # 判断 message 是否存在且为字典
+                if not kw or not isinstance(kw, dict):
+                    continue
+                msg = pick_msg_fields(kw, content="content", type="type", id="id")
+                if not msg:
+                    continue
+                messages.append(msg)
+        # 对 messages 中的内容上色（保持原有行为）
+        for i, msg in enumerate(messages):
+            messages[i] = value_colour_for_dict(msg, colour="green")
 
         # 合并字典，确保messages在第一条
-        merged_state = {"messages": messages} | other_state
+        if messages:
+            merged_state = {"messages": messages} | other_state_colored
+        else:
+            merged_state = other_state_colored
 
         graph_logger.opt(ansi=True).info(f"""
     <bold><bg green>START NODE:</bg green></bold>
@@ -66,26 +78,33 @@ class NodeLogHandler(BaseCallbackHandler):
         # 获取run id
         current_run_id, parent_run_id = get_run_id_for_node(kwargs)
         # 过滤信息,注意,节点的输入和输出不太一样,所以需要额外处理一步,差异在output的结果并不是全部的状态,或可在graph中仅仅传State,但是这样子就必须维护超步问题
-        other_state = {k: v for k, v in outputs.items() if k != "messages"}
-        if other_state:
-            other_state = value_colour_for_dict(other_state, colour="green")
+        state_dict = _safe_to_dict(outputs)
+        other_state = {k: v for k, v in state_dict.items() if k != "messages"}
+        # 深拷贝后上色，避免改写输出状态
+        other_state_colored = value_colour_for_dict(copy.deepcopy(other_state), colour="green") if other_state else {}
 
-        # 处理messages
-        messages = {k: v for k, v in outputs.items() if k == "messages"}
+        # 安全构造 messages：先判断 inputs 是否包含消息并且消息有效
+        messages = []
+        if getattr(outputs, "messages", None):
+            for m in outputs.messages:
+                data = dumpd(m)
+                kw = data.get("kwargs")
+                # 判断 message 是否存在且为字典
+                if not kw or not isinstance(kw, dict):
+                    continue
+                msg = pick_msg_fields(kw, content="content", type="type", id="id")
+                if not msg:
+                    continue
+                messages.append(msg)
+        # 对 messages 中的内容上色（保持原有行为）
+        for i, msg in enumerate(messages):
+            messages[i] = value_colour_for_dict(msg, colour="green")
+
+        # 合并字典，确保messages在第一条
         if messages:
-            messages = [
-                pick_msg_fields(
-                    dumpd(m).get("kwargs"), content="content", type="type", id="id"
-                )
-                for m in messages["messages"]
-            ]
-        # 对messages中的内容上色
-        for msg in messages:
-            msg = value_colour_for_dict(msg, colour="green")
-        if messages:
-            merged_state = {"messages": messages} | other_state
+            merged_state = {"messages": messages} | other_state_colored
         else:
-            merged_state = other_state
+            merged_state = other_state_colored
         graph_logger.opt(ansi=True).info(f"""
     <bold><bg white>NODE END:</bg white></bold>
         <bold>RUN ID:</bold> {current_run_id}
@@ -107,7 +126,7 @@ class LLMLogHandler(BaseCallbackHandler):
         provider = kwargs["metadata"]["ls_provider"]
         model_name = kwargs["metadata"]["ls_model_name"]
         invoke_params = value_colour_for_dict(
-            kwargs["invocation_params"], colour="green"
+            copy.deepcopy(kwargs["invocation_params"]), colour="green"
         )
         llm_logger.opt(ansi=True).info(f"""
     <bold><bg green>LLM INVOKE:</bg green></bold>
@@ -130,9 +149,8 @@ class LLMLogHandler(BaseCallbackHandler):
         model_name = output_message.response_metadata["model_name"]
         content = output_message.content
         additional_kwargs = output_message.additional_kwargs
-        additional_kwargs = value_colour_for_dict(additional_kwargs, colour="green")
-        token_usage = outputs.llm_output["token_usage"]
-        token_usage = value_colour_for_dict(token_usage, colour="green")
+        additional_kwargs = value_colour_for_dict(copy.deepcopy(additional_kwargs), colour="green")
+        token_usage = value_colour_for_dict(copy.deepcopy(outputs.llm_output["token_usage"]), colour="green")
         graph_logger.opt(ansi=True).info(f"""
     <bold><bg white>LLM END:</bg white></bold>
         <bold>RUN ID:</bold> <green>{run_id}</green>
