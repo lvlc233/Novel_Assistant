@@ -162,3 +162,8 @@ cython_debug/
 #.idea/
 uv.lock
 .langgraph_api/
+
+
+*.db
+*.jsonl
+*.gz
