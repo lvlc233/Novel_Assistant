@@ -5,6 +5,22 @@ from memory import SemanticMemory
 from neo4j import GraphDatabase
 from dataclasses import dataclass, field
 
+
+
+
+
+
+
+from typing import Protocol
+
+# 无需继承，结构匹配即可
+class Logger(Protocol):
+    def log(self, message: str) -> None: ...
+
+
+
+
+
 class Model(Enum):
     SAVE   = "save"
     GET    = "get"
@@ -17,7 +33,7 @@ T = TypeVar("T")
 class Table(ABC):
     """每张关系表只负责拼 DDL 与字段清单"""
     name: str
-    columns: Dict[str, str]          # 列名 -> SQL 类型
+    columns: Dict[str, str]          
 
 # 长期记忆
 class LongTermMemoryTable(Table):
@@ -175,6 +191,8 @@ from typing import Any, List, Optional, Dict
 import psycopg
 from psycopg import sql
 
+
+
 class PgClient(RelationalClient):
     def __init__(self, conn_str: str = "postgresql://user:password@localhost:5432/memdb"):
         # psycopg 3 支持“连接池”式写法，也可直接给 dsn
@@ -276,10 +294,6 @@ class PgClient(RelationalClient):
                 )
                 self.conn.commit()
             return True
-
-
-
-
 @dataclass
 class KGEntity:
     id:str=field(metadata={"description":"全局唯一id"})

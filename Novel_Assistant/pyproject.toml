@@ -16,6 +16,7 @@ dependencies = [
     "loguru>=0.7.3",
     "neo4j>=5.28.2",
     "python-dotenv>=1.0.1",
+    "sqlmodel>=0.0.27",
 ]
 
 

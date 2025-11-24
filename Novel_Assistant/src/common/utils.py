@@ -5,7 +5,7 @@ from typing import Union
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from common.config.agent.model_configs import global_model_config
+from common.configer.agent.model_configs import global_model_config
 
 def normalize_region(region: str) -> str | None:
     """Normalize region aliases to standard values.
