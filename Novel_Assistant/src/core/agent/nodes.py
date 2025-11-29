@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage
 from langgraph.types import Send
 from core.agent.state import KDBuildState, Allocation
-from core.agent.prompts import (ATTENTION_READ_PROMPT,
+from core.agent.llm.prompts import (ATTENTION_READ_PROMPT,
                                 ATOM_SUBMIT_PROMPT,
                                 DEPENDENCE_SUBMIT_PROMPT,
                                 COMPLETE_KD_PROMPT,

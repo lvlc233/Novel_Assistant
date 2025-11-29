@@ -1,17 +1,12 @@
-"""Chat router for handling conversation endpoints."""
 from typing import Dict,List
 
 from fastapi import APIRouter
 from langchain_core.messages import AIMessage
 
 from api.models import SendQueryToChatHelperRequest, Response
+router = APIRouter(tags=[""])
 
-router = APIRouter(tags=["chat"])
-# 后面用redis来做缓存
-session_cache: Dict[str, List[str]] = {}
-
-
-@router.post("/sendMessage", response_model_by_alias=True)
+@router.post("/get", response_model_by_alias=True)
 async def send_message(request: SendQueryToChatHelperRequest):
     """发送消息 - 简化版本，返回基础响应"""
     # 模拟AI响应
@@ -22,6 +17,3 @@ async def send_message(request: SendQueryToChatHelperRequest):
         "timestamp": ai_message.timestamp if hasattr(ai_message, 'timestamp') else None,
         "session_id": "default_session"
     })
-
-
-

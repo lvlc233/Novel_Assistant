@@ -1,15 +1,17 @@
-from dataclasses import dataclass, field
-from dataclasses_json import dataclass_json, config
+from pydantic import BaseModel,Field
 from typing import List
 from langchain_core.messages import AnyMessage
 from common.memory import BaseMemory
-from common.prompts import Context_to_System_Prompt
 
 
 
-@dataclass_json
-@dataclass
-class Context():
+class BaseRuntimeContext(BaseModel):
+    session_id:str = Field(description="会话ID")
+    
+    
+    
+
+class Context(BaseModel):
     """
         上下文类,用于存储Agent的运行时上下文信息
         上下文信息包括:

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(curl -s http://localhost:8000/chat/api/v1/health)",
+      "Bash(python:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(npm run:*)",
+      "Bash(npx next dev:*)",
+      "Bash(langgraph dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

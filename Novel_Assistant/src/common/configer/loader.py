@@ -27,7 +27,7 @@ class ConfigLoader:
         """
         if config_dir is None:
             project_root = Path(__file__).parent.parent.parent.parent
-            config_dir = project_root / "src"/"config"
+            config_dir = project_root / "src" / ".config"
         
         self.config_dir = Path(config_dir)
         # 确保配置目录存在

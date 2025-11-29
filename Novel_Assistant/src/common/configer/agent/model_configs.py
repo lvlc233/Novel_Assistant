@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 from ..loader import ConfigLoader, LoadError
 
 class NodeModelItem(BaseModel):
+    
     """单个节点的模型配置。
 
     必填：

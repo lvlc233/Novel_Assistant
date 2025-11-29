@@ -9,14 +9,17 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.17.2",
+    "asyncpg>=0.31.0",
     "fastapi>=0.121.2",
     "langchain-qwq>=0.2.1",
     "langgraph-cli[inmem]>=0.4.7",
     "langgraph[itme]>=0.2.6",
     "loguru>=0.7.3",
     "neo4j>=5.28.2",
+    "psycopg2-binary>=2.9.11",
     "python-dotenv>=1.0.1",
-    "sqlmodel>=0.0.27",
+    "sqlmodel[asyncio]>=0.0.27",
 ]
 
 

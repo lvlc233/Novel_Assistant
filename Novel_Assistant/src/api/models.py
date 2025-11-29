@@ -1,25 +1,13 @@
 """API模型"""
-
-from datetime import datetime
 from typing import Any, TypeVar, Generic
 from enum import Enum
 
-from langchain_core.messages import AIMessage,HumanMessage
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from uuid import uuid4
-
-
-# 将 snake_case 字段名转换为 camelCase，用于 JSON 序列化别名
-def to_camel(s: str) -> str:
-    parts = s.split("_")
-    return parts[0] + "".join(w.capitalize() for w in parts[1:])
-
 
 class ApiBaseModel(BaseModel):
     """统一的 API 基类，开启驼峰别名输出与按名称填充。"""
 
     model_config = ConfigDict(
-        alias_generator=to_camel,
         populate_by_name=True,
     )
 
@@ -43,6 +31,25 @@ class CodeEnum(Enum):
     @property
     def message(self) -> str:
         return self._message
+"""
+    小说相关
+"""
+class CreateNovelRequest(BaseModel):
+    """小说信息"""
+    user_id: str = Field(..., description="用户ID")
+    name: str|None = Field(default=None, description="小说名称")
+    summary: str|None = Field(default=None, description="小说简介")
+
+
+class GetNovelListRequest(BaseModel):
+    """获取小说列表请求"""
+    user_id: str = Field(..., description="用户ID")
+
+
+class SendQueryToChatHelperRequest(ApiBaseModel):
+    """发送查询到聊天助手请求模型"""
+    query: str = Field(..., description="用户发送的信息")
+
 
 T = TypeVar("T")
 class Response(ApiBaseModel, Generic[T]):
