@@ -1,18 +1,13 @@
 """FastAPI application for ufan_agent."""
 from contextlib import asynccontextmanager
 from sqlmodel import SQLModel
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import user_api, document_api
+from api.routers import user_api, novel_api,document_api
 from api.error_handler import register_exception_handlers
-
 from common.clients.pg.pg_client import engine
 import logging
-import os
-from dotenv import load_dotenv
-
 
 
 async def init_db():
@@ -27,7 +22,6 @@ async def init_db():
 async def lifespan(app: FastAPI):
     await init_db()
     
-    load_dotenv("../.config/.env")
     logging.info("数据库初始化完成")
 
     yield
@@ -56,6 +50,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(user_api.router, prefix="/user")
+    app.include_router(novel_api.router,prefix="/novel")
     app.include_router(document_api.router,prefix="/document")
 
     # Register global exception handlers
