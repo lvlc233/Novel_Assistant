@@ -25,7 +25,7 @@ if __name__ == "__main__":
         app="api.app:app",
         host="127.0.0.1",
         port=8001,
-        reload=False,
+        reload=True,
         log_level="info"
     )
     print("Uvicorn server exited.")

@@ -115,3 +115,116 @@ src
 
 **忘记更新这里了xixi**
 
+
+
+### 
+补充：domain叫domain只是我的个人习惯，如果有和您学到的domain有差距，此处仅表示下文的概念，仅供参考
+
+```markdown
+src/
+├── api/                       # web的api层
+│   ├── routers/               # 各个web接口 
+│   ├── services/              # 服务层
+│   └── models.py              # web数据模型
+├── common/                    # 通用层
+│   ├── adapter/               # 适配器 
+│   ├── clients/               # 客户端
+|   |   └── xxx/               # 例如java...
+|   |      ├── xxx_client.py   # 实际客户端
+|   |      └── xxx_models.py   # 该客户端的数据模型
+|   ├── utils.py               # 工具
+├── core/                      # 核心内容:主要是Agent
+|   ├── agent/                 # agent
+|   |   ├── llm/               # LLM相关
+|   |   |  ├── prompts.py      # 提示词
+|   |   |  └── struct_models   #结构化输出结构
+|   |   ├── grpah.py           # 图结构
+|   |   ├── nodes.py           # 实际节点
+|   |   ├── runtime_context.py # 图的运行时上下文结构
+|   |   └── state.py           # 图的运行时状态
+|   └── domain/                # 通用的领域
+|       └── models.py          # 领域模型
+```
+
+我们看到模型被分在个各个层次中，如此的考虑是想到了每个业务逻辑，API、 LLM还是Graph，都可以看作是数据的输入输出。
+
+例如：context(prompts)→llm→struct_model (只是一个例子，甚至在该层中加入tool也是可以的。)
+
+而各个层之间的数据模型的转换则通过domain作为中介。使用common中的adapter适配器进行domain模型到层次模型的转换和从层次模型到domain模型的转换。
+
+这样子的好处有三点。
+
+1. 层次分明。不同的层只需要维护好各自层的数据模型即可。
+2. 便于维护和管理。一方面在使用的时候，对于某个层来说，其他层的数据模型是无感知的。对于该层来说，只需要导入相关的适配器即可。另外一方面，若数据模型存在变动，在adapter中就可以找到了
+3. 扩展容易。只需要在适配器中补充相关的转换即可。
+
+在上述的结构中
+
+domain是：src\core\domain\models.py
+
+api层：        src\api\models.py [Request、Response]
+
+client层:       src\clients\xxx\xxx_models.py [Request、Response]
+
+llm层：        src\core\agent\llm\[prompts、struct_models]
+
+graph层：   src\core\agent\[runtime_context、state]
+
+至于runtime_context和state，请参考 ***Context 还是 Stat***e
+
+### 数据库读写分离
+- **读操作 (Query)**：为了性能和数据一致性，推荐在 Client 层（如 `PGClient`）封装复杂的聚合查询（使用 JOIN 或 ORM 关系加载），尽量减少上层调用的次数（避免 N+1 问题）。
+- **写操作 (Command)**：为了实现灵活的事务控制，Client 层只提供原子操作（如 `add`、`flush`），**不要在 Client 方法内部调用 `commit`**。由上层 Service/Router 开启事务，调用多个 Client 方法后，统一进行 `commit` 或异常时的 `rollback`。
+
+每一层之间尽量保持干净,即接口参数尽量不要使用非该层的数据模型据模型。
+数据模型尽量在对应的层中封装
+例: 其中`UserEntity`属于`client layer`
+正确的做法 √
+```python
+# in service layer
+async def login4services(name: str, password: str,session: AsyncSession = Depends(get_session)) -> str|None:
+    """用户登录"""
+    pg_client = PGClient(session)
+    try:
+        user = await pg_client.user_login(name, passwd_hash(password))
+        return user.id
+    except Exception as e:
+        logging.error(f"登录用户失败: {e}")
+        raise
+# in clients layer
+async def user_login(self, name: str, password: str) -> UserEntity:
+    """用户登录"""
+    statement = select(UserEntity).where(UserEntity.name == name, UserEntity.password == password)
+    result = await self.session.execute(statement)
+    user :UserEntity|None = result.scalars().first()
+    if user is None:
+        raise UserLoginError(name, password)
+    return user
+```
+错误的做法 x
+```python
+# in services layer
+async def login4services(name: str, password: str,session: AsyncSession) -> str|None:
+    """用户登录"""
+    pg_client = PGClient(session)
+    try:
+        user=UserEntity(name=name, password=passwd_hash(password))
+        user = await pg_client.user_login(user)
+        return user.id
+    except Exception as e:
+        logging.error(f"登录用户失败: {e}")
+        raise
+# in clients layer
+async def user_login(self, user: UserEntity) -> UserEntity:
+    """用户登录"""
+    statement = select(UserEntity).where(UserEntity.name == user.name, UserEntity.password == user.password)
+    result = await self.session.execute(statement)
+    user :UserEntity|None = result.scalars().first()
+    if user is None:
+        raise UserLoginError(user.name, user.password)
+    return user
+```
+
+并且 `client`应该尽量完整的返回结果，而不是只返回必要的信息。信息的提取交给`service`层决定。并交给`API`层进行数据转换。
+
+如果是测试的话就尽量在API层一次性完成。

@@ -2,14 +2,17 @@
 from contextlib import asynccontextmanager
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import chat, health, websocket, document
-from .error import register_exception_handlers
+from api.routers import user_api, document_api
+from api.error_handler import register_exception_handlers
 
 from common.clients.pg.pg_client import engine
 import logging
+import os
+from dotenv import load_dotenv
+
 
 
 async def init_db():
@@ -23,7 +26,10 @@ async def init_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    
+    load_dotenv("../.config/.env")
     logging.info("数据库初始化完成")
+
     yield
     await engine.dispose()
     logging.info("数据库连接关闭")
@@ -43,18 +49,14 @@ def create_app() -> FastAPI:
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 在生产环境中应该配置具体的域名
+        allow_origins=["*"],  
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # Include routers
-    # app.include_router(health.router, prefix="/chat/api/v1")
-    # app.include_router(chat.router, prefix="/chat/api/v1")
-    app.include_router(websocket.router, prefix="/chat/api/v1")
-
-    app.include_router(document.router,prefix="/document")
+    app.include_router(user_api.router, prefix="/user")
+    app.include_router(document_api.router,prefix="/document")
 
     # Register global exception handlers
     register_exception_handlers(app)

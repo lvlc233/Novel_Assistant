@@ -1,12 +1,55 @@
 """Utility & helper functions."""
 
 from typing import Union
+import uuid
 
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from common.configer.agent.model_configs import global_model_config
 
+"""
+    通用工具函数
+"""
+def create_uuid() -> str:
+    """创建一个 UUID 字符串。"""
+    return uuid.uuid4().hex
+def passwd_hash(password: str) -> str:
+    """密码哈希"""
+    import hashlib
+    import secrets
+
+    # 生成随机盐
+    salt = secrets.token_hex(16)
+    # 使用SHA-256进行哈希
+    pwd_hash = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+    # 返回盐和哈希值的组合
+    return f"{salt}${pwd_hash}"
+
+def passwd_verify(password: str, hashed_password: str) -> bool:
+    """验证密码
+
+    Args:
+        password: 明文密码
+        hashed_password: 存储的哈希密码 (格式: salt$hash)
+
+    Returns:
+        bool: 密码是否匹配
+    """
+    import hashlib
+
+    try:
+        # 分离盐和哈希值
+        salt, stored_hash = hashed_password.split('$', 1)
+        # 重新计算哈希
+        pwd_hash = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+        # 比较哈希值
+        return pwd_hash == stored_hash
+    except ValueError:
+        # 如果格式不正确，返回False
+        return False 
+
+""""""
 def normalize_region(region: str) -> str | None:
     """Normalize region aliases to standard values.
 
