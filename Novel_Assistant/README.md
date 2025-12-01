@@ -228,3 +228,4 @@ async def user_login(self, user: UserEntity) -> UserEntity:
 并且 `client`应该尽量完整的返回结果，而不是只返回必要的信息。信息的提取交给`service`层决定。并交给`API`层进行数据转换。
 
 如果是测试的话就尽量在API层一次性完成。
+

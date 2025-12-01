@@ -23,9 +23,9 @@ class FolderEntity(BaseModel):
 
 class NovelState(str, Enum):
     """小说状态."""
-    UPDATING = "更新中"
-    COMPLETED = "已完结"
-    DELETED = "已删除"
+    UPDATING = "UPDATING"
+    COMPLETED = "COMPLETED"
+    DELETED = "DELETED"
 
 class NovelDomain(BaseModel):
     """小说."""
@@ -37,5 +37,5 @@ class NovelDomain(BaseModel):
     state: NovelState = Field(description="小说状态")
     create_time: str = Field(description="创建时间")
     update_time: str = Field(description="最新更新时间")
-    hiatus_interval: str = Field(description="断更间隔时间,单位为天")
+    hiatus_interval: int = Field(description="断更间隔时间,单位为天")
     table_of_contents: List[Union[FolderEntity, TableOfContentsEntity]] = Field(description="小说目录")

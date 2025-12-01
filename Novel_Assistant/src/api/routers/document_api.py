@@ -4,11 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.models import (
     CreateNovelRequest, 
     GetNovelListRequest, 
-    Response
+    Response,
+    NovelIdResponse
 )
-from common.clients.pg.pg_client import PGClient, get_session
-from common.clients.pg.pg_models import NovelSQLEntity
-from common.err import NovelNotFoundError
+from common.clients.pg.pg_client import get_session
+
+
+from common.adapter.novel import NovelAdapter
 from api.services.document_service import (
     create_novel4service,
     get_novel_existing_list4service
@@ -21,7 +23,7 @@ async def debug_router():
     return {"status": "document router registered", "message": "pong"}
 
 @router.post("/create_novel")
-async def create_novel(request: CreateNovelRequest, session: AsyncSession = Depends(get_session)):
+async def create_novel(request: CreateNovelRequest, session: AsyncSession = Depends(get_session))->Response[str]:
     """创建小说"""
     
     novel_id = await create_novel4service(request.user_id, request.name, request.summary, session)
@@ -29,22 +31,8 @@ async def create_novel(request: CreateNovelRequest, session: AsyncSession = Depe
 
 
 @router.post("/get_novels")
-async def get_novels4api(request: GetNovelListRequest, session: AsyncSession = Depends(get_session)):
+async def get_novels4api(request: GetNovelListRequest, session: AsyncSession = Depends(get_session))->Response[List[NovelIdResponse]]:
     """获取所有小说"""
     novels = await get_novel_existing_list4service(request.user_id, session)
+    novels = [NovelAdapter.from_domain(novel) for novel in novels]
     return Response.ok(data=novels)
-
-
-@router.get("/novel/{novel_id}", response_model=Response[NovelSQLEntity])
-async def get_novel(novel_id: str, session: AsyncSession = Depends(get_session)):
-    """获取小说详情"""
-    pg_client = PGClient(session)
-    exist = await pg_client.check_novel_exist(novel_id)
-    if not exist:
-        raise NovelNotFoundError(novel_id)
-    novel = await pg_client.get_novel_details(novel_id)
-    if not novel:
-        raise NovelNotFoundError(novel_id)
-
-    return Response.ok(data=novel)
-

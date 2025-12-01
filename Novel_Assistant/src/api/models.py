@@ -40,7 +40,20 @@ class SendQueryToChatHelperRequest(BaseRequest):
 
 class UserIdResponse(BaseModel):
     """用户ID"""
-    user_id: str = Field(..., description="用户ID") 
+    user_id: str = Field(..., description="用户ID")
+
+class NovelIdResponse(BaseModel):
+    """小说ID"""
+    novel_id: str = Field(..., description="小说ID")
+    novel_name: str = Field(..., description="小说名称")
+    image_url: str|None = Field(default=None, description="小说封面URL")
+    summary: str|None = Field(default=None, description="小说简介")
+    state: str = Field(..., description="小说状态")
+    create_time: str = Field(..., description="创建时间")
+    update_time: str = Field(..., description="更新时间")
+    hiatus_interval: int = Field(..., description="上次更新时间间隔（天）")
+  
+
 T = TypeVar("T")
 class Response(BaseModel, Generic[T]):
     """统一响应模型（支持泛型），可用作 Response[InitSessionData] 等"""

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime,timezone
 from common.utils import create_uuid 
 from sqlmodel import Field, SQLModel
 
@@ -15,6 +15,9 @@ class DocumentSQLEntity(SQLModel, table=True):
     current_version_id: str = Field(default_factory=lambda: create_uuid(),description="当前版本")      
     is_remove: bool = Field(default=False,description="是否删除")
 
+    novel_id: str = Field(description="小说ID")
+    folder_id: str|None = Field(default=None,description="文件夹ID")
+
 class DocumentVersionSQLEntity(SQLModel, table=True):
     """
         文档版本.
@@ -25,8 +28,12 @@ class DocumentVersionSQLEntity(SQLModel, table=True):
     parent_version_id: str|None = Field(default_factory=lambda: create_uuid(),description="父版本ID")
     doc_id: str = Field(description="文档ID")
     body_text: str|None = Field(default=None,description="正文")
-    create_time: datetime = Field(default_factory=datetime.now,description="创建时间")
-    update_time: datetime = Field(default_factory=datetime.now,description="更新时间")
+    create_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),description="创建时间")
+    update_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),description="更新时间")
+
+    
+    novel_id: str = Field(description="小说ID")
+    folder_id: str|None = Field(default=None,description="文件夹ID")
 
 class NovelSQLEntity(SQLModel, table=True):
     """
@@ -39,9 +46,9 @@ class NovelSQLEntity(SQLModel, table=True):
     name: str = Field(default="未命名小说",description="小说名称")
     image_url: str = Field(default="",description="小说封面URL")
     description: str = Field(default="",description="小说描述")
-    state: str = Field(default="draft",description="小说状态")
-    create_time: datetime = Field(default_factory=datetime.now,description="创建时间")
-    update_time: datetime = Field(default_factory=datetime.now,description="更新时间")
+    state: str = Field(default="UPDATING",description="小说状态")
+    create_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),description="创建时间")
+    update_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),description="更新时间")
     is_remove: bool = Field(default=False,description="是否删除")
 
 class FolderSQLEntity(SQLModel, table=True):
@@ -53,7 +60,7 @@ class FolderSQLEntity(SQLModel, table=True):
     folder_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="文件夹ID")
     novel_id: str = Field(description="小说ID")
     name: str = Field(default="未命名文件夹",description="文件夹名称")
-    create_time: datetime = Field(default_factory=datetime.now,description="创建时间")
+    create_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),description="创建时间")
 
 class TreeSortSQLEntity(SQLModel, table=True):
     """
