@@ -1,7 +1,8 @@
 """Utility & helper functions."""
-
-from typing import Union
 import uuid
+from datetime import datetime
+from typing import Union
+
 
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
@@ -49,6 +50,12 @@ def passwd_verify(password: str, hashed_password: str) -> bool:
         # 如果格式不正确，返回False
         return False 
 
+def get_now_time() -> datetime:
+    """获取当前时间"""
+    return datetime.now().replace(tzinfo=None)
+def format_time(time: datetime) -> str:
+    """格式化时间"""
+    return time.strftime("%Y-%m-%d %H:%M:%S")
 """"""
 def normalize_region(region: str) -> str | None:
     """Normalize region aliases to standard values.

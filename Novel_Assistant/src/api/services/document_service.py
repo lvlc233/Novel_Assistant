@@ -17,9 +17,15 @@ from common.err import (
 from common.adapter.novel import (
     NovelAdapter, 
     FolderAdapter, 
-    TableOfContentsEntityAdapter
+    TableOfContentsEntityAdapter,
+    DocumentAdapter
 )    
-from core.domain.models import NovelDomain, FolderEntity, TableOfContentsEntity
+from core.domain.models import (
+    NovelDomain, 
+    FolderEntity, 
+    TableOfContentsEntity,
+    DocumentDomain
+)
 from typing import Union
 
 async def create_novel4service(user_id: str, name: str, summary: str, session: AsyncSession) -> str:
@@ -125,3 +131,33 @@ async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> Nove
         raise e
 
 
+async def create_chapter4service(
+    *,
+    session: AsyncSession,
+    user_id: str, 
+    novel_id: str, 
+    folder_id: str|None=None
+) -> DocumentDomain:
+    """创建章节"""
+    pg_client = PGClient(session)
+    try:
+        if not await pg_client.check_user_exist_by_id(user_id):
+            raise UserNotFoundError(f"用户ID {user_id} 不存在")
+        chapter : DocumentSQLEntity= await pg_client.create_novel_document(user_id, novel_id, folder_id)
+        version : DocumentVersionSQLEntity= await pg_client.create_novel_document_version(
+            version_id=chapter.current_version_id,
+            doc_id=chapter.doc_id,
+            novel_id=novel_id,
+            folder_id=folder_id,
+        )
+        if folder_id:
+            await pg_client.add_document_to_folder(novel_id, folder_id, chapter.doc_id)
+        await session.commit()
+        await session.refresh(chapter)
+        await session.refresh(version)
+        document_domain = DocumentAdapter.to_domain(chapter, [version])
+        return document_domain
+    except Exception as e:
+        logging.error(f"创建章节失败: {e}")
+        await session.rollback()
+        raise e

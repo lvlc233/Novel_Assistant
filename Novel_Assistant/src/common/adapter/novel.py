@@ -1,18 +1,34 @@
-from datetime import datetime,timezone
+
 from typing import List,Union
+from common.utils import get_now_time
 from common.clients.pg.pg_models import (
     NovelSQLEntity, 
     FolderSQLEntity,
     DocumentVersionSQLEntity,
     DocumentSQLEntity
 )
-from core.domain.models import NovelDomain,FolderEntity,TableOfContentsEntity
+from core.domain.models import (
+    NovelDomain,
+    FolderEntity,
+    TableOfContentsEntity,
+    DocumentDomain,
+    DocumentVersionEntity,
+)
 from api.models import (
     NovelAbbreviateResponse,
     NovelDetailResponse,
     FolderItemInAPI,
-    DocumentItemInAPI
+    DocumentItemInAPI,
+
+    CreateChapterResponse,
 )
+from common.err import DocumentVersionNotFoundError
+
+
+
+"""
+    小说相关。
+"""
 class NovelAdapter:
     """小说适配器."""
     @staticmethod
@@ -36,7 +52,7 @@ class NovelAdapter:
             state=novel_entity.state,
             create_time=novel_entity.create_time.isoformat(),
             update_time=novel_entity.update_time.isoformat(),
-            hiatus_interval=(datetime.now(timezone.utc) - novel_entity.update_time).days,
+            hiatus_interval=(get_now_time() - novel_entity.update_time).days,
             table_of_contents=table_of_contents
         )
 
@@ -111,7 +127,6 @@ class FolderAdapter:
                 for item in folder_entity.table_of_contents
             ]
         )
-
 class TableOfContentsEntityAdapter:
     """目录项适配器."""
     @staticmethod
@@ -138,3 +153,47 @@ class TableOfContentsEntityAdapter:
             current_version=entity.chapter_current_version,
             document_version_list=entity.chapter_version_list 
         )
+
+"""
+    文档相关。
+"""
+class DocumentAdapter:
+    """文档适配器."""
+    @staticmethod
+    def to_domain(chapter:DocumentSQLEntity,dvs_entities: List[DocumentVersionSQLEntity]) -> DocumentDomain:
+        """将数据库实体转换为领域模型.
+            Args:
+                DocumentVersionSQLEntity: 文档版本数据库实体
+                DocumentSQLEntity: 文档数据库实体
+            Returns:
+                DocumentDomain: 文档领域模型
+        """
+        for dvs_entity in dvs_entities:
+            if dvs_entity.version_id == chapter.current_version_id:
+                return DocumentDomain(
+                    doc_id=chapter.doc_id,
+                    title=chapter.title,
+                    current_version_id=chapter.current_version_id,
+                    version_list=[DocumentVersionEntity(
+                        version_id=dvs_entity.version_id,
+                        parent_version_id=dvs_entity.parent_version_id
+                    ) for dvs_entity in dvs_entities],
+                    body_text=dvs_entity.body_text,
+                    create_time=dvs_entity.create_time.isoformat(),
+                    update_time=dvs_entity.update_time.isoformat(),
+                )
+        raise DocumentVersionNotFoundError(chapter.current_version_id)
+
+    @staticmethod
+    def from_domain(document_domain: DocumentDomain) -> CreateChapterResponse:
+        """将领域模型转换为API模型."""
+        return CreateChapterResponse(
+            document_id=document_domain.doc_id,
+            title=document_domain.title,
+            current_version=document_domain.current_version_id,
+            chapter_version_list=[dvs_entity.version_id for dvs_entity in document_domain.version_list],
+            body_text=document_domain.body_text,
+            create_time=document_domain.create_time,
+            update_time=document_domain.update_time,
+        )
+

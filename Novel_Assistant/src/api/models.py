@@ -1,4 +1,5 @@
 """API模型"""
+from tkinter import N
 from typing import List, TypeVar, Generic,Union
 
 from pydantic import BaseModel, Field
@@ -33,11 +34,37 @@ class GetNovelDetailRequest(BaseRequest):
     """获取小说详情请求"""
     novel_id: str = Field(..., description="小说ID")
 
+class CreateChapterRequest(BaseRequest):
+    """创建章节请求"""
+    user_id: str = Field(..., description="用户ID")
+    novel_id: str = Field(..., description="小说ID")
+    folder_id: str|None = Field(default=None, description="文件夹ID")
+
 class SendQueryToChatHelperRequest(BaseRequest):
     """发送查询到聊天助手请求模型"""
     query: str = Field(..., description="用户发送的信息")
 
 
+
+
+
+T = TypeVar("T")
+class Response(BaseModel, Generic[T]):
+    """统一响应模型（支持泛型），可用作 Response[InitSessionData] 等"""
+
+    code: str = Field(..., description="状态码")
+    data: T | None = Field(default=None, description="响应数据")
+    message: str | None = Field(default=None, description="响应消息")
+ 
+
+    @classmethod
+    def ok(cls, data: T | None = None) -> "Response[T]":
+        return cls(code="200", data=data)
+
+    @classmethod
+    def fail(cls,code:str, message: str , data: T | None = None) -> "Response[T]":    
+        # 支持自定义失败消息，否则使用枚举默认消息
+        return cls(code=code, data=data, message=message )
 
 class UserIdResponse(BaseModel):
     """用户ID"""
@@ -76,23 +103,12 @@ class NovelDetailResponse(BaseModel):
     hiatus_interval: int = Field(..., description="上次更新时间间隔（天）")
     menu: List[Union[FolderItemInAPI, DocumentItemInAPI]] = Field(default=[], description="小说目录")
 
-
-
-T = TypeVar("T")
-class Response(BaseModel, Generic[T]):
-    """统一响应模型（支持泛型），可用作 Response[InitSessionData] 等"""
-
-    code: str = Field(..., description="状态码")
-    data: T | None = Field(default=None, description="响应数据")
-    message: str | None = Field(default=None, description="响应消息")
- 
-
-    @classmethod
-    def ok(cls, data: T | None = None) -> "Response[T]":
-        return cls(code="200", data=data)
-
-    @classmethod
-    def fail(cls,code:str, message: str , data: T | None = None) -> "Response[T]":    
-        # 支持自定义失败消息，否则使用枚举默认消息
-        return cls(code=code, data=data, message=message )
-
+class CreateChapterResponse(BaseModel):
+    """章节项"""
+    document_id: str = Field(..., description="文档ID")
+    title: str = Field(..., description="标题名")
+    current_version: str = Field(..., description="当前版本")
+    chapter_version_list: List[str] = Field(..., description="章节版本列表")
+    body_text: str|None = Field(default=None, description="章节内容") 
+    create_time: str = Field(..., description="创建时间")
+    update_time: str = Field(..., description="更新时间")

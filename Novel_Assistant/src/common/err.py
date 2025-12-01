@@ -55,3 +55,16 @@ class NovelNotFoundError(BaseError):
     def __init__(self, novel_id: str):
         super().__init__("5201", message=f"小说不存在: {novel_id}")
         self.novel_id = novel_id
+
+class ChapterNotFoundError(BaseError):
+    """章节不存在异常"""
+
+    def __init__(self, chapter_id: str):
+        super().__init__("5202", message=f"章节不存在: {chapter_id}")
+        self.chapter_id = chapter_id
+class DocumentVersionNotFoundError(BaseError):
+    """文档不存在异常"""
+
+    def __init__(self, document_id: str):
+        super().__init__("5203", message=f"文档版本不存在: {document_id}")
+        self.document_id = document_id

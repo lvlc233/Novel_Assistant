@@ -1,8 +1,8 @@
-import asyncio
-from typing import List, Optional, Tuple
+
+from typing import List
 from sqlmodel import select, col
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-
+from common.enums import NodeTypeEnum
 from common.clients.pg.pg_models import (
     DocumentSQLEntity, 
     DocumentVersionSQLEntity, 
@@ -145,6 +145,19 @@ class PGClient:
         result_doc = await self.session.execute(stmt_doc)
         return result_doc.scalars().all()
 
+    async def create_novel_document(self, user_id: str,novel_id: str,folder_id: str|None=None) -> DocumentSQLEntity:
+        """创建文档"""
+        document = DocumentSQLEntity(user_id=user_id,novel_id=novel_id, folder_id=folder_id)
+        self.session.add(document)
+        await self.session.flush()
+        await self.session.refresh(document)
+        return document
+
+    async def check_novel_exist_by_id(self, novel_id: str) -> bool:
+        """检查小说是否存在,若存在则返回True,否则返回False"""
+        novel = await self.session.get(NovelSQLEntity, novel_id)
+        return novel is not None
+
     """
         文档版本相关操作
     """
@@ -157,6 +170,28 @@ class PGClient:
         result_doc_version = await self.session.execute(stmt_doc_version)
         return result_doc_version.scalars().all()
 
+    async def create_novel_document_version(
+        self,
+        version_id: str,
+        doc_id: str, 
+        novel_id: str,
+        folder_id: str|None = None,
+        parent_version_id: str|None=None,
+        body_text: str|None=None
+    ) -> DocumentVersionSQLEntity:
+        """创建文档版本"""
+        document_version = DocumentVersionSQLEntity(
+            version_id=version_id,
+            parent_version_id=parent_version_id,
+            doc_id=doc_id,
+            novel_id=novel_id, 
+            folder_id=folder_id,
+            body_text=body_text
+        )
+        self.session.add(document_version)
+        await self.session.flush()
+        await self.session.refresh(document_version)
+        return document_version
     """
         文件夹相关操作
     """
@@ -180,3 +215,11 @@ class PGClient:
         stmt_tree = select(TreeSortSQLEntity).where(TreeSortSQLEntity.novel_id == novel_id)
         result_tree = await self.session.execute(stmt_tree)
         return result_tree.scalars().all()
+
+    async def add_document_to_folder(self, novel_id: str, folder_id: str,doc_id: str) -> TreeSortSQLEntity:
+        """创建树结构"""
+        tree_sort = TreeSortSQLEntity(novel_id=novel_id, parent_id=folder_id, node_type=NodeTypeEnum.NOVEL, node_id=doc_id)
+        self.session.add(tree_sort)
+        await self.session.flush()
+        await self.session.refresh(tree_sort)
+        return tree_sort

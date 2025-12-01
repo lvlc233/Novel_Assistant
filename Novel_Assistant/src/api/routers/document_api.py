@@ -4,19 +4,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.models import (
     CreateNovelRequest, 
     GetNovelListRequest, 
+    GetNovelDetailRequest,
+    CreateChapterRequest,
+
     Response,
     NovelAbbreviateResponse,
     NovelDetailResponse,
-    GetNovelDetailRequest
+    CreateChapterResponse,
+
 )
 from common.clients.pg.pg_client import get_session
 
 
-from common.adapter.novel import NovelAdapter
+from common.adapter.novel import NovelAdapter, DocumentAdapter
 from api.services.document_service import (
     create_novel4service,
     get_novel_existing_list4service,
-    get_novel_detail4service 
+    get_novel_detail4service,
+    create_chapter4service,
 )
 
 router = APIRouter(tags=["document"])
@@ -46,3 +51,14 @@ async def get_novel_detail4api(request:GetNovelDetailRequest , session: AsyncSes
     novel = await get_novel_detail4service(request.novel_id, session)
     novel = NovelAdapter.from_domain_detail(novel)
     return Response.ok(data=novel)
+
+@router.post("/create_chapter")
+async def create_chapter4api(request: CreateChapterRequest, session: AsyncSession = Depends(get_session))->Response[CreateChapterResponse]:
+    """创建章节"""
+    chapter_domain = await create_chapter4service(
+        user_id=request.user_id, 
+        novel_id=request.novel_id, 
+        folder_id=request.folder_id, 
+        session=session)
+    chapter = DocumentAdapter.from_domain(chapter_domain)
+    return Response.ok(data=chapter)
