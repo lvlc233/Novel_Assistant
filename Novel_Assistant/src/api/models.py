@@ -34,6 +34,10 @@ class GetNovelDetailRequest(BaseRequest):
     """获取小说详情请求"""
     novel_id: str = Field(..., description="小说ID")
 
+class DeleteNovelRequest(BaseRequest):
+    """删除小说请求"""
+    novel_id: str = Field(..., description="小说ID")
+
 class CreateChapterRequest(BaseRequest):
     """创建章节请求"""
     user_id: str = Field(..., description="用户ID")

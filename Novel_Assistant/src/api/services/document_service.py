@@ -60,6 +60,21 @@ async def get_novel_existing_list4service(user_id: str, session: AsyncSession) -
         logging.error(f"获取存在小说列表失败: {e}")
         raise e
 
+async def delete_novel4service(novel_id: str, session: AsyncSession) -> bool:
+    """删除小说"""
+    pg_client = PGClient(session)
+    try:
+        if not await pg_client.check_novel_exist_by_id(novel_id):
+            raise NovelNotFoundError(novel_id)
+            
+        await pg_client.delete_novel(novel_id)
+        await session.commit()
+        return True
+    except Exception as e:
+        logging.error(f"删除小说失败: {e}")
+        await session.rollback()
+        raise e
+
 async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> NovelDomain:
     """根据小说ID获取小说详情"""
     pg_client = PGClient(session)

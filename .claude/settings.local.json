@@ -8,7 +8,8 @@
       "Bash(findstr:*)",
       "Bash(npm run:*)",
       "Bash(npx next dev:*)",
-      "Bash(langgraph dev:*)"
+      "Bash(langgraph dev:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

@@ -10,7 +10,7 @@ from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 
 from core.agent.graph.chat_helper_graph import chat_helper_agent
-from api.models import CodeEnum, Response
+from api.models import  Response
 
 router = APIRouter(tags=["websocket"])
 

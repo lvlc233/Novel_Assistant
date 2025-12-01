@@ -7,6 +7,11 @@ import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
+# 延迟导入避免循环依赖
+def format_time(time: datetime) -> str:
+    """格式化时间 - 临时解决循环导入"""
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
 
 
 class LoadError(Exception):
@@ -92,7 +97,7 @@ class ConfigLoader:
             "exists": True,
             "path": str(file_path),
             "size": stat.st_size,
-            "modified_time": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "modified_time": format_time(datetime.fromtimestamp(stat.st_mtime))
         }
     
     def list_config_files(self) -> list[str]:
