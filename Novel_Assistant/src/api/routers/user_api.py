@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 
-from common.clients.pg.pg_model import UserEntity
+from common.clients.pg.pg_models import UserSQLEntity
 from common.clients.pg.pg_client import get_session,PGClient
 from common.utils import (
     create_uuid, 
@@ -38,8 +38,8 @@ async def login4api(request: CreateUserRequest, session: AsyncSession = Depends(
     return Response.ok(data=UserIdResponse(user_id=user_id))
 
 
-@router.get("/get_user_test", response_model=Response[UserEntity])
-async def get_user4api_test(user_name: str, session: AsyncSession = Depends(get_session)) -> Response[UserEntity]:
+@router.get("/get_user_test", response_model=Response[UserSQLEntity])
+async def get_user4api_test(user_name: str, session: AsyncSession = Depends(get_session)) -> Response[UserSQLEntity]:
     """获取用户"""
     pg_client = PGClient(session)
     user = await pg_client.get_user_by_name(user_name)

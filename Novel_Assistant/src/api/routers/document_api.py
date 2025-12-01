@@ -7,11 +7,11 @@ from api.models import (
     Response
 )
 from common.clients.pg.pg_client import PGClient, get_session
-from common.clients.pg.pg_model import NovelEntity
+from common.clients.pg.pg_models import NovelSQLEntity
 from common.err import NovelNotFoundError
 from api.services.document_service import (
     create_novel4service,
-    get_novels4service
+    get_novel_existing_list4service
 )
 
 router = APIRouter(tags=["document"])
@@ -35,7 +35,7 @@ async def get_novels4api(request: GetNovelListRequest, session: AsyncSession = D
     return Response.ok(data=novels)
 
 
-@router.get("/novel/{novel_id}", response_model=Response[NovelEntity])
+@router.get("/novel/{novel_id}", response_model=Response[NovelSQLEntity])
 async def get_novel(novel_id: str, session: AsyncSession = Depends(get_session)):
     """获取小说详情"""
     pg_client = PGClient(session)
