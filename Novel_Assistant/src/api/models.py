@@ -54,6 +54,16 @@ class SendQueryToChatHelperRequest(BaseRequest):
     """发送查询到聊天助手请求模型"""
     query: str = Field(..., description="用户发送的信息")
 
+class SearchDocumentRequest(BaseRequest):
+    """搜索文档请求"""
+    query: str = Field(..., description="查询文本")
+    novel_id: str | None = Field(default=None, description="小说ID，可选")
+    search_by_title: bool = Field(default=True, description="是否根据标题搜索")
+    search_by_content: bool = Field(default=False, description="是否根据正文搜索")
+    is_remove: bool = Field(default=False, description="是否搜索已删除文档")
+
+
+
 
 
 
@@ -122,3 +132,9 @@ class CreateChapterResponse(BaseModel):
     body_text: str|None = Field(default=None, description="章节内容") 
     create_time: str = Field(..., description="创建时间")
     update_time: str = Field(..., description="更新时间")
+
+class SearchDocumentResponse(BaseModel):
+    """搜索文档响应"""
+    doc_id: str = Field(..., description="文档ID")
+    title: str = Field(..., description="文档标题")
+    body_text: str|None = Field(default=None, description="文档正文")

@@ -1,5 +1,5 @@
 
-from typing import List
+from typing import List,Tuple
 from sqlmodel import select, col
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from common.enums import NodeTypeEnum
@@ -205,6 +205,9 @@ class PGClient:
         await self.session.flush()
         await self.session.refresh(document_version)
         return document_version
+    
+        
+    # end def
     """
         文件夹相关操作
     """
@@ -215,9 +218,6 @@ class PGClient:
         stmt_folder = select(FolderSQLEntity).where(FolderSQLEntity.novel_id == novel_id)
         result_folder = await self.session.execute(stmt_folder)
         return result_folder.scalars().all()
-        statement = select(FolderSQLEntity).where(FolderSQLEntity.novel_id == novel_id)
-        return await self.session.exec(statement).all()  
-
     """
         层次结构相关操作
     """
@@ -231,8 +231,43 @@ class PGClient:
 
     async def add_document_to_folder(self, novel_id: str, folder_id: str,doc_id: str) -> TreeSortSQLEntity:
         """创建树结构"""
-        tree_sort = TreeSortSQLEntity(novel_id=novel_id, parent_id=folder_id, node_type=NodeTypeEnum.NOVEL, node_id=doc_id)
+        tree_sort = TreeSortSQLEntity(novel_id=novel_id, parent_id=folder_id, node_type=NodeTypeEnum.CHAPTER, node_id=doc_id)
         self.session.add(tree_sort)
         await self.session.flush()
         await self.session.refresh(tree_sort)
         return tree_sort
+
+    """
+        搜索相关操作
+    """
+    async def search_documents_by_title(self, is_remove: bool, keyword: str, novel_id: str | None = None) -> List[DocumentSQLEntity]:
+        """根据标题搜索文档"""
+
+        stmt = select(DocumentSQLEntity).join(
+            DocumentVersionSQLEntity, 
+            DocumentSQLEntity.current_version_id == DocumentVersionSQLEntity.version_id
+        ).where(
+            col(DocumentSQLEntity.title).contains(keyword),
+            DocumentSQLEntity.is_remove == is_remove
+        )
+        if novel_id:
+            stmt = stmt.where(DocumentSQLEntity.novel_id == novel_id)
+        
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def search_documents_by_content(self, is_remove: bool, keyword: str, novel_id: str | None = None) -> List[Tuple[DocumentSQLEntity, DocumentVersionSQLEntity]]:
+        """根据正文搜索文档"""
+        # 仅仅搜索当前版本current_version_id
+        stmt = select(DocumentSQLEntity, DocumentVersionSQLEntity).join(
+            DocumentVersionSQLEntity, 
+            DocumentSQLEntity.current_version_id == DocumentVersionSQLEntity.version_id
+        ).where(
+            col(DocumentVersionSQLEntity.body_text).contains(keyword),
+            DocumentSQLEntity.is_remove == is_remove
+        )
+        if novel_id:
+            stmt = stmt.where(DocumentSQLEntity.novel_id == novel_id)
+            
+        result = await self.session.execute(stmt)
+        return result.all()

@@ -24,7 +24,8 @@ from core.domain.models import (
     NovelDomain, 
     FolderEntity, 
     TableOfContentsEntity,
-    DocumentDomain
+    DocumentDomain,
+
 )
 from typing import Union
 
@@ -190,4 +191,25 @@ async def create_chapter4service(
     except Exception as e:
         logging.error(f"创建章节失败: {e}")
         await session.rollback()
+        raise e
+
+# 这里的逻辑真的好吗?还是说文档搜索这一块给搜索引擎比较好呃?
+async def search_documents_by_title4service(is_remove: bool, keyword: str, session: AsyncSession, novel_id: str | None = None) -> List[DocumentDomain]:
+    """根据标题搜索文档"""
+    pg_client = PGClient(session)
+    try:
+        docs = await pg_client.search_documents_by_title(is_remove=is_remove, keyword=keyword, novel_id=novel_id)
+        return [DocumentAdapter.to_domain(doc) for doc in docs]
+    except Exception as e:
+        logging.error(f"根据标题搜索文档失败: {e}")
+        raise e
+
+async def search_documents_by_content4service(is_remove: bool, keyword: str, session: AsyncSession, novel_id: str | None = None) -> List[DocumentDomain]:
+    """根据正文搜索文档"""
+    pg_client = PGClient(session)
+    try:
+        docs = await pg_client.search_documents_by_content(is_remove=is_remove, keyword=keyword, novel_id=novel_id)
+        return [DocumentAdapter.to_domain(doc[0], [doc[1]]) for doc in docs]
+    except Exception as e:
+        logging.error(f"根据正文搜索文档失败: {e}")
         raise e

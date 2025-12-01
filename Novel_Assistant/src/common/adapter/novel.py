@@ -19,8 +19,8 @@ from api.models import (
     NovelDetailResponse,
     FolderItemInAPI,
     DocumentItemInAPI,
-
     CreateChapterResponse,
+    SearchDocumentResponse,
 )
 from common.err import DocumentVersionNotFoundError
 
@@ -183,7 +183,14 @@ class DocumentAdapter:
                     update_time=dvs_entity.update_time.isoformat(),
                 )
         raise DocumentVersionNotFoundError(chapter.current_version_id)
-
+    @staticmethod
+    def to_domain_not_version_list(chapter: DocumentSQLEntity) -> DocumentDomain:
+        """将领域模型转换为基础领域模型."""
+        return DocumentDomain(
+            doc_id=chapter.doc_id,
+            novel_id=chapter.novel_id,
+            title=chapter.title,
+        )
     @staticmethod
     def from_domain(document_domain: DocumentDomain) -> CreateChapterResponse:
         """将领域模型转换为API模型."""
@@ -195,5 +202,13 @@ class DocumentAdapter:
             body_text=document_domain.body_text,
             create_time=document_domain.create_time,
             update_time=document_domain.update_time,
+        )
+    @staticmethod
+    def from_domain_to_search(document_domain: DocumentDomain) -> SearchDocumentResponse:
+        """将基础领域模型转换为API模型."""
+        return SearchDocumentResponse(
+            doc_id=document_domain.doc_id,
+            title=document_domain.title,
+            body_text=document_domain.body_text,
         )
 
