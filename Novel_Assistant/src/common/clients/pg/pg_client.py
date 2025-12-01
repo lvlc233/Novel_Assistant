@@ -166,6 +166,16 @@ class PGClient:
         await self.session.refresh(document)
         return document
 
+    async def soft_delete_document(self, doc_id: str) -> bool:
+        """软删除文档"""
+        document = await self.session.get(DocumentSQLEntity, doc_id)
+        if document:
+            document.is_remove = True
+            self.session.add(document)
+            await self.session.flush()
+            return True
+        return False
+
     async def check_novel_exist_by_id(self, novel_id: str) -> bool:
         """检查小说是否存在,若存在则返回True,否则返回False"""
         novel = await self.session.get(NovelSQLEntity, novel_id)

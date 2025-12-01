@@ -12,7 +12,8 @@ from common.clients.pg.pg_models import (
 
 from common.err import (
     UserNotFoundError,
-    NovelNotFoundError
+    NovelNotFoundError,
+    ChapterNotFoundError,
 )
 from common.adapter.novel import (
     NovelAdapter, 
@@ -190,6 +191,20 @@ async def create_chapter4service(
         return document_domain
     except Exception as e:
         logging.error(f"创建章节失败: {e}")
+        await session.rollback()
+        raise e
+
+async def delete_chapter4service(chapter_id: str, session: AsyncSession) -> bool:
+    """删除章节"""
+    pg_client = PGClient(session)
+    try:
+        result = await pg_client.soft_delete_document(chapter_id)
+        if not result:
+            raise ChapterNotFoundError(chapter_id)
+        await session.commit()
+        return True
+    except Exception as e:
+        logging.error(f"删除章节失败: {e}")
         await session.rollback()
         raise e
 

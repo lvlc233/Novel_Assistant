@@ -8,6 +8,7 @@ from api.models import (
     DeleteNovelRequest,
     UpdateNovelRequest,
     CreateChapterRequest,
+    DeleteChapterRequest,
     SearchDocumentRequest,
 
     Response,
@@ -28,6 +29,7 @@ from api.services.document_service import (
     delete_novel4service,
     update_novel_info4service,
     create_chapter4service,
+    delete_chapter4service,
     search_documents_by_title4service,
     search_documents_by_content4service,
 )
@@ -86,9 +88,12 @@ async def create_chapter4api(request: CreateChapterRequest, session: AsyncSessio
     chapter = DocumentAdapter.from_domain(chapter_domain)
     return Response.ok(data=chapter)
 
+@router.post("/delete_chapter")
+async def delete_chapter4api(request: DeleteChapterRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
+    """删除章节"""
+    result = await delete_chapter4service(request.chapter_id, session)
+    return Response.ok(data=result)
 
-
-### 相关接口和代码需要重新审核。
 @router.post("/search_documents")
 async def search_documents4api(request: SearchDocumentRequest, session: AsyncSession = Depends(get_session)) -> Response[List[SearchDocumentResponse]]:
     """搜索文档"""

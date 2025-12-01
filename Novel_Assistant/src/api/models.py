@@ -50,6 +50,11 @@ class CreateChapterRequest(BaseRequest):
     novel_id: str = Field(..., description="小说ID")
     folder_id: str|None = Field(default=None, description="文件夹ID")
 
+class DeleteChapterRequest(BaseRequest):
+    """删除章节请求"""
+    chapter_id: str = Field(..., description="章节ID")
+
+
 class SendQueryToChatHelperRequest(BaseRequest):
     """发送查询到聊天助手请求模型"""
     query: str = Field(..., description="用户发送的信息")
