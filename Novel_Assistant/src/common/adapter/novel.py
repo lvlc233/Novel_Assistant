@@ -19,7 +19,7 @@ from api.models import (
     NovelDetailResponse,
     FolderItemInAPI,
     DocumentItemInAPI,
-    CreateChapterResponse,
+    CreateDocumentResponse,
     SearchDocumentResponse,
 )
 from common.err import DocumentVersionNotFoundError
@@ -130,28 +130,28 @@ class FolderAdapter:
 class TableOfContentsEntityAdapter:
     """目录项适配器."""
     @staticmethod
-    def to_domain(chapter:DocumentSQLEntity,dvs_entities: List[DocumentVersionSQLEntity]) -> TableOfContentsEntity:
+    def to_domain(document:DocumentSQLEntity,dvs_entities: List[DocumentVersionSQLEntity]) -> TableOfContentsEntity:
         """将数据库实体转换为领域模型.
             Args:
                 DocumentVersionSQLEntity: 目录项数据库实体
-                DocumentSQLEntity: 章节数据库实体
+                DocumentSQLEntity: 文档数据库实体
             Returns:
                 TableOfContentsEntity: 目录项领域模型
         """
         return TableOfContentsEntity(
-            chapter_id=chapter.doc_id,
-            chapter_name=chapter.title,
-            chapter_current_version=chapter.current_version_id,
-            chapter_version_list=[dvs_entity.version_id for dvs_entity in dvs_entities]
+            document_id=document.doc_id,
+            document_name=document.title,
+            document_current_version=document.current_version_id,
+            document_version_list=[dvs_entity.version_id for dvs_entity in dvs_entities]
         )
 
     @staticmethod
     def from_domain(entity: TableOfContentsEntity) -> DocumentItemInAPI:
         """将领域模型转换为API模型."""
         return DocumentItemInAPI(
-            document_name=entity.chapter_name,
-            current_version=entity.chapter_current_version,
-            document_version_list=entity.chapter_version_list 
+            document_name=entity.document_name,
+            current_version=entity.document_current_version,
+            document_version_list=entity.document_version_list 
         )
 
 """
@@ -160,7 +160,7 @@ class TableOfContentsEntityAdapter:
 class DocumentAdapter:
     """文档适配器."""
     @staticmethod
-    def to_domain(chapter:DocumentSQLEntity,dvs_entities: List[DocumentVersionSQLEntity]) -> DocumentDomain:
+    def to_domain(document:DocumentSQLEntity,dvs_entities: List[DocumentVersionSQLEntity]) -> DocumentDomain:
         """将数据库实体转换为领域模型.
             Args:
                 DocumentVersionSQLEntity: 文档版本数据库实体
@@ -169,11 +169,11 @@ class DocumentAdapter:
                 DocumentDomain: 文档领域模型
         """
         for dvs_entity in dvs_entities:
-            if dvs_entity.version_id == chapter.current_version_id:
+            if dvs_entity.version_id == document.current_version_id:
                 return DocumentDomain(
-                    doc_id=chapter.doc_id,
-                    title=chapter.title,
-                    current_version_id=chapter.current_version_id,
+                    doc_id=document.doc_id,
+                    title=document.title,
+                    current_version_id=document.current_version_id,
                     version_list=[DocumentVersionEntity(
                         version_id=dvs_entity.version_id,
                         parent_version_id=dvs_entity.parent_version_id
@@ -182,23 +182,23 @@ class DocumentAdapter:
                     create_time=dvs_entity.create_time.isoformat(),
                     update_time=dvs_entity.update_time.isoformat(),
                 )
-        raise DocumentVersionNotFoundError(chapter.current_version_id)
+        raise DocumentVersionNotFoundError(document.current_version_id)
     @staticmethod
-    def to_domain_not_version_list(chapter: DocumentSQLEntity) -> DocumentDomain:
+    def to_domain_not_version_list(document: DocumentSQLEntity) -> DocumentDomain:
         """将领域模型转换为基础领域模型."""
         return DocumentDomain(
-            doc_id=chapter.doc_id,
-            novel_id=chapter.novel_id,
-            title=chapter.title,
+            doc_id=document.doc_id,
+            novel_id=document.novel_id,
+            title=document.title,
         )
     @staticmethod
-    def from_domain(document_domain: DocumentDomain) -> CreateChapterResponse:
+    def from_domain(document_domain: DocumentDomain) -> CreateDocumentResponse:
         """将领域模型转换为API模型."""
-        return CreateChapterResponse(
+        return CreateDocumentResponse(
             document_id=document_domain.doc_id,
             title=document_domain.title,
             current_version=document_domain.current_version_id,
-            chapter_version_list=[dvs_entity.version_id for dvs_entity in document_domain.version_list],
+            document_version_list=[dvs_entity.version_id for dvs_entity in document_domain.version_list],
             body_text=document_domain.body_text,
             create_time=document_domain.create_time,
             update_time=document_domain.update_time,

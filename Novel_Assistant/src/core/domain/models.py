@@ -9,10 +9,10 @@ from common.enums import NovelState
 
 class TableOfContentsEntity(BaseModel):
     """目录项."""
-    chapter_id: str = Field(description="章节ID")
-    chapter_name: str = Field(description="章节名称")
-    chapter_current_version: str = Field(description="章节版本")
-    chapter_version_list: List[str] = Field(description="章节版本列表")
+    document_id: str = Field(description="文档ID")
+    document_name: str = Field(description="文档名称")
+    document_current_version: str = Field(description="文档版本")
+    document_version_list: List[str] = Field(description="文档版本列表")
 class FolderEntity(BaseModel):
     """文件夹实体."""
     folder_id: str = Field(description="文件夹ID")

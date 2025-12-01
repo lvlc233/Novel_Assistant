@@ -241,7 +241,7 @@ class PGClient:
 
     async def add_document_to_folder(self, novel_id: str, folder_id: str,doc_id: str) -> TreeSortSQLEntity:
         """创建树结构"""
-        tree_sort = TreeSortSQLEntity(novel_id=novel_id, parent_id=folder_id, node_type=NodeTypeEnum.CHAPTER, node_id=doc_id)
+        tree_sort = TreeSortSQLEntity(novel_id=novel_id, parent_id=folder_id, node_type=NodeTypeEnum.DOCUMENT, node_id=doc_id)
         self.session.add(tree_sort)
         await self.session.flush()
         await self.session.refresh(tree_sort)

@@ -13,7 +13,7 @@ from common.clients.pg.pg_models import (
 from common.err import (
     UserNotFoundError,
     NovelNotFoundError,
-    ChapterNotFoundError,
+    DocumentNotFoundError,
 )
 from common.adapter.novel import (
     NovelAdapter, 
@@ -163,7 +163,7 @@ async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> Nove
         raise e
 
 
-async def create_chapter4service(
+async def create_document4service(
     *,
     session: AsyncSession,
     user_id: str, 
@@ -175,32 +175,32 @@ async def create_chapter4service(
     try:
         if not await pg_client.check_user_exist_by_id(user_id):
             raise UserNotFoundError(f"用户ID {user_id} 不存在")
-        chapter : DocumentSQLEntity= await pg_client.create_novel_document(user_id, novel_id, folder_id)
+        document : DocumentSQLEntity= await pg_client.create_novel_document(user_id, novel_id, folder_id)
         version : DocumentVersionSQLEntity= await pg_client.create_novel_document_version(
-            version_id=chapter.current_version_id,
-            doc_id=chapter.doc_id,
+            version_id=document.current_version_id,
+            doc_id=document.doc_id,
             novel_id=novel_id,
             folder_id=folder_id,
         )
         if folder_id:
-            await pg_client.add_document_to_folder(novel_id, folder_id, chapter.doc_id)
+            await pg_client.add_document_to_folder(novel_id, folder_id, document.doc_id)
         await session.commit()
-        await session.refresh(chapter)
+        await session.refresh(document)
         await session.refresh(version)
-        document_domain = DocumentAdapter.to_domain(chapter, [version])
+        document_domain = DocumentAdapter.to_domain(document, [version])
         return document_domain
     except Exception as e:
-        logging.error(f"创建章节失败: {e}")
+        logging.error(f"创建文档失败: {e}")
         await session.rollback()
         raise e
 
-async def delete_chapter4service(chapter_id: str, session: AsyncSession) -> bool:
-    """删除章节"""
+async def delete_document4service(document_id: str, session: AsyncSession) -> bool:
+    """删除文档"""
     pg_client = PGClient(session)
     try:
-        result = await pg_client.soft_delete_document(chapter_id)
+        result = await pg_client.soft_delete_document(document_id)
         if not result:
-            raise ChapterNotFoundError(chapter_id)
+            raise DocumentNotFoundError(document_id)
         await session.commit()
         return True
     except Exception as e:

@@ -9,4 +9,4 @@ class NodeTypeEnum(str, Enum):
     """节点类型."""
     NOVEL = "NOVEL"
     FOLDER = "FOLDER"
-    CHAPTER = "CHAPTER"
+    DOCUMENT = "DOCUMENT"

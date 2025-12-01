@@ -7,14 +7,14 @@ from api.models import (
     GetNovelDetailRequest,
     DeleteNovelRequest,
     UpdateNovelRequest,
-    CreateChapterRequest,
-    DeleteChapterRequest,
+    CreateDocumentRequest,
+    DeleteDocumentRequest,
     SearchDocumentRequest,
 
     Response,
     NovelAbbreviateResponse,
     NovelDetailResponse,
-    CreateChapterResponse,
+    CreateDocumentResponse, 
     SearchDocumentResponse,
 
 )
@@ -28,8 +28,8 @@ from api.services.document_service import (
     get_novel_detail4service,
     delete_novel4service,
     update_novel_info4service,
-    create_chapter4service,
-    delete_chapter4service,
+    create_document4service,
+    delete_document4service,    
     search_documents_by_title4service,
     search_documents_by_content4service,
 )
@@ -77,21 +77,21 @@ async def update_novel_info4api(request: UpdateNovelRequest, session: AsyncSessi
 
 
 
-@router.post("/create_chapter")
-async def create_chapter4api(request: CreateChapterRequest, session: AsyncSession = Depends(get_session))->Response[CreateChapterResponse]:
-    """创建章节"""
-    chapter_domain = await create_chapter4service(
+@router.post("/create_document")
+async def create_document4api(request: CreateDocumentRequest, session: AsyncSession = Depends(get_session))->Response[CreateDocumentResponse]:
+    """创建文档"""
+    document_domain = await create_document4service(
         user_id=request.user_id, 
         novel_id=request.novel_id, 
         folder_id=request.folder_id, 
         session=session)
-    chapter = DocumentAdapter.from_domain(chapter_domain)
-    return Response.ok(data=chapter)
+    document = DocumentAdapter.from_domain(document_domain)
+    return Response.ok(data=document)
 
-@router.post("/delete_chapter")
-async def delete_chapter4api(request: DeleteChapterRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
-    """删除章节"""
-    result = await delete_chapter4service(request.chapter_id, session)
+@router.post("/delete_document")
+async def delete_document4api(request: DeleteDocumentRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
+    """删除文档"""
+    result = await delete_document4service(request.document_id, session)
     return Response.ok(data=result)
 
 @router.post("/search_documents")

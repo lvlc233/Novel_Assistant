@@ -44,15 +44,15 @@ class UpdateNovelRequest(BaseRequest):
     name: str | None = Field(default=None, description="小说名称")
     summary: str | None = Field(default=None, description="小说简介")
 
-class CreateChapterRequest(BaseRequest):
-    """创建章节请求"""
+class CreateDocumentRequest(BaseRequest):
+    """创建文档请求"""
     user_id: str = Field(..., description="用户ID")
     novel_id: str = Field(..., description="小说ID")
     folder_id: str|None = Field(default=None, description="文件夹ID")
 
-class DeleteChapterRequest(BaseRequest):
-    """删除章节请求"""
-    chapter_id: str = Field(..., description="章节ID")
+class DeleteDocumentRequest(BaseRequest):
+    """删除文档请求"""
+    document_id: str = Field(..., description="文档ID")
 
 
 class SendQueryToChatHelperRequest(BaseRequest):
@@ -128,13 +128,13 @@ class NovelDetailResponse(BaseModel):
     hiatus_interval: int = Field(..., description="上次更新时间间隔（天）")
     menu: List[Union[FolderItemInAPI, DocumentItemInAPI]] = Field(default=[], description="小说目录")
 
-class CreateChapterResponse(BaseModel):
-    """章节项"""
+class CreateDocumentResponse(BaseModel):
+    """文档项"""
     document_id: str = Field(..., description="文档ID")
     title: str = Field(..., description="标题名")
     current_version: str = Field(..., description="当前版本")
-    chapter_version_list: List[str] = Field(..., description="章节版本列表")
-    body_text: str|None = Field(default=None, description="章节内容") 
+    document_version_list: List[str] = Field(..., description="文档版本列表")
+    body_text: str|None = Field(default=None, description="文档内容") 
     create_time: str = Field(..., description="创建时间")
     update_time: str = Field(..., description="更新时间")
 

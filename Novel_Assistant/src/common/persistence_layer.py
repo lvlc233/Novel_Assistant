@@ -298,7 +298,7 @@ class PgClient(RelationalClient):
 class KGEntity:
     id:str=field(metadata={"description":"全局唯一id"})
     book_id:str=field(metadata={"description":"书id"})
-    chapter_id:str=field(metadata={"description":"章节id"})
+    document_id:str=field(metadata={"description":"文档id"})
     version: str=field(metadata={"description":"版本号"})
     content: Any=field(metadata={"description":"核心内容"})
 class Neo4jClient:
@@ -324,8 +324,8 @@ class Neo4jClient:
             """)
      
             session.run("""
-                CREATE INDEX rel_chapter_version IF NOT EXISTS
-                FOR ()-[r:chapter]-() ON (r.chapter_id, r.version)
+                CREATE INDEX rel_document_version IF NOT EXISTS
+                FOR ()-[r:document]-() ON (r.document_id, r.version)
             """)
             
             print("✅ Schema初始化完成")
