@@ -38,6 +38,12 @@ class DeleteNovelRequest(BaseRequest):
     """删除小说请求"""
     novel_id: str = Field(..., description="小说ID")
 
+class UpdateNovelRequest(BaseRequest):
+    """修改小说信息请求"""
+    novel_id: str = Field(..., description="小说ID")
+    name: str | None = Field(default=None, description="小说名称")
+    summary: str | None = Field(default=None, description="小说简介")
+
 class CreateChapterRequest(BaseRequest):
     """创建章节请求"""
     user_id: str = Field(..., description="用户ID")

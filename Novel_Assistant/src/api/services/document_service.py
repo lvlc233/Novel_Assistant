@@ -75,6 +75,21 @@ async def delete_novel4service(novel_id: str, session: AsyncSession) -> bool:
         await session.rollback()
         raise e
 
+async def update_novel_info4service(novel_id: str, name: str | None, summary: str | None, session: AsyncSession) -> bool:
+    """修改小说信息"""
+    pg_client = PGClient(session)
+    try:
+        if not await pg_client.check_novel_exist_by_id(novel_id):
+            raise NovelNotFoundError(novel_id)
+        
+        result = await pg_client.update_novel(novel_id, name, summary)
+        await session.commit()
+        return result
+    except Exception as e:
+        logging.error(f"修改小说信息失败: {e}")
+        await session.rollback()
+        raise e
+
 async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> NovelDomain:
     """根据小说ID获取小说详情"""
     pg_client = PGClient(session)

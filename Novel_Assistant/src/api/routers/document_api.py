@@ -6,6 +6,7 @@ from api.models import (
     GetNovelListRequest, 
     GetNovelDetailRequest,
     DeleteNovelRequest,
+    UpdateNovelRequest,
     CreateChapterRequest,
 
     Response,
@@ -23,6 +24,7 @@ from api.services.document_service import (
     get_novel_existing_list4service,
     get_novel_detail4service,
     delete_novel4service,
+    update_novel_info4service,
     create_chapter4service,
 )
 
@@ -60,6 +62,14 @@ async def delete_novel4api(request: DeleteNovelRequest, session: AsyncSession = 
     """删除小说"""
     result = await delete_novel4service(request.novel_id, session)
     return Response.ok(data=result)
+
+@router.post("/update_novel_info")
+async def update_novel_info4api(request: UpdateNovelRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
+    """修改小说信息"""
+    result = await update_novel_info4service(request.novel_id, request.name, request.summary, session)
+    return Response.ok(data=result)
+
+
 
 @router.post("/create_chapter")
 async def create_chapter4api(request: CreateChapterRequest, session: AsyncSession = Depends(get_session))->Response[CreateChapterResponse]:

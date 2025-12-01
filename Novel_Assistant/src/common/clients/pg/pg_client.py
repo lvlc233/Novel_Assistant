@@ -133,6 +133,19 @@ class PGClient:
             return True
         return False
 
+    async def update_novel(self, novel_id: str, name: str | None = None, description: str | None = None) -> bool:
+        """更新小说信息（不更新update_time）"""
+        novel = await self.session.get(NovelSQLEntity, novel_id)
+        if novel:
+            if name is not None:
+                novel.name = name
+            if description is not None:
+                novel.description = description
+            self.session.add(novel)
+            await self.session.flush()
+            return True
+        return False
+
     """
         文档相关操作
     """
