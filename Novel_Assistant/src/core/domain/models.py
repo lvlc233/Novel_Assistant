@@ -10,6 +10,7 @@ class TableOfContentsEntity(BaseModel):
     chapter_id: str = Field(description="章节ID")
     chapter_name: str = Field(description="章节名称")
     chapter_current_version: str = Field(description="章节版本")
+    chapter_version_list: List[str] = Field(description="章节版本列表")
  
 
 class FolderEntity(BaseModel):

@@ -1,8 +1,7 @@
 """API模型"""
-from typing import Any, TypeVar, Generic
-from enum import Enum
+from typing import List, TypeVar, Generic,Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from pydantic import BaseModel, Field
 
 """请求相关"""
 class BaseRequest(BaseModel):
@@ -30,7 +29,9 @@ class CreateNovelRequest(BaseRequest):
 class GetNovelListRequest(BaseRequest):
     """获取小说列表请求"""
     user_id: str = Field(..., description="用户ID")
-
+class GetNovelDetailRequest(BaseRequest):
+    """获取小说详情请求"""
+    novel_id: str = Field(..., description="小说ID")
 
 class SendQueryToChatHelperRequest(BaseRequest):
     """发送查询到聊天助手请求模型"""
@@ -42,8 +43,8 @@ class UserIdResponse(BaseModel):
     """用户ID"""
     user_id: str = Field(..., description="用户ID")
 
-class NovelIdResponse(BaseModel):
-    """小说ID"""
+class NovelAbbreviateResponse(BaseModel):
+    """小说缩略视图"""
     novel_id: str = Field(..., description="小说ID")
     novel_name: str = Field(..., description="小说名称")
     image_url: str|None = Field(default=None, description="小说封面URL")
@@ -52,7 +53,30 @@ class NovelIdResponse(BaseModel):
     create_time: str = Field(..., description="创建时间")
     update_time: str = Field(..., description="更新时间")
     hiatus_interval: int = Field(..., description="上次更新时间间隔（天）")
-  
+
+
+class DocumentItemInAPI(BaseModel):
+    """目录项"""
+    document_name: str = Field(..., description="文档名")
+    current_version: str = Field(..., description="当前版本")
+    document_version_list: List[str] = Field(..., description="文档版本列表")
+class FolderItemInAPI(BaseModel):
+    """目录项"""
+    folder_name: str = Field(..., description="文件夹名")
+    document_list: List[DocumentItemInAPI] = Field(..., description="文档列表")
+class NovelDetailResponse(BaseModel):
+    """小说详情响应"""
+    novel_id: str = Field(..., description="小说ID")
+    novel_name: str = Field(..., description="小说名称")
+    image_url: str|None = Field(default=None, description="小说封面URL")
+    summary: str|None = Field(default=None, description="小说简介")
+    state: str = Field(..., description="小说状态")
+    create_time: str = Field(..., description="创建时间")
+    update_time: str = Field(..., description="更新时间")
+    hiatus_interval: int = Field(..., description="上次更新时间间隔（天）")
+    menu: List[Union[FolderItemInAPI, DocumentItemInAPI]] = Field(default=[], description="小说目录")
+
+
 
 T = TypeVar("T")
 class Response(BaseModel, Generic[T]):

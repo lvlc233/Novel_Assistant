@@ -117,8 +117,7 @@ class PGClient:
     async def get_novel_details(self, novel_id: str) -> NovelSQLEntity|None:
         """获取小说详情"""
         statement = select(NovelSQLEntity).where(
-            NovelSQLEntity.novel_id == novel_id, 
-            NovelSQLEntity.is_remove == False
+            NovelSQLEntity.novel_id == novel_id
         )
         result = await self.session.execute(statement)
         return result.scalars().first()

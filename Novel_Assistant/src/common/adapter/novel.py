@@ -1,9 +1,18 @@
 from datetime import datetime,timezone
 from typing import List,Union
 from common.clients.pg.pg_models import (
-    NovelSQLEntity, FolderSQLEntity,DocumentVersionSQLEntity,DocumentSQLEntity)
+    NovelSQLEntity, 
+    FolderSQLEntity,
+    DocumentVersionSQLEntity,
+    DocumentSQLEntity
+)
 from core.domain.models import NovelDomain,FolderEntity,TableOfContentsEntity
-from api.models import NovelIdResponse
+from api.models import (
+    NovelAbbreviateResponse,
+    NovelDetailResponse,
+    FolderItemInAPI,
+    DocumentItemInAPI
+)
 class NovelAdapter:
     """小说适配器."""
     @staticmethod
@@ -31,14 +40,14 @@ class NovelAdapter:
             table_of_contents=table_of_contents
         )
 
-    def from_domain(novel_domain: NovelDomain) -> NovelIdResponse:
+    def from_domain_abbreviate(novel_domain: NovelDomain) -> NovelAbbreviateResponse:
         """将领域模型转换为数据库实体.
             Args:
                 NovelDomain: 小说领域模型
             Returns:
                 NovelIdResponse: 小说ID响应模型
         """
-        return NovelIdResponse(
+        return NovelAbbreviateResponse(
             novel_id=novel_domain.novel_id,
             image_url=novel_domain.image_url,
             novel_name=novel_domain.novel_name,
@@ -47,6 +56,32 @@ class NovelAdapter:
             create_time=novel_domain.create_time,
             update_time=novel_domain.update_time,
             hiatus_interval=novel_domain.hiatus_interval,
+        )
+    @staticmethod
+    def from_domain_detail(novel_domain: NovelDomain) -> NovelDetailResponse:
+        """将领域模型转换为数据库实体.
+            Args:
+                NovelDomain: 小说领域模型
+            Returns:
+                NovelDetailResponse: 小说详情响应模型
+        """
+        menu = []
+        for item in novel_domain.table_of_contents:
+            if isinstance(item, FolderEntity):
+                menu.append(FolderAdapter.from_domain(item))
+            elif isinstance(item, TableOfContentsEntity):
+                menu.append(TableOfContentsEntityAdapter.from_domain(item))
+
+        return NovelDetailResponse(
+            novel_id=novel_domain.novel_id,
+            image_url=novel_domain.image_url,
+            novel_name=novel_domain.novel_name,
+            summary=novel_domain.summary,
+            state=novel_domain.state,
+            create_time=novel_domain.create_time,
+            update_time=novel_domain.update_time,
+            hiatus_interval=novel_domain.hiatus_interval,
+            menu=menu
         )
 class FolderAdapter:
     """文件夹适配器."""
@@ -66,10 +101,21 @@ class FolderAdapter:
             table_of_contents=table_of_contents
         )
 
+    @staticmethod
+    def from_domain(folder_entity: FolderEntity) -> FolderItemInAPI:
+        """将领域模型转换为API模型."""
+        return FolderItemInAPI(
+            folder_name=folder_entity.folder_name,
+            document_list=[
+                TableOfContentsEntityAdapter.from_domain(item) 
+                for item in folder_entity.table_of_contents
+            ]
+        )
+
 class TableOfContentsEntityAdapter:
     """目录项适配器."""
     @staticmethod
-    def to_domain(dvs_entity: DocumentVersionSQLEntity,chapter:DocumentSQLEntity) -> TableOfContentsEntity:
+    def to_domain(chapter:DocumentSQLEntity,dvs_entities: List[DocumentVersionSQLEntity]) -> TableOfContentsEntity:
         """将数据库实体转换为领域模型.
             Args:
                 DocumentVersionSQLEntity: 目录项数据库实体
@@ -78,7 +124,17 @@ class TableOfContentsEntityAdapter:
                 TableOfContentsEntity: 目录项领域模型
         """
         return TableOfContentsEntity(
-            chapter_id=dvs_entity.doc_id,
+            chapter_id=chapter.doc_id,
             chapter_name=chapter.title,
-            chapter_current_version=dvs_entity.version_id
+            chapter_current_version=chapter.current_version_id,
+            chapter_version_list=[dvs_entity.version_id for dvs_entity in dvs_entities]
+        )
+
+    @staticmethod
+    def from_domain(entity: TableOfContentsEntity) -> DocumentItemInAPI:
+        """将领域模型转换为API模型."""
+        return DocumentItemInAPI(
+            document_name=entity.chapter_name,
+            current_version=entity.chapter_current_version,
+            document_version_list=entity.chapter_version_list 
         )

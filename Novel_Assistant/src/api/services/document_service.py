@@ -1,15 +1,26 @@
-from ast import Dict
 import logging
-from typing import List
+from typing import List, Dict, Union, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.clients.pg.pg_client import PGClient
+from common.clients.pg.pg_models import (
+    FolderSQLEntity, 
+    DocumentSQLEntity, 
+    DocumentVersionSQLEntity, 
+    TreeSortSQLEntity
+)
 
 from common.err import (
-    UserNotFoundError
+    UserNotFoundError,
+    NovelNotFoundError
 )
-from common.adapter.novel import NovelAdapter,FolderAdapter
-from core.domain.models import NovelDomain
+from common.adapter.novel import (
+    NovelAdapter, 
+    FolderAdapter, 
+    TableOfContentsEntityAdapter
+)    
+from core.domain.models import NovelDomain, FolderEntity, TableOfContentsEntity
+from typing import Union
 
 async def create_novel4service(user_id: str, name: str, summary: str, session: AsyncSession) -> str:
     """创建小说"""
@@ -41,6 +52,76 @@ async def get_novel_existing_list4service(user_id: str, session: AsyncSession) -
         return novels
     except Exception as e:
         logging.error(f"获取存在小说列表失败: {e}")
+        raise e
+
+async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> NovelDomain:
+    """根据小说ID获取小说详情"""
+    pg_client = PGClient(session)
+    try:
+        # 1. 获取小说
+        novel = await pg_client.get_novel_details(novel_id)
+        if not novel:
+            raise NovelNotFoundError(novel_id)
+
+        # 2. 获取关联数据
+        folders = await pg_client.get_novel_folders(novel_id)
+        documents = await pg_client.get_novel_documents(novel_id)
+        doc_versions = await pg_client.get_novel_document_versions(novel_id)
+        tree_sorts = await pg_client.get_novel_tree_sorts(novel_id)
+
+        # 3. 构建映射
+        folder_map: Dict[str, FolderSQLEntity] = {f.folder_id: f for f in folders}
+        doc_map: Dict[str, DocumentSQLEntity] = {d.doc_id: d for d in documents}
+        
+        # 构建版本映射: doc_id -> 版本列表（按创建时间倒序）
+        version_map: Dict[str, List[DocumentVersionSQLEntity]] = {}
+        for version in doc_versions:
+            if version.doc_id not in version_map:
+                version_map[version.doc_id] = []
+            version_map[version.doc_id].append(version)
+        
+        # 对每个文档的版本列表按创建时间倒序排序
+        for doc_id in version_map:
+            version_map[doc_id].sort(key=lambda x: x.create_time, reverse=True)
+
+        # 构建树子节点映射: parent_id -> children list
+        tree_children_map: Dict[Optional[str], List[TreeSortSQLEntity]] = {}
+        for node in tree_sorts:
+            pid = node.parent_id
+            if pid not in tree_children_map:
+                tree_children_map[pid] = []
+            tree_children_map[pid].append(node)
+        
+        # 排序
+        for pid in tree_children_map:
+            tree_children_map[pid].sort(key=lambda x: x.sort_order)
+
+        # 4. 递归组装
+        def build_hierarchy(parent_id: str | None) -> List[Union[FolderEntity, TableOfContentsEntity]]:
+            nodes = tree_children_map.get(parent_id, [])
+            result: List[Union[FolderEntity, TableOfContentsEntity]] = []
+            for node in nodes:
+                if node.node_type == "folder":
+                    folder = folder_map.get(node.node_id)
+                    if folder:
+                        children = build_hierarchy(node.node_id)
+                        result.append(FolderAdapter.to_domain(folder, children))
+                elif node.node_type == "file":
+                    doc = doc_map.get(node.node_id)
+                    if doc:
+                        # 获取文档的所有版本列表
+                        doc_versions_list = version_map.get(doc.doc_id, [])
+                        if doc_versions_list:
+                            # 验证版本列表非空，确保能够正确转换
+                            result.append(TableOfContentsEntityAdapter.to_domain(doc, doc_versions_list))
+            return result
+
+        # 5. 转换并返回
+        toc = build_hierarchy(None)
+        return NovelAdapter.to_domain(novel, toc)
+
+    except Exception as e:
+        logging.error(f"获取小说详情失败: {e}")
         raise e
 
 
