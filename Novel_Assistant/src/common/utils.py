@@ -108,10 +108,14 @@ def get_message_text(msg: BaseMessage) -> str:
 def load_chat_model(
     node_name: str|None = None,
 ) -> Union[BaseChatModel]:
-    """Load a chat model from a model name.
+    """加载一个聊天模型.
+    需在模型配置文件中配置模型节点.
 
     Args:
-        model_name (str): String in the format 'provider:model'.
+        node_name: 模型节点名称,如果为空,则使用默认节点.
+
+    Returns:
+        BaseChatModel: 加载的聊天模型.
     """
     if not node_name or node_name not in [k.node_name for k in global_model_config.nodes_config]:
         node_name = "default"

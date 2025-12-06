@@ -4,7 +4,12 @@ from sqlmodel import SQLModel
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import user_api, novel_api,document_api
+from api.routers import (
+    user_api,
+    novel_api,
+    document_api,
+    chat_helper_api
+)
 from api.error_handler import register_exception_handlers
 from common.clients.pg.pg_client import engine
 import logging
@@ -48,6 +53,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    app.include_router(chat_helper_api.router, prefix="/agent/chat_helper/v1")
+
 
     app.include_router(user_api.router, prefix="/user")
     app.include_router(novel_api.router,prefix="/novel")
