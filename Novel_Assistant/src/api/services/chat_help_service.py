@@ -1,7 +1,7 @@
 
 from langchain_core.messages import HumanMessage
 from sse_starlette.sse import ServerSentEvent
-from core.agent.agent_runnable import chat_helper
+from core.agents.agent_runnable import chat_helper
 import uuid
 
 

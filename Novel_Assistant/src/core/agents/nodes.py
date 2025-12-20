@@ -3,7 +3,7 @@ from typing import Any, List, Tuple, cast
 from langchain_core.messages import  SystemMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from core.agent.state import KDBuildState
+from core.agents.state import KDBuildState
 
 
 from common.utils import load_chat_model
@@ -27,8 +27,8 @@ from typing import List, Dict, cast
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage
 from langgraph.types import Send
-from core.agent.state import KDBuildState, Allocation
-from core.agent.llm.prompts import (ATTENTION_READ_PROMPT,
+from core.agents.state import KDBuildState, Allocation
+from core.agents.llm.prompts import (ATTENTION_READ_PROMPT,
                                 ATOM_SUBMIT_PROMPT,
                                 DEPENDENCE_SUBMIT_PROMPT,
                                 COMPLETE_KD_PROMPT,
