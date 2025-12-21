@@ -105,6 +105,35 @@ def get_message_text(msg: BaseMessage) -> str:
         return "".join(txts).strip()
 
 
+import re
+
+def count_words(text: str) -> int:
+    """
+    后端标准字数统计：
+    1. 中文字符（含标点）计为 1。
+    2. 英文单词（以空白分隔）计为 1。
+    3. 剔除空白字符。
+    """
+    if not text:
+        return 0
+    
+    # 移除首尾空白
+    text = text.strip()
+    if not text:
+        return 0
+
+    # 1. 统计中文字符 (CJK Unified Ideographs)
+    # 范围：\u4e00-\u9fa5
+    chinese_pattern = re.compile(r'[\u4e00-\u9fa5]')
+    chinese_count = len(chinese_pattern.findall(text))
+    
+    # 2. 统计非中文部分，先将中文替换为空格
+    text_no_chinese = chinese_pattern.sub(' ', text)
+    # 按空白分割，统计单词数
+    english_count = len(text_no_chinese.split())
+    
+    return chinese_count + english_count
+
 def load_chat_model(
     node_name: str|None = None,
 ) -> Union[BaseChatModel]:

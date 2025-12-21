@@ -15,13 +15,11 @@ dependencies = [
     "alembic",
     "asyncpg",
     "fastapi",
-    "langgraph-cli[inmem]",
-    "langgraph[itme]",
     "loguru",
     "neo4j",
     "psycopg2-binary",
     "python-dotenv",
-    "sqlmodel[asyncio]",
+    "sqlmodel",
     "langchain-openai",
     "pip>=25.3",
     "copilotkit==0.1.70",
@@ -36,11 +34,12 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["core", "common", "api"]
+packages = ["core", "common", "api","services"]
 [tool.setuptools.package-dir]
 "core" = "src/core"
 "common" = "src/common"
 "api" = "src/api"
+"services" = "src/services"
 
 
 [tool.setuptools.package-data]

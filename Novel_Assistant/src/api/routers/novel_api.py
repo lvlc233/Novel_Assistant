@@ -26,13 +26,16 @@ from api.services.document_service import (
 
 router = APIRouter(tags=["novel"])
 
-@router.get("/debug")
-async def debug_router():
-    return {"status": "novel router registered", "message": "pong"}
-
 @router.post("/create_novel")
 async def create_novel(request: CreateNovelRequest, session: AsyncSession = Depends(get_session))->Response[str]:
-    """创建小说"""
+    """创建小说。
+    Args:
+        user_id: str, # 用户ID
+        name: str | None, # 小说名称
+        summary: str | None, # 小说简介
+    Return:
+        novel_id: str, # 小说ID
+    """
     
     novel_id = await create_novel4service(request.user_id, request.name, request.summary, session)
     return Response.ok(data=novel_id)
@@ -41,27 +44,67 @@ async def create_novel(request: CreateNovelRequest, session: AsyncSession = Depe
 
 @router.post("/get_novels")
 async def get_novels4api(request: GetNovelListRequest, session: AsyncSession = Depends(get_session))->Response[List[NovelAbbreviateResponse]]:
-    """获取所有小说"""
+    """获取所有小说的缩略视图。
+    Args:
+        user_id: str , # 用户ID
+    Return:
+        novels: List[NovelAbbreviateResponse],  # 小说列表
+            novel_id: str,  # 小说ID
+            novel_name: str,  # 小说名称
+            image_url: str | None,  # 小说封面URL
+            summary: str | None,  # 小说简介
+            state: str,  # 小说状态
+            create_time: str,  # 创建时间
+            update_time: str,  # 更新时间
+            hiatus_interval: int  # 上次更新时间间隔（天）
+
+    """
     novels = await get_novel_existing_list4service(request.user_id, session)
     novels = [NovelAdapter.from_domain_abbreviate(novel) for novel in novels]
     return Response.ok(data=novels)
 
 @router.post("/get_novel_detail")
 async def get_novel_detail4api(request:GetNovelDetailRequest , session: AsyncSession = Depends(get_session))->Response[NovelDetailResponse]:
-    """获取小说详情"""
+    """获取小说详情。
+    Args:
+        novel_id: str, # 小说ID
+    Return:
+        novel: NovelDetailResponse, # 小说详情
+            novel_id: str, # 小说ID
+            novel_name: str, # 小说名称
+            image_url: str | None, # 小说封面URL
+            summary: str | None, # 小说简介
+            state: str, # 小说状态
+            create_time: str, # 创建时间
+            update_time: str, # 更新时间
+            hiatus_interval: int, # 上次更新时间间隔（天）
+            menu: List[Union[FolderItemInAPI, DocumentItemInAPI]], # 小说目录
+    """
     novel = await get_novel_detail4service(request.novel_id, session)
     novel = NovelAdapter.from_domain_detail(novel)
     return Response.ok(data=novel)
 
 @router.post("/delete_novel")
 async def delete_novel4api(request: DeleteNovelRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
-    """删除小说"""
+    """删除小说。
+    Args:
+        novel_id: str, # 小说ID
+    Return:
+        result: bool, # 是否删除成功
+    """
     result = await delete_novel4service(request.novel_id, session)
     return Response.ok(data=result)
 
 @router.post("/update_novel_info")
 async def update_novel_info4api(request: UpdateNovelRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
-    """修改小说信息"""
+    """修改小说信息。
+    Args:
+        novel_id: str, # 小说ID
+        name: str | None, # 小说名称
+        summary: str | None, # 小说简介
+    Return:
+        result: bool, # 是否修改成功
+    """
     result = await update_novel_info4service(request.novel_id, request.name, request.summary, session)
     return Response.ok(data=result)
 

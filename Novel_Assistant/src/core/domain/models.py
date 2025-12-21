@@ -13,6 +13,7 @@ class TableOfContentsEntity(BaseModel):
     document_name: str = Field(description="文档名称")
     document_current_version: str = Field(description="文档版本")
     document_version_list: List[str] = Field(description="文档版本列表")
+    
 class FolderEntity(BaseModel):
     """文件夹实体."""
     folder_id: str = Field(description="文件夹ID")
@@ -36,6 +37,7 @@ class DocumentVersionEntity(BaseModel):
     """文档版本实体."""
     version_id: str = Field(description="版本ID")
     parent_version_id: str|None = Field(default=None,description="父版本ID")
+    
 class DocumentDomain(BaseModel):
     """文档实体."""
     doc_id: str = Field(description="文档ID")

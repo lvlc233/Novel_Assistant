@@ -27,9 +27,11 @@ class CreateNovelRequest(BaseRequest):
     summary: str|None = Field(default=None, description="小说简介")
 
 
+
 class GetNovelListRequest(BaseRequest):
     """获取小说列表请求"""
     user_id: str = Field(..., description="用户ID")
+
 class GetNovelDetailRequest(BaseRequest):
     """获取小说详情请求"""
     novel_id: str = Field(..., description="小说ID")
@@ -67,11 +69,73 @@ class SearchDocumentRequest(BaseRequest):
     search_by_content: bool = Field(default=False, description="是否根据正文搜索")
     is_remove: bool = Field(default=False, description="是否搜索已删除文档")
 
+class CreateFolderRequest(BaseRequest):
+    """创建文件夹请求"""
+    user_id: str = Field(..., description="用户ID")
+    novel_id: str = Field(..., description="小说ID")
+    name: str = Field(..., description="文件夹名称")
+    
+class DeleteFolderRequest(BaseRequest):
+    """删除文件夹请求"""
+    folder_id: str = Field(..., description="文件夹ID")
+
+class UpdateFolderRequest(BaseRequest):
+    """更新文件夹请求"""
+    folder_id: str = Field(..., description="文件夹ID")
+    name: str = Field(..., description="文件夹名称")
+
+class UpdateDocumentRequest(BaseRequest):
+    """更新文档请求"""
+    document_id: str = Field(..., description="文档ID")
+    title: str | None = Field(default=None, description="文档标题")
+    body_text: str | None = Field(default=None, description="文档内容")
+    
+class GetDocumentDetailRequest(BaseRequest):
+    """获取文档详情请求"""
+    document_id: str = Field(..., description="文档ID")
+
+class MoveNodeRequest(BaseRequest):
+    """移动节点请求"""
+    node_id: str = Field(..., description="节点ID")
+    target_parent_id: str | None = Field(default=None, description="目标父节点ID（文件夹ID），为None表示根目录")
+    sort_order: int = Field(default=0, description="排序位置")
+
+"""
+    知识库相关
+"""
+class GetKDsRequest(BaseRequest):
+    """获取知识库的请求"""
+    user_id: int = Field(...,description="用户ID")
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+# 响应体
+class FolderResponse(BaseModel):
+    """文件夹响应"""
+    folder_id: str = Field(..., description="文件夹ID")
+    name: str = Field(..., description="文件夹名称")
+
+class DocumentDetailResponse(BaseModel):
+    """文档详情响应"""
+    document_id: str = Field(..., description="文档ID")
+    title: str = Field(..., description="文档标题")
+    body_text: str | None = Field(default=None, description="文档内容")
+    current_version_id: str = Field(..., description="当前版本ID")
+    update_time: str = Field(..., description="更新时间")
 
 T = TypeVar("T")
 class Response(BaseModel, Generic[T]):

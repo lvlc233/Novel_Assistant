@@ -1,6 +1,7 @@
 from datetime import datetime
 from common.utils import create_uuid,get_now_time
 from sqlmodel import Field, SQLModel
+from typing import Literal
 
 
 class DocumentSQLEntity(SQLModel, table=True):
@@ -30,8 +31,8 @@ class DocumentVersionSQLEntity(SQLModel, table=True):
     body_text: str|None = Field(default=None,description="正文")
     create_time: datetime = Field(default_factory=lambda: get_now_time(),description="创建时间")
     update_time: datetime = Field(default_factory=lambda: get_now_time(),description="更新时间")
+    word_count: int = Field(default=0,description="字数")
 
-    
     novel_id: str = Field(description="小说ID")
     folder_id: str|None = Field(default=None,description="文件夹ID")
 
@@ -59,7 +60,7 @@ class FolderSQLEntity(SQLModel, table=True):
 
     folder_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="文件夹ID")
     novel_id: str = Field(description="小说ID")
-    name: str = Field(default="未命名文件夹",description="文件夹名称")
+    novel_name: str = Field(default="未命名文件夹",description="文件夹名称")
     create_time: datetime = Field(default_factory=lambda: get_now_time(),description="创建时间")
 
 class TreeSortSQLEntity(SQLModel, table=True):

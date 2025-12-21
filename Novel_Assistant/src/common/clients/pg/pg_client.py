@@ -1,5 +1,5 @@
 
-from typing import List,Tuple
+from typing import List,Tuple,Union
 from sqlmodel import select, col
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from common.enums import NodeTypeEnum
@@ -35,6 +35,8 @@ class PGClient:
     """
         用户相关操作
     """
+
+    """?"""
     async def check_user_exist_by_name(self, name: str) -> bool:
         """检查用户是否存在,若存在则返回True,否则返回False"""
         user = await self.get_user_by_name(name)
@@ -84,6 +86,8 @@ class PGClient:
     """
         小说相关操作
     """
+
+    """?"""
     async def create_novel(self, user_id: str, novel_name: str|None=None, description: str|None=None) -> NovelSQLEntity:
         
         novel = NovelSQLEntity(user_id=user_id, name=novel_name, description=description)
@@ -149,8 +153,8 @@ class PGClient:
     """
         文档相关操作
     """
-    
-    async def get_novel_documents(self, novel_id: str) -> List[DocumentSQLEntity]:
+    # ok
+    async def get_novel_document_list_by_novel_id(self, novel_id: str) -> List[DocumentSQLEntity]:
         """根据小说ID获取文档数据"""
         if not novel_id:
             return []
@@ -181,11 +185,35 @@ class PGClient:
         novel = await self.session.get(NovelSQLEntity, novel_id)
         return novel is not None
 
+    # ok
+    async def get_document_by_doc_id(self, doc_id: str) -> DocumentSQLEntity | None:
+        """根据ID获取文档"""
+        return await self.session.get(DocumentSQLEntity, doc_id)
+    # ok
+    async def get_document_version_by_doc_id_and_version_id(self, doc_id: str, version_id: str) -> DocumentVersionSQLEntity | None:
+        """根据 doc_id 与 version_id 获取对应的文档版本"""
+        stmt = select(DocumentVersionSQLEntity).where(
+            DocumentVersionSQLEntity.doc_id == doc_id,
+            DocumentVersionSQLEntity.version_id == version_id
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+
     """
         文档版本相关操作
     """
 
-    async def get_novel_document_versions(self, novel_id: str) -> List[DocumentVersionSQLEntity]:
+    async def get_document_versions_by_document_id(self,document_id:str) -> List[DocumentVersionSQLEntity]:
+        """根据小说ID获取文档版本数据"""
+        if not document_id:
+            return []
+        stmt_doc_version = select(DocumentVersionSQLEntity).where(DocumentVersionSQLEntity.doc_id == document_id)    
+        result_doc_version = await self.session.execute(stmt_doc_version)
+        return result_doc_version.scalars().all()
+
+    # ???
+    async def get_document_versions_by_novel_id(self, novel_id: str) -> List[DocumentVersionSQLEntity]:
         """根据小说ID获取文档版本数据"""
         if not novel_id:
             return []
@@ -221,6 +249,7 @@ class PGClient:
     """
         文件夹相关操作
     """
+    # ok
     async def get_novel_folders(self, novel_id: str) -> List[FolderSQLEntity]:
         """根据小说ID获取文件夹数据"""
         if not novel_id:
@@ -231,7 +260,8 @@ class PGClient:
     """
         层次结构相关操作
     """
-    async def get_novel_tree_sorts(self, novel_id: str) -> List[TreeSortSQLEntity]:
+    # ok
+    async def get_novel_tree_sorts_by_novel_id(self, novel_id: str) -> List[TreeSortSQLEntity]:
         """根据小说ID获取树结构数据"""
         if not novel_id:
             return []
@@ -281,3 +311,96 @@ class PGClient:
             
         result = await self.session.execute(stmt)
         return result.all()
+
+    async def update_document_title(self, doc_id: str, title: str) -> bool:
+        """更新文档标题"""
+        doc = await self.session.get(DocumentSQLEntity, doc_id)
+        if doc:
+            doc.title = title
+            self.session.add(doc)
+            await self.session.flush()
+            return True
+        return False
+        
+    async def update_document_current_version(self, doc_id: str, version_id: str) -> bool:
+        """更新文档当前版本"""
+        doc = await self.session.get(DocumentSQLEntity, doc_id)
+        if doc:
+            doc.current_version_id = version_id
+            self.session.add(doc)
+            await self.session.flush()
+            return True
+        return False
+
+    async def create_folder(self, novel_id: str, name: str) -> FolderSQLEntity:
+        """创建文件夹"""
+        folder = FolderSQLEntity(novel_id=novel_id, name=name)
+        self.session.add(folder)
+        await self.session.flush()
+        await self.session.refresh(folder)
+        return folder
+
+    async def delete_folder(self, folder_id: str) -> bool:
+        """删除文件夹"""
+        folder = await self.session.get(FolderSQLEntity, folder_id)
+        if folder:
+            await self.session.delete(folder)
+            await self.session.flush()
+            return True
+        return False
+
+    async def update_folder(self, folder_id: str, name: str) -> bool:
+        """更新文件夹"""
+        folder = await self.session.get(FolderSQLEntity, folder_id)
+        if folder:
+            folder.name = name
+            self.session.add(folder)
+            await self.session.flush()
+            return True
+        return False
+
+    async def add_node_to_tree(self, novel_id: str, node_id: str, node_type: str, parent_id: str | None = None, sort_order: int = 0) -> TreeSortSQLEntity:
+        """添加节点到树结构"""
+        tree_node = TreeSortSQLEntity(
+            novel_id=novel_id,
+            node_id=node_id,
+            node_type=node_type,
+            parent_id=parent_id,
+            sort_order=sort_order
+        )
+        self.session.add(tree_node)
+        await self.session.flush()
+        await self.session.refresh(tree_node)
+        return tree_node
+
+    async def get_tree_node(self, node_id: str) -> TreeSortSQLEntity | None:
+        """根据节点ID获取树节点"""
+        stmt = select(TreeSortSQLEntity).where(TreeSortSQLEntity.node_id == node_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def delete_tree_node(self, node_id: str) -> bool:
+        """从树结构删除节点"""
+        stmt = select(TreeSortSQLEntity).where(TreeSortSQLEntity.node_id == node_id)
+        result = await self.session.execute(stmt)
+        node = result.scalars().first()
+        if node:
+            await self.session.delete(node)
+            await self.session.flush()
+            return True
+        return False
+    
+    async def update_tree_node(self, node_id: str, parent_id: str | None, sort_order: int) -> bool:
+        """更新树节点位置"""
+        stmt = select(TreeSortSQLEntity).where(TreeSortSQLEntity.node_id == node_id)
+        result = await self.session.execute(stmt)
+        node = result.scalars().first()
+        if node:
+            node.parent_id = parent_id
+            node.sort_order = sort_order
+            self.session.add(node)
+            await self.session.flush()
+            return True
+        return False
+
+
