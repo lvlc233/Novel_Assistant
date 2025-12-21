@@ -185,22 +185,6 @@ async def create_novel4service(user_id: str, name: str, summary: str, session: A
         raise e
 
 
-async def get_novel_existing_list4service(user_id: str, session: AsyncSession) -> List[NovelDomain]:
-    """根据用户ID获取小说列表"""
-    pg_client = PGClient(session)
-    try:
-        if not await pg_client.check_user_exist_by_id(user_id):
-            raise UserNotFoundError(f"用户ID {user_id} 不存在")
-        novels_db = await pg_client.get_user_active_novels(user_id)
-        novels = []
-        for novel_db in novels_db:
-            novel = NovelAdapter.to_domain(novel_db)
-            novels.append(novel)
-        return novels
-    except Exception as e:
-        logging.error(f"获取存在小说列表失败: {e}")
-        raise e
-
 async def delete_novel4service(novel_id: str, session: AsyncSession) -> bool:
     """删除小说"""
     pg_client = PGClient(session)

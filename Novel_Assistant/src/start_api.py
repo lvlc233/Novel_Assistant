@@ -22,7 +22,7 @@ def main():
     args = _parse_args()
     host = args.host or os.getenv("HOST") or "0.0.0.0"
     env_port = args.port if args.port is not None else os.getenv("PORT")
-    port = int(env_port) if env_port is not None else 8000
+    port = int(env_port) if env_port is not None else 8426
     uvicorn.run(app="src.api.app:app", host=host, port=port, log_level="debug", reload=True)
     
     

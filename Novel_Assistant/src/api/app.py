@@ -20,7 +20,6 @@ from api.routers import (
     user_api,
     novel_api,
     document_api,
-    chat_helper_api
 )
 from api.error_handler import register_exception_handlers
 
@@ -67,10 +66,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.include_router(chat_helper_api.router, prefix="/agent/chat_helper/v1")
-
-
-    app.include_router(user_api.router, prefix="/user")
+    # app.include_router(user_api.router, prefix="/user")
     app.include_router(novel_api.router,prefix="/novel")
     app.include_router(document_api.router,prefix="/document")
 
@@ -78,7 +74,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
 
-    # LangGraphAGUIAgent.dict_repr = dict_repr
+    # agent 路由配置:agui
     sdk = CopilotKitRemoteEndpoint(
         agents=[
             LangGraphAGUIAdapter (

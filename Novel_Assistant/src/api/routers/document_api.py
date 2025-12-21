@@ -20,19 +20,19 @@ from api.models import (
 from common.clients.pg.pg_client import get_session
 
 
-from common.adapter.novel import DocumentAdapter, FolderAdapter
-from api.services.document_service import (
-    create_document4service,
-    delete_document4service,    
-    search_documents_by_title4service,
-    search_documents_by_content4service,
-    create_folder4service,
-    delete_folder4service,
-    update_folder4service,
-    get_document_detail4service,
-    update_document4service,
-    move_node4service,
-)
+# from common.adapter.novel import DocumentAdapter, FolderAdapter
+# from api.services.document_service import (
+#     create_document4service,
+#     delete_document4service,    
+#     search_documents_by_title4service,
+#     search_documents_by_content4service,
+#     create_folder4service,
+#     delete_folder4service,
+#     update_folder4service,
+#     get_document_detail4service,
+#     update_document4service,
+#     move_node4service,
+# )
 
 
 router = APIRouter(tags=["document"])

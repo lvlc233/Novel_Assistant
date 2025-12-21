@@ -26,7 +26,6 @@ def passwd_hash(password: str) -> str:
     pwd_hash = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
     # 返回盐和哈希值的组合
     return f"{salt}${pwd_hash}"
-
 def passwd_verify(password: str, hashed_password: str) -> bool:
     """验证密码
 
@@ -50,9 +49,13 @@ def passwd_verify(password: str, hashed_password: str) -> bool:
         # 如果格式不正确，返回False
         return False 
 
-def get_now_time() -> datetime:
-    """获取当前时间"""
-    return datetime.now().replace(tzinfo=None)
+def get_now_time(timezone: str = "Asia/Shanghai") -> datetime:
+    """获取当前时间:含时区"""
+    from datetime import timezone as tz
+    import pytz
+    tzinfo = pytz.timezone(timezone)
+    return datetime.now(tzinfo)
+
 def format_time(time: datetime) -> str:
     """格式化时间"""
     return time.strftime("%Y-%m-%d %H:%M:%S")
