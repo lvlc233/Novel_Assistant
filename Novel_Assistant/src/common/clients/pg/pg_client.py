@@ -1,26 +1,28 @@
 
 from typing import List,Tuple,Union
 from sqlmodel import select, col
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from common.enums import NodeTypeEnum
 from common.clients.pg.pg_models import (
-    # DocumentSQLEntity, 
-    # DocumentVersionSQLEntity, 
+    DocumentMetadataSQLEntity,
+    DocumentVersionSQLEntity, 
     NovelSQLEntity, 
-    # FolderSQLEntity, 
-    # TreeSortSQLEntity, 
-    # UserSQLEntity
+    FolderSQLEntity, 
+    TreeSortSQLEntity, 
+    UserSQLEntity
 )
 
 
 
-from common.err import (
+from common.errors import (
     UserExistsError,
     UserNotFoundError,
     UserPasswordError
 )
 from common.utils import passwd_verify
 import os
+from common.clients.pg.pg_models import NovelKDMappingSQLEntity
 
 engine = create_async_engine(os.getenv("DATABASE_URL"), echo=True, future=True)
 
@@ -35,17 +37,22 @@ class PGClient:
     """
         用户相关操作
     """
+    async def get_user_by_id(self, user_id: str) -> UserSQLEntity|None:
+        """根据用户ID获取用户"""
+        user = await self.session.get(UserSQLEntity, user_id)
+        return user
 
+    async def check_user_exist_by_id(self, user_id: str) -> bool:
+        """检查用户是否存在,若存在则返回True,否则返回False"""
+        user = await self.get_user_by_id(user_id)
+        return user is not None
     """?"""
     # async def check_user_exist_by_name(self, name: str) -> bool:
     #     """检查用户是否存在,若存在则返回True,否则返回False"""
     #     user = await self.get_user_by_name(name)
     #     return user is not None
 
-    # async def check_user_exist_by_id(self, user_id: str) -> bool:
-    #     """检查用户是否存在,若存在则返回True,否则返回False"""
-    #     user = await self.get_user_by_id(user_id)
-    #     return user is not None
+
 
     # async def create_user(self, name: str, password: str) -> UserSQLEntity:
     #     if await self.check_user_exist_by_name(name):
@@ -79,10 +86,7 @@ class PGClient:
     #     result = await self.session.execute(statement)
     #     return result.scalars().first()
 
-    # async def get_user_by_id(self, user_id: str) -> UserSQLEntity|None:
-    #     """根据用户ID获取用户"""
-    #     user = await self.session.get(UserSQLEntity, user_id)
-    #     return user
+
     """
         小说相关操作
     """
@@ -92,16 +96,76 @@ class PGClient:
         novel = await self.session.get(NovelSQLEntity, novel_id)
         return novel is not None
 
-    """?"""
-    async def create_novel(self, user_id: str, novel_name: str|None=None, description: str|None=None) -> NovelSQLEntity:
+    async def get_novel_by_id(self, novel_id: str) -> NovelSQLEntity | None:
+        """根据小说ID获取小说"""
+        return await self.session.get(NovelSQLEntity, novel_id)
+
+    async def get_novel_word_count(self, novel_id: str) -> int:
+        """获取小说总字数"""
+        stmt = (
+            select(func.coalesce(func.sum(DocumentVersionSQLEntity.document_word_count), 0))
+            .select_from(DocumentMetadataSQLEntity)
+            .join(DocumentVersionSQLEntity, DocumentMetadataSQLEntity.document_current_version_id == DocumentVersionSQLEntity.document_version_id)
+            .where(DocumentMetadataSQLEntity.novel_id == novel_id)
+            .where(DocumentMetadataSQLEntity.document_is_remove == False)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
+    async def get_novel_directory_elements(self, novel_id: str):
+        """
+        获取小说目录相关的所有元素：TreeSort, Folder, DocumentMetadata, DocumentVersion(用于字数)
+        """
+        # 1. Get TreeSort items
+        stmt_tree = select(TreeSortSQLEntity).where(TreeSortSQLEntity.novel_id == novel_id).order_by(TreeSortSQLEntity.node_sort_order)
+        tree_results = await self.session.execute(stmt_tree)
+        tree_items = tree_results.scalars().all()
         
-        novel = NovelSQLEntity(user_id=user_id, name=novel_name, description=description)
+        # 2. Get Folders
+        stmt_folder = select(FolderSQLEntity).where(FolderSQLEntity.novel_id == novel_id)
+        folder_results = await self.session.execute(stmt_folder)
+        folders = folder_results.scalars().all()
+        folder_map = {f.folder_id: f for f in folders}
+        
+        # 3. Get Documents (joined with version for word count)
+        # We need doc title, update time, and word count.
+        stmt_doc = (
+            select(DocumentMetadataSQLEntity, DocumentVersionSQLEntity.document_word_count)
+            .outerjoin(DocumentVersionSQLEntity, DocumentMetadataSQLEntity.document_current_version_id == DocumentVersionSQLEntity.document_version_id)
+            .where(DocumentMetadataSQLEntity.novel_id == novel_id)
+            .where(DocumentMetadataSQLEntity.document_is_remove == False)
+        )
+        doc_results = await self.session.execute(stmt_doc)
+        # Result is list of (DocumentMetadataSQLEntity, word_count)
+        docs = doc_results.all()
+        doc_map = {d[0].document_id: (d[0], d[1]) for d in docs}
+        
+        return tree_items, folder_map, doc_map
+
+
+    async def create_novel_entity(
+        self, 
+        user_id: str, 
+        novel_cover_image_url:str|None=None,
+        novel_name: str|None=None, 
+        novel_summary: str|None=None,
+        ) -> NovelSQLEntity:
+        """创建小说"""
+
+        novel = NovelSQLEntity(
+            user_id=user_id, 
+            novel_cover_image_url=novel_cover_image_url,
+            novel_name=novel_name, 
+            novel_summary=novel_summary,
+        )
         
         self.session.add(novel) 
         await self.session.flush()
         await self.session.refresh(novel)
         return novel
 
+
+    """?"""
     async def get_user_active_novels(self, user_id: str) -> List[NovelSQLEntity]:
         """获取用户所有未删除的小说列表"""
         stmt_novel = select(NovelSQLEntity).where(
@@ -110,6 +174,27 @@ class PGClient:
         )
         result_novel = await self.session.execute(stmt_novel)
         return result_novel.scalars().all()
+
+    async def get_user_active_novels_with_word_count(self, user_id: str) -> List[Tuple[NovelSQLEntity, int]]:
+        """获取用户所有未删除的小说列表及总字数"""
+
+        stmt = (
+            select(NovelSQLEntity, func.coalesce(func.sum(DocumentVersionSQLEntity.document_word_count), 0).label("total_word_count"))
+            .outerjoin(DocumentMetadataSQLEntity, 
+                       (NovelSQLEntity.novel_id == DocumentMetadataSQLEntity.novel_id) & 
+                       (DocumentMetadataSQLEntity.document_is_remove == False))
+            .outerjoin(DocumentVersionSQLEntity, 
+                       DocumentMetadataSQLEntity.document_current_version_id == DocumentVersionSQLEntity.document_version_id)
+            .where(
+                NovelSQLEntity.user_id == user_id,
+                NovelSQLEntity.novel_is_remove == False
+            )
+            .group_by(NovelSQLEntity.novel_id)
+            .order_by(NovelSQLEntity.novel_create_time.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.all()
+
 
 
     async def get_removed_novel_list(self, user_id: str) -> List[NovelSQLEntity]:
@@ -156,8 +241,41 @@ class PGClient:
         return False
 
     """
-        文档相关操作
+        小说和知识库映射
+        novel_kd_mapping
     """
+    async def creat_novel_kd_mapping(self, document_id: str, kd_id_list: List[str]) -> bool:
+        """创建小说和知识库的映射关系"""
+        
+        if not kd_id_list:
+            return True
+        
+        # 批量插入映射记录
+        mappings = [
+            NovelKDMappingSQLEntity(
+                document_id=document_id,
+                kd_id=kd_id
+            )
+            for kd_id in kd_id_list
+        ]
+        
+        self.session.add_all(mappings)
+        await self.session.flush()
+        return True
+
+    """
+        文档元数据相关操作
+        document_metadata
+    """
+    async def get_document_by_novel_id_batch(self, novel_id_list: List[str]) -> List[DocumentMetadataSQLEntity]:
+        """根据小说ID列表批量获取文档元数据"""
+        if not novel_id_list:
+            return []
+        stmt_doc = select(DocumentMetadataSQLEntity).where(
+            DocumentMetadataSQLEntity.novel_id.in_(novel_id_list)
+        )
+        result_doc = await self.session.execute(stmt_doc)
+        return result_doc.scalars().all()
     # # ok
     # async def get_novel_document_list_by_novel_id(self, novel_id: str) -> List[DocumentSQLEntity]:
     #     """根据小说ID获取文档数据"""
@@ -201,9 +319,31 @@ class PGClient:
     #     return result.scalars().first()
 
 
-    # """
-    #     文档版本相关操作
-    # """
+    """
+        文档版本相关操作
+        document_version
+    """
+    async def get_document_current_version_by_document_id_batch(self, document_id_list: List[str]) -> List[DocumentVersionSQLEntity]:
+        """根据文档ID列表批量获取当前版本"""
+        if not document_id_list:
+            return []
+        # 先查出所有文档的 current_version_id
+        stmt_doc = select(DocumentMetadataSQLEntity.doc_id, DocumentMetadataSQLEntity.current_version_id).where(
+            DocumentMetadataSQLEntity.doc_id.in_(document_id_list)
+        )
+        result_doc = await self.session.execute(stmt_doc)
+        rows = result_doc.all()
+        if not rows:
+            return []
+        version_id_list = [row.current_version_id for row in rows if row.current_version_id]
+        if not version_id_list:
+            return []
+        # 再批量查版本
+        stmt_version = select(DocumentVersionSQLEntity).where(
+            DocumentVersionSQLEntity.version_id.in_(version_id_list)
+        )
+        result_version = await self.session.execute(stmt_version)
+        return result_version.scalars().all()
 
     # async def get_document_versions_by_document_id(self,document_id:str) -> List[DocumentVersionSQLEntity]:
     #     """根据小说ID获取文档版本数据"""

@@ -23,9 +23,11 @@ class CreateUserRequest(BaseRequest):
 class CreateNovelRequest(BaseRequest):
     """小说信息"""
     user_id: str = Field(..., description="用户ID")
-    name: str|None = Field(default=None, description="小说名称")
-    summary: str|None = Field(default=None, description="小说简介")
-
+    novel_cover_image_url: str|None = Field(default=None,description="小说封面url")
+    novel_name: str|None = Field(default=None, description="小说名称")
+    novel_summary: str|None = Field(default=None, description="小说简介")
+    kd_id_list: List[str] = Field(default=[], description="知识库ID列表")
+    
 
 
 class GetNovelListRequest(BaseRequest):

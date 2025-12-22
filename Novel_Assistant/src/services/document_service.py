@@ -14,7 +14,7 @@ from common.clients.pg.pg_models import (
     
 )
 
-from common.err import (
+from common.errors import (
     UserNotFoundError,
     NovelNotFoundError,
     DocumentNotFoundError,

@@ -3,13 +3,23 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.clients.pg.pg_client import PGClient
+from common.errors import UserNotFoundError
 from common.utils import (
     passwd_hash
 )
 
+async def check_user_exist_by_user_id4service(user_id:str,*,session: AsyncSession):
+    pg_client=PGClient(session)
+    try:
+        if not await pg_client.check_user_exist_by_id(user_id):
+            raise UserNotFoundError(f"用户ID {user_id} 不存在")
+    except Exception as e:
+        logging.error(f"用户异常:当前用户不存在: {e}")
+        raise e
 
 
-async def create_user4service(name: str, password: str,session: AsyncSession) -> str|None:
+
+async def create_user4service(name: str, password: str,*,session: AsyncSession) -> str|None:
     """创建用户"""
     pg_client = PGClient(session)
     try:

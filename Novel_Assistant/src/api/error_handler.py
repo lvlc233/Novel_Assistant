@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from api.models import Response
-from common.err import BaseError
+from common.errors import BaseError
 
 
 # ------------------------
