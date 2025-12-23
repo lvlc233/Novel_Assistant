@@ -33,7 +33,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       icon: <FileText className="w-8 h-8" />,
       rotation: '-rotate-4',
       color: 'bg-surface-white',
-      onClick: () => router.push('/documents'),
+      onClick: () => router.push('/novels'),
     },
     {
       title: '知识库',

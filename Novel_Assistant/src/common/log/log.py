@@ -96,10 +96,13 @@ def add_layer_sink(path: str, layer: str):
 add_layer_sink("api.jsonl", "API")
 add_layer_sink("graph.jsonl", "GRAPH")
 add_layer_sink("llm.jsonl", "LLM")
+add_layer_sink("db.jsonl", "DB")
 
 
 api_logger = logger.bind(layer="API")
 graph_logger = logger.bind(layer="GRAPH")
 llm_logger = logger.bind(layer="LLM")
+db_logger = logger.bind(layer="DB")
 
-__all__ = ["api_logger", "graph_logger", "llm_logger"]
+
+__all__ = ["api_logger", "graph_logger", "llm_logger", "db_logger"]

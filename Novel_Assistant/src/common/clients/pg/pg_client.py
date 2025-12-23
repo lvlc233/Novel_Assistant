@@ -21,9 +21,9 @@ from common.errors import (
     UserPasswordError
 )
 from common.utils import passwd_verify
-import os
 from common.clients.pg.pg_models import NovelKDMappingSQLEntity
-
+from common.log.log import db_logger
+import os
 engine = create_async_engine(os.getenv("DATABASE_URL"), echo=True, future=True)
 
 async def get_session() -> AsyncSession:
@@ -39,9 +39,12 @@ class PGClient:
     """
     async def get_user_by_id(self, user_id: str) -> UserSQLEntity|None:
         """根据用户ID获取用户"""
-        user = await self.session.get(UserSQLEntity, user_id)
-        return user
-
+        try:
+            user = await self.session.get(UserSQLEntity, user_id)
+            return user
+        except Exception as e:
+            db_logger.error(f"数据库异常:位置`get_user_by_id`:参数信息 {e}")
+            raise e
     async def check_user_exist_by_id(self, user_id: str) -> bool:
         """检查用户是否存在,若存在则返回True,否则返回False"""
         user = await self.get_user_by_id(user_id)
@@ -244,7 +247,7 @@ class PGClient:
         小说和知识库映射
         novel_kd_mapping
     """
-    async def creat_novel_kd_mapping(self, document_id: str, kd_id_list: List[str]) -> bool:
+    async def creat_novel_kd_mapping(self, novel_id: str, kd_id_list: List[str]) -> bool:
         """创建小说和知识库的映射关系"""
         
         if not kd_id_list:
@@ -253,7 +256,7 @@ class PGClient:
         # 批量插入映射记录
         mappings = [
             NovelKDMappingSQLEntity(
-                document_id=document_id,
+                novel_id=novel_id,
                 kd_id=kd_id
             )
             for kd_id in kd_id_list

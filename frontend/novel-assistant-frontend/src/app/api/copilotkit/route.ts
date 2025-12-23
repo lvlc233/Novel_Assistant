@@ -5,11 +5,12 @@ import {
   ExperimentalEmptyAdapter,
 } from "@copilotkit/runtime";
 import { NextRequest } from "next/server";
+import { config } from "@/config";
 
 // 访问的后端,还有什么其他配置嘛?
 const runtime = new CopilotRuntime({
   // 端点
-  remoteEndpoints: [{url: "http://localhost:8001/copilotkit"},],
+  remoteEndpoints: [{ url: config.novel.agents.copilotEndpoint }],
   // 还可以配置agent,action...
 });
 const serviceAdapter = new ExperimentalEmptyAdapter();

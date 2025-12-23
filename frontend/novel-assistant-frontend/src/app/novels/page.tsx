@@ -5,43 +5,36 @@ import DocumentCarousel from '@/components/Document/DocumentCarousel';
 import { Novel, KnowledgeBase } from '@/types/novel';
 import { NovelCreationData } from '@/components/Document/CreateNovelCard';
 import BottomInput from '@/components/base/BottomInput';
+import { getNovelList, createNovel, CreateNovelDto } from '@/services/novelService';
+
+import { userId } from '@/services/mock';
 
 export default function DocumentsPage() {
   const router = useRouter();
   
-  // Mock data matching the interface in types/novel.ts
-  const [novels, setNovels] = useState<Novel[]>([
-    {
-      id: '1',
-      title: '星际迷航：未知的边界',
-      cover: '',
-      synopsis: '在遥远的未来，人类探索宇宙的边缘...',
-      wordCount: 12500,
-      status: '连载中',
-      updatedAt: '2023-10-24 14:30',
-      createdAt: ''
-    },
-     {
-       id: '2',
-       title: '魔法学院的日常',
-       cover: '',
-       synopsis: '一个平凡少年进入魔法学院的故事...',
-       wordCount: 56000,
-       status: '完结',
-       updatedAt: '2023-09-15 09:20',
-       createdAt: ''
-     },
-    {
-      id: '3',
-      title: '赛博朋克：霓虹之夜',
-      cover: '',
-      synopsis: '在被霓虹灯覆盖的城市下，隐藏着巨大的阴谋...',
-      wordCount: 3400,
-      status: '断更',
-      updatedAt: '2023-11-01 18:45',
-      createdAt: ''
-    }
-  ]);
+  const [novels, setNovels] = useState<Novel[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch novels from API
+  useEffect(() => {
+    const fetchNovels = async () => {
+      try {
+        setIsLoading(true);
+    
+        
+        const data = await getNovelList(userId);
+        setNovels(data);
+      } catch (err: any) {
+        console.error('Error fetching novels:', err);
+        setError(err.message || '连接服务器失败，请检查后端服务是否启动');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNovels();
+  }, []);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
@@ -91,36 +84,45 @@ export default function DocumentsPage() {
   const handleSelectNovel = (novel: Novel) => {
     // Navigate to novel detail page
     console.log('Selected novel:', novel);
-    router.push(`/documents/${novel.id}`);
+    router.push(`/novels/${novel.id}`);
   };
 
   const handleEditNovel = (novel: Novel) => {
     console.log('Edit novel:', novel);
     // Logic for editing novel metadata (maybe same page or modal?)
     // For now, go to detail page
-    router.push(`/documents/${novel.id}`);
+    router.push(`/novels/${novel.id}`);
   };
 
   const handleDeleteNovel = (id: string) => {
       setNovels(prev => prev.filter(n => n.id !== id));
   };
 
-  const handleCreateNovel = (data: NovelCreationData) => {
-      console.log("Create novel", data);
-      const newNovel: Novel = {
-          id: Date.now().toString(),
-          title: data.title,
-          synopsis: data.synopsis,
-          wordCount: 0,
-          status: '连载中',
-          createdAt: new Date().toLocaleDateString(),
-          updatedAt: new Date().toLocaleString(),
-          volumes: [],
-          orphanChapters: []
-      };
-      setNovels([...novels, newNovel]);
-      // Navigate to the new novel page
-      router.push(`/documents/${newNovel.id}`);
+  const handleCreateNovel = async (data: NovelCreationData) => {
+      try {
+        console.log("Creating novel with data:", data);
+        
+        // 构造 DTO
+        const createDto: CreateNovelDto = {
+          user_id: userId,
+          novel_name: data.title,
+          novel_summary: data.synopsis,
+          // TODO: 处理封面图片上传，目前仅透传 null 或 URL
+          // novel_cover_image_url: data.cover ? URL.createObjectURL(data.cover) : undefined,
+          kd_id_list: data.selectedKbIds
+        };
+
+        const newNovel = await createNovel(createDto);
+        
+        setNovels(prev => [...prev, newNovel]);
+        setIsCreating(false);
+        // Navigate to the new novel page
+        router.push(`/documents/${newNovel.id}`);
+      } catch (err: any) {
+        console.error("Failed to create novel:", err);
+        // TODO: 显示错误 Toast
+        alert(`创建失败: ${err.message}`);
+      }
   };
 
   return (
@@ -134,6 +136,25 @@ export default function DocumentsPage() {
             ← 返回首页
         </button>
 
+       {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="w-16 h-16 border-4 border-gray-200 border-t-black rounded-full animate-spin mb-4"></div>
+            <p className="text-gray-500 font-serif animate-pulse">正在加载作品列表...</p>
+            {/* 提示用户可能的冷启动延迟 */}
+            <p className="text-gray-400 text-xs mt-2">首次加载可能需要唤醒后端服务，请稍候</p>
+          </div>
+       ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+             <div className="text-red-500 text-xl font-bold mb-2">出错了</div>
+             <p className="text-gray-600 mb-4">{error}</p>
+             <button 
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+             >
+                重试
+             </button>
+          </div>
+       ) : (
        <DocumentCarousel 
           novels={novels}
           onSelectNovel={handleSelectNovel}
@@ -146,6 +167,7 @@ export default function DocumentsPage() {
           onToggleCreating={setIsCreating}
           existingKnowledgeBases={mockKnowledgeBases}
        />
+       )}
 
         <div className="fixed bottom-12 left-0 right-0 z-50 flex items-end justify-center gap-4 px-4 pointer-events-none">
           <div className="pointer-events-auto w-full max-w-2xl">
