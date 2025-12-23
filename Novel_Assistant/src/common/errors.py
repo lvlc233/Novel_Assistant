@@ -15,6 +15,11 @@ class BaseError(Exception):
         self.data = data
         super().__init__(self.message)
 
+class DBURLNotFoundError(BaseError):
+
+    def __init__(self, db_url: str):
+        super().__init__("5001", message=f"数据库链接不存在: {db_url}")
+        self.db_url = db_url
 
 class SessionNotFoundError(BaseError):
     """会话不存在异常（示例），"""

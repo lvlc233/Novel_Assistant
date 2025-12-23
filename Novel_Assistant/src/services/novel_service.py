@@ -28,7 +28,7 @@ from common.utils import (
 from core.domain.models import (
     NovelItemUse2Overview,
     DirectoryNode,
-    NovelDetailDomain
+    NovelDetail
 )
 from typing import Union
 
@@ -202,7 +202,7 @@ async def get_novel_directory4service(novel_id: str, session: AsyncSession) -> L
         raise e
 
 
-async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> NovelDetailDomain:
+async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> NovelDetail:
     """获取指定小说ID的小说详情。
     Args:
         novel_id: str, # 小说ID
@@ -225,7 +225,7 @@ async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> Nove
         # 4. Calculate Hiatus Interval
         hiatus_interval = (get_now_time() - novel.novel_update_time).days
         
-        return NovelDetailDomain(
+        return NovelDetail(
             novel_id=novel.novel_id,
             novel_name=novel.novel_name,
             novel_cover_image_url=novel.novel_cover_image_url,

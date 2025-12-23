@@ -17,6 +17,14 @@ class NovelItemUse2Overview(BaseModel):
     novel_hiatus_interval: int = Field(description="断更间隔时间,单位为天")
     novel_word_count: int = Field(description="小说字数")
 
+class DocumentDetailPinnedVersion(BaseModel):
+    """指定版本的文档详情。
+    """
+    doc_id: str = Field(description="文档ID")
+    version_id: str = Field(description="版本ID")
+    title: str = Field(description="文档标题")
+    body_text: str | None = Field(default=None,description="文档内容")
+    word_count: int = Field(default=0,description="字数")
 
 class DirectoryNode(BaseModel):
     """目录节点（文件夹或文档）"""
@@ -33,8 +41,8 @@ class DirectoryNode(BaseModel):
     # 文件夹特有字段
     create_time: str | None = Field(default=None, description="创建时间")
 
-class NovelDetailDomain(BaseModel):
-    """小说详情领域模型"""
+class NovelDetail(BaseModel):
+    """小说详情模型"""
     novel_id: str = Field(description="小说ID")
     novel_name: str = Field(description="小说名称")
     novel_cover_image_url: str | None = Field(default=None, description="小说封面图片URL")

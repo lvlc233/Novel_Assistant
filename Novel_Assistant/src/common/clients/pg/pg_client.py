@@ -307,19 +307,19 @@ class PGClient:
     #     return False
 
 
-    # # ok
-    # async def get_document_by_doc_id(self, doc_id: str) -> DocumentSQLEntity | None:
-    #     """根据ID获取文档"""
-    #     return await self.session.get(DocumentSQLEntity, doc_id)
-    # # ok
-    # async def get_document_version_by_doc_id_and_version_id(self, doc_id: str, version_id: str) -> DocumentVersionSQLEntity | None:
-    #     """根据 doc_id 与 version_id 获取对应的文档版本"""
-    #     stmt = select(DocumentVersionSQLEntity).where(
-    #         DocumentVersionSQLEntity.doc_id == doc_id,
-    #         DocumentVersionSQLEntity.version_id == version_id
-    #     )
-    #     result = await self.session.execute(stmt)
-    #     return result.scalars().first()
+    # ok
+    async def get_document_by_doc_id(self, document_id: str) -> DocumentMetadataSQLEntity | None:
+        """根据ID获取文档"""
+        return await self.session.get(DocumentMetadataSQLEntity, document_id)
+    # ok
+    async def get_document_version_by_doc_id_and_version_id(self, document_id: str, document_version_id: str) -> DocumentVersionSQLEntity | None:
+        """根据 document_id 与 version_id 获取对应的文档版本"""
+        stmt = select(DocumentVersionSQLEntity).where(
+            DocumentVersionSQLEntity.document_id == document_id,
+            DocumentVersionSQLEntity.document_version_id == document_version_id
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
 
 
     """

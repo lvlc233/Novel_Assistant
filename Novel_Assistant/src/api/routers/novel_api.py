@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.domain.models import(
-    NovelItemUse2Overview
+    NovelItemUse2Overview,
+    NovelDetail
 ) 
 from api.models import (
     CreateNovelRequest, 
@@ -12,13 +13,13 @@ from api.models import (
     DeleteNovelRequest,
     UpdateNovelRequest,
     Response,
-    NovelAbbreviateResponse,
-    NovelDetailResponse
+
 
 )
 from services.novel_service import (
     get_novel_existing_overview_list4service,
-    create_novel4service
+    create_novel4service,
+    get_novel_detail4service
 )
 from services.user_service import check_user_exist_by_user_id4service
 from common.clients.pg.pg_client import get_session
@@ -65,30 +66,23 @@ async def create_novel4api(request: CreateNovelRequest, session: AsyncSession = 
     Return:
         novel_item_use2overview: NovelItemUse2Overview, # 小说视图
     """
+    await check_user_exist_by_user_id4service(request.user_id,session=session)
     request=request.__dict__
     novel_item_use2overview = await create_novel4service(session=session,**request)
     return Response.ok(data=novel_item_use2overview)
 
-# @router.post("/get_novel_detail")
-# async def get_novel_detail4api(request:GetNovelDetailRequest , session: AsyncSession = Depends(get_session))->Response[NovelDetailResponse]:
-#     """获取小说详情。
-#     Args:
-#         novel_id: str, # 小说ID
-#     Return:
-#         novel: NovelDetailResponse, # 小说详情
-#             novel_id: str, # 小说ID
-#             novel_name: str, # 小说名称
-#             image_url: str | None, # 小说封面URL
-#             summary: str | None, # 小说简介
-#             state: str, # 小说状态
-#             create_time: str, # 创建时间
-#             update_time: str, # 更新时间
-#             hiatus_interval: int, # 上次更新时间间隔（天）
-#             menu: List[Union[FolderItemInAPI, DocumentItemInAPI]], # 小说目录
-#     """
-#     novel = await get_novel_detail4service(request.novel_id, session)
-#     novel = NovelAdapter.from_domain_detail(novel)
-#     return Response.ok(data=novel)
+@router.post("/get_novel_detail")
+async def get_novel_detail4api(request:GetNovelDetailRequest , session: AsyncSession = Depends(get_session))->Response[NovelDetail]:
+    """获取小说详情。
+    Args:
+        user_id: str, # 用户ID
+        novel_id: str, # 小说IDNovelDetail
+    Return:
+        novel: NovelDetailResponse, # 小说详情
+    """
+    await check_user_exist_by_user_id4service(request.user_id,session=session)
+    novel_detail = await get_novel_detail4service(request.novel_id, session)
+    return Response.ok(data=novel_detail)
 
 # @router.post("/delete_novel")
 # async def delete_novel4api(request: DeleteNovelRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:

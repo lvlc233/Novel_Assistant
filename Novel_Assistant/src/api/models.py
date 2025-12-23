@@ -36,6 +36,7 @@ class GetNovelListRequest(BaseRequest):
 
 class GetNovelDetailRequest(BaseRequest):
     """获取小说详情请求"""
+    user_id: str = Field(..., description="用户ID")
     novel_id: str = Field(..., description="小说ID")
 
 class DeleteNovelRequest(BaseRequest):
@@ -182,6 +183,7 @@ class FolderItemInAPI(BaseModel):
     """目录项"""
     folder_name: str = Field(..., description="文件夹名")
     document_list: List[DocumentItemInAPI] = Field(..., description="文档列表")
+    
 class NovelDetailResponse(BaseModel):
     """小说详情响应"""
     novel_id: str = Field(..., description="小说ID")

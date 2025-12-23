@@ -117,7 +117,7 @@ export default function DocumentsPage() {
         setNovels(prev => [...prev, newNovel]);
         setIsCreating(false);
         // Navigate to the new novel page
-        router.push(`/documents/${newNovel.id}`);
+        router.push(`/novels/${newNovel.id}`);
       } catch (err: any) {
         console.error("Failed to create novel:", err);
         // TODO: 显示错误 Toast
