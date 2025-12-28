@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import DocumentEditor from '@/components/DocumentEdit/DocumentEditor';
 import { CopilotSidebar } from '@copilotkit/react-ui';
 import CustomChatButton from '@/components/Sidebar/Button/Button';
@@ -7,12 +8,11 @@ import CustomHeader from '@/components/Sidebar/Header/Header';
 import CustomInput from '@/components/Sidebar/Input/Input';
 import MailIcon from '@/components/Mail/MailIcon';
 
-export default function EditorPage() {
-    const [isCopilotOpen, setIsCopilotOpen] = useState(true);
-  // 处理侧边栏收起/展开逻辑
-  const handleToggleSidebar = () => {
-    setIsCopilotOpen(!isCopilotOpen);
-  };
+function EditorContent() {
+  const [isCopilotOpen, setIsCopilotOpen] = useState(true);
+  const searchParams = useSearchParams();
+  const novelId = searchParams.get('novelId');
+  const initialChapterId = searchParams.get('initialChapterId');
 
       
   return (
@@ -32,12 +32,22 @@ export default function EditorPage() {
         Input={CustomInput}  
       />
    
-  
-    
       {/* 文档编辑器 */}
-      <DocumentEditor isChatExpanded={isCopilotOpen} />
+      <DocumentEditor 
+        isChatExpanded={isCopilotOpen} 
+        novelId={novelId}
+        initialChapterId={initialChapterId}
+      />
       {/* 邮件图标 - 悬浮在页面右上角 */}
       <MailIcon onClick={() => console.log('邮件图标被点击')} />
     </div>
+  );
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">加载编辑器...</div>}>
+      <EditorContent />
+    </Suspense>
   );
 }
