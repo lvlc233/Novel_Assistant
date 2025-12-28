@@ -1,46 +1,22 @@
 "use client";
 
-import { useState } from 'react';
-
-interface Chapter {
-  id: string;
-  title: string;
-}
-
-interface Volume {
-  id: string;
-  title: string;
-  chapters: Chapter[];
-  isExpanded: boolean;
-}
+import { useState, useEffect } from 'react';
+import { Volume, Chapter } from '@/types/novel';
 
 interface TableOfContentsProps {
   isVisible?: boolean;
+  volumes: Volume[];
+  orphanChapters: Chapter[];
+  onSelectChapter: (chapterId: string) => void;
 }
 
-export default function TableOfContents({ isVisible = true }: TableOfContentsProps) {
+export default function TableOfContents({ isVisible = true, volumes: initialVolumes, orphanChapters, onSelectChapter }: TableOfContentsProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const [volumes, setVolumes] = useState<Volume[]>([
-    {
-      id: 'vol1',
-      title: '第一卷：序章',
-      isExpanded: true,
-      chapters: [
-        { id: 'ch1', title: '第一章：开始' },
-        { id: 'ch2', title: '第二章：相遇' },
-        { id: 'ch3', title: '第三章：冒险' }
-      ]
-    },
-    {
-      id: 'vol2',
-      title: '第二卷：成长',
-      isExpanded: false,
-      chapters: [
-        { id: 'ch4', title: '第四章：挑战' },
-        { id: 'ch5', title: '第五章：突破' }
-      ]
-    }
-  ]);
+  const [volumes, setVolumes] = useState<Volume[]>(initialVolumes);
+
+  useEffect(() => {
+    setVolumes(initialVolumes);
+  }, [initialVolumes]);
 
   const toggleOpen = () => {
     setIsOpen(!isOpen);
@@ -88,7 +64,7 @@ export default function TableOfContents({ isVisible = true }: TableOfContentsPro
                     <div 
                       key={chapter.id} 
                       className="chapter-item"
-                      onClick={() => console.log('跳转到章节:', chapter.title)}
+                      onClick={() => onSelectChapter(chapter.id)}
                     >
                       {chapter.title}
                     </div>
@@ -96,6 +72,22 @@ export default function TableOfContents({ isVisible = true }: TableOfContentsPro
                 </div>
               </div>
             ))}
+            
+            {orphanChapters && orphanChapters.length > 0 && (
+              <div className="volume-item">
+                <div className="chapter-list">
+                  {orphanChapters.map((chapter) => (
+                    <div 
+                      key={chapter.id} 
+                      className="chapter-item"
+                      onClick={() => onSelectChapter(chapter.id)}
+                    >
+                      {chapter.title}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
