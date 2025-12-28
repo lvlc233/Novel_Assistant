@@ -3,9 +3,7 @@ import type { Metadata } from "next";
 import { CopilotKit } from "@copilotkit/react-core";
 import "./globals.css";
 import "@copilotkit/react-ui/styles.css";
-// import "../styles/base.css";
-// import "../styles/mail-icon.css";
-// import "../styles/copilot-custom.css";
+
 import "../components/Sidebar/Header/Header.css";
 import "../components/Sidebar/Button/Button.css";
 import "../components/Sidebar/Input/Input.css";
