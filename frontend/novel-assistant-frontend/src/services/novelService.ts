@@ -1,49 +1,12 @@
+// 导入数据模型
+import { NovelOverviewDto, DirectoryNodeDto, NovelDetailDto ,ApiResponse} from '@/services/models';
+
 import { Novel, Volume, Chapter, ChapterVersion } from '@/types/novel';
 import { config } from '@/config';
 
-const API_BASE_URL = config.novel.apiBaseUrl;
+const NOVEL_API_BASE_URL = config.novel.novelApiBaseUrl;
 
-export interface NovelOverviewDto {
-  novel_id: string;
-  novel_name: string;
-  novel_cover_image_url: string;
-  novel_summary: string;
-  novel_state: string;
-  novel_word_count: number;
-  novel_create_time: string;
-  novel_update_time: string;
-  novel_hiatus_interval: number;
-}
 
-export interface DirectoryNodeDto {
-  node_id: string;
-  node_name: string;
-  node_type: 'folder' | 'document';
-  sort_order: number;
-  children: DirectoryNodeDto[];
-  word_count?: number;
-  update_time?: string;
-  create_time?: string;
-}
-
-export interface NovelDetailDto {
-  novel_id: string;
-  novel_name: string;
-  novel_cover_image_url?: string;
-  novel_summary?: string;
-  novel_state: string;
-  novel_create_time: string;
-  novel_update_time: string;
-  novel_hiatus_interval: number;
-  novel_word_count: number;
-  directory: DirectoryNodeDto[];
-}
-
-export interface ApiResponse<T> {
-  code: string;
-  message: string;
-  data: T;
-}
 
 /**
  * 数据模型映射：DTO -> Domain Model
@@ -145,15 +108,10 @@ function mapDetailDtoToModel(dto: NovelDetailDto): Novel {
  * @param userId 用户ID
  * @returns Novel[]
  */
-/**
- * 获取小说列表
- * @param userId 用户ID
- * @returns Novel[]
- */
 export async function getNovelList(userId: string): Promise<Novel[]> {
   try {
-    console.log(`[getNovelList] Requesting: ${API_BASE_URL}/get_novels with user_id: ${userId}`);
-    const response = await fetch(`${API_BASE_URL}/get_novels`, {
+    console.log(`[getNovelList] Requesting: ${NOVEL_API_BASE_URL}/get_novels with user_id: ${userId}`);
+    const response = await fetch(`${NOVEL_API_BASE_URL}/get_novels`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -189,8 +147,8 @@ export async function getNovelList(userId: string): Promise<Novel[]> {
  */
 export async function getNovelDetail(userId: string, novelId: string): Promise<Novel> {
   try {
-    console.log(`[getNovelDetail] Requesting: ${API_BASE_URL}/get_novel_detail`, { userId, novelId });
-    const response = await fetch(`${API_BASE_URL}/get_novel_detail`, {
+    console.log(`[getNovelDetail] Requesting: ${NOVEL_API_BASE_URL}/get_novel_detail`, { userId, novelId });
+    const response = await fetch(`${NOVEL_API_BASE_URL}/get_novel_detail`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -233,8 +191,8 @@ export interface CreateNovelDto {
  */
 export async function createNovel(data: CreateNovelDto): Promise<Novel> {
   try {
-    console.log(`[createNovel] Requesting: ${API_BASE_URL}/create_novel`, data);
-    const response = await fetch(`${API_BASE_URL}/create_novel`, {
+    console.log(`[createNovel] Requesting: ${NOVEL_API_BASE_URL}/create_novel`, data);
+    const response = await fetch(`${NOVEL_API_BASE_URL}/create_novel`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
