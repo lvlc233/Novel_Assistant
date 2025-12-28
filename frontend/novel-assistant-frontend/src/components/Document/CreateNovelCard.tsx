@@ -15,6 +15,7 @@ export interface NovelCreationData {
   selectedKbIds?: string[];
 }
 
+//  创建小说卡片信息
 const CreateNovelCard: React.FC<CreateNovelCardProps> = ({ 
   onCancel, 
   onCreate,

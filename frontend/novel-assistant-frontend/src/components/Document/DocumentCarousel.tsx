@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import {Plus } from 'lucide-react';
 import { KnowledgeBase, Novel } from '@/types/novel';
 import NovelCard from './NovelCard';
 import CreateNovelCard from './CreateNovelCard';
@@ -32,17 +32,30 @@ interface DocumentCarouselProps {
   existingKnowledgeBases?: KnowledgeBase[];
 }
 
+// 文档卡片轮播组件
+// TODO: 或考虑更细致的组件化
 const DocumentCarousel: React.FC<DocumentCarouselProps> = ({ 
+  // 文档列表
   novels, 
+  // 选择文档回调
   onSelectNovel,
+  // 创建文档回调
   onCreateNovel,
+  // 删除文档回调
   onDeleteNovel,
+  // 编辑文档回调
   onEditNovel,
+  // 打开知识库回调
   onOpenKnowledgeBase,
+  // 受控索引
   activeIndex: controlledIndex,
+  // 索引变化回调
   onIndexChange,
+  // 受控创建状态
   isCreating: controlledIsCreating,
+  // 创建状态变化回调
   onToggleCreating,
+  // 已存在知识库列表
   existingKnowledgeBases = []
 }) => {
   // Items = Existing Novels + 1 "Create" Placeholder
@@ -125,6 +138,7 @@ const DocumentCarousel: React.FC<DocumentCarouselProps> = ({
 
   if (isCreating) {
     return (
+      // 单个卡片
       <div className="flex items-center justify-center w-full h-[600px]">
         <CreateNovelCard 
           onCancel={() => handleToggleCreating(false)} 
@@ -137,7 +151,7 @@ const DocumentCarousel: React.FC<DocumentCarouselProps> = ({
       </div>
     );
   }
-
+  //  不存在卡片时候的情况?
   return (
     <div className="relative w-full h-[600px] flex items-center justify-center overflow-hidden perspective-[1200px]">
         {/* Title */}

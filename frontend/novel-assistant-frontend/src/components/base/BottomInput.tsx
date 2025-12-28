@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Paperclip, Send, ArrowUp } from 'lucide-react';
 import Button from './Button';
 
+// 通用的底部栏
 interface BottomInputProps {
   placeholder?: string;
   onSubmit: (value: string, files?: File[]) => void;

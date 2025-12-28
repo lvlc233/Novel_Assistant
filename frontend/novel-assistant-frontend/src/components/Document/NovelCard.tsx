@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Novel } from '@/types/novel';
 
+//  小说卡片信息。
 interface NovelCardProps {
   novel: Novel;
   isActive?: boolean;
