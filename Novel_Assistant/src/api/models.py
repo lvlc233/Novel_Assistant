@@ -54,11 +54,27 @@ class CreateDocumentRequest(BaseRequest):
     user_id: str = Field(..., description="用户ID")
     novel_id: str = Field(..., description="小说ID")
     folder_id: str|None = Field(default=None, description="文件夹ID")
+    title: str = Field(..., description="文档标题")
+
+class UpdateDocumentContentRequest(BaseRequest):
+    """更新文档内容请求"""
+    user_id: str = Field(..., description="用户ID")
+    novel_id: str = Field(..., description="小说ID")
+    document_id: str = Field(..., description="文档ID")
+    content: str = Field(..., description="文档内容")
 
 class DeleteDocumentRequest(BaseRequest):
     """删除文档请求"""
+    user_id: str = Field(..., description="用户ID")
+    novel_id: str = Field(..., description="小说ID")
     document_id: str = Field(..., description="文档ID")
 
+class UpdateDocumentRequest(BaseRequest):
+    """更新文档请求"""
+    user_id: str = Field(..., description="用户ID")
+    novel_id: str = Field(..., description="小说ID")
+    document_id: str = Field(..., description="文档ID")
+    title: str = Field(..., description="文档标题")
 
 class SendQueryToChatHelperRequest(BaseRequest):
     """发送查询到聊天助手请求模型"""
@@ -80,21 +96,32 @@ class CreateFolderRequest(BaseRequest):
     
 class DeleteFolderRequest(BaseRequest):
     """删除文件夹请求"""
+    user_id: str = Field(..., description="用户ID")
+    novel_id: str = Field(..., description="小说ID")
     folder_id: str = Field(..., description="文件夹ID")
 
 class UpdateFolderRequest(BaseRequest):
     """更新文件夹请求"""
+    user_id: str = Field(..., description="用户ID")
+    novel_id: str = Field(..., description="小说ID")
     folder_id: str = Field(..., description="文件夹ID")
     name: str = Field(..., description="文件夹名称")
 
 class UpdateDocumentRequest(BaseRequest):
     """更新文档请求"""
+    user_id: str = Field(..., description="用户ID")
     document_id: str = Field(..., description="文档ID")
     title: str | None = Field(default=None, description="文档标题")
     body_text: str | None = Field(default=None, description="文档内容")
     
 class GetDocumentDetailRequest(BaseRequest):
     """获取文档详情请求"""
+    user_id: str = Field(..., description="用户ID")
+    document_id: str = Field(..., description="文档ID")
+    version_id: str | None = Field(default=None, description="版本ID")
+
+class GetDocumentVersionsRequest(BaseRequest):
+    """获取文档版本列表请求"""
     document_id: str = Field(..., description="文档ID")
 
 class MoveNodeRequest(BaseRequest):
@@ -126,19 +153,7 @@ class GetKDsRequest(BaseRequest):
 
 
 
-# 响应体
-class FolderResponse(BaseModel):
-    """文件夹响应"""
-    folder_id: str = Field(..., description="文件夹ID")
-    name: str = Field(..., description="文件夹名称")
 
-class DocumentDetailResponse(BaseModel):
-    """文档详情响应"""
-    document_id: str = Field(..., description="文档ID")
-    title: str = Field(..., description="文档标题")
-    body_text: str | None = Field(default=None, description="文档内容")
-    current_version_id: str = Field(..., description="当前版本ID")
-    update_time: str = Field(..., description="更新时间")
 
 T = TypeVar("T")
 class Response(BaseModel, Generic[T]):
@@ -157,60 +172,6 @@ class Response(BaseModel, Generic[T]):
     def fail(cls,code:str, message: str , data: T | None = None) -> "Response[T]":    
         # 支持自定义失败消息，否则使用枚举默认消息
         return cls(code=code, data=data, message=message )
-
-class UserIdResponse(BaseModel):
-    """用户ID"""
-    user_id: str = Field(..., description="用户ID")
-
-class NovelAbbreviateResponse(BaseModel):
-    """小说缩略视图"""
-    novel_id: str = Field(..., description="小说ID")
-    novel_name: str = Field(..., description="小说名称")
-    image_url: str|None = Field(default=None, description="小说封面URL")
-    summary: str|None = Field(default=None, description="小说简介")
-    state: str = Field(..., description="小说状态")
-    create_time: str = Field(..., description="创建时间")
-    update_time: str = Field(..., description="更新时间")
-    hiatus_interval: int = Field(..., description="上次更新时间间隔（天）")
-
-
-class DocumentItemInAPI(BaseModel):
-    """目录项"""
-    document_name: str = Field(..., description="文档名")
-    current_version: str = Field(..., description="当前版本")
-    document_version_list: List[str] = Field(..., description="文档版本列表")
-class FolderItemInAPI(BaseModel):
-    """目录项"""
-    folder_name: str = Field(..., description="文件夹名")
-    document_list: List[DocumentItemInAPI] = Field(..., description="文档列表")
-    
-class NovelDetailResponse(BaseModel):
-    """小说详情响应"""
-    novel_id: str = Field(..., description="小说ID")
-    novel_name: str = Field(..., description="小说名称")
-    image_url: str|None = Field(default=None, description="小说封面URL")
-    summary: str|None = Field(default=None, description="小说简介")
-    state: str = Field(..., description="小说状态")
-    create_time: str = Field(..., description="创建时间")
-    update_time: str = Field(..., description="更新时间")
-    hiatus_interval: int = Field(..., description="上次更新时间间隔（天）")
-    menu: List[Union[FolderItemInAPI, DocumentItemInAPI]] = Field(default=[], description="小说目录")
-
-class CreateDocumentResponse(BaseModel):
-    """文档项"""
-    document_id: str = Field(..., description="文档ID")
-    title: str = Field(..., description="标题名")
-    current_version: str = Field(..., description="当前版本")
-    document_version_list: List[str] = Field(..., description="文档版本列表")
-    body_text: str|None = Field(default=None, description="文档内容") 
-    create_time: str = Field(..., description="创建时间")
-    update_time: str = Field(..., description="更新时间")
-
-class SearchDocumentResponse(BaseModel):
-    """搜索文档响应"""
-    doc_id: str = Field(..., description="文档ID")
-    title: str = Field(..., description="文档标题")
-    body_text: str|None = Field(default=None, description="文档正文")
 
 
 

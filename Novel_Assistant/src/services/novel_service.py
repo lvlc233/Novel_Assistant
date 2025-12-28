@@ -35,7 +35,7 @@ from typing import Union
 
 
 
-
+# ok
 async def get_novel_existing_overview_list4service(user_id: str, session: AsyncSession) -> List[NovelItemUse2Overview]:
     """根据用户ID，获取存在的小说概述列表，"""
     pg_client = PGClient(session)
@@ -71,7 +71,7 @@ async def get_novel_existing_overview_list4service(user_id: str, session: AsyncS
         logging.error(f"获取存在小说列表失败: {e}")
         raise e
 
-
+#ok
 async def create_novel4service(
     user_id: str,
     novel_cover_image_url: str | None,
@@ -120,7 +120,7 @@ async def create_novel4service(
     return novel_item_use2overview
 
 
-
+# ok
 async def get_novel_directory4service(novel_id: str, session: AsyncSession) -> List[DirectoryNode]:
     """获取指定小说ID的小说目录,小说目录具有排序规则
     Args:
@@ -201,7 +201,7 @@ async def get_novel_directory4service(novel_id: str, session: AsyncSession) -> L
         logging.error(f"获取小说目录失败: {e}")
         raise e
 
-
+# ok
 async def get_novel_detail4service(novel_id: str, session: AsyncSession) -> NovelDetail:
     """获取指定小说ID的小说详情。
     Args:

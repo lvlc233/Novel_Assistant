@@ -37,7 +37,10 @@ export default function DocumentEditor({ isChatExpanded, novelId, initialChapter
 
   useEffect(() => {
     if (currentChapterId) {
-       getDocumentDetail({ document_id: currentChapterId }).then(detail => {
+       getDocumentDetail({
+         document_id: currentChapterId,
+         user_id: userId
+       }).then(detail => {
            setContent(detail.document_body_text || '');
            setTitle(detail.document_title || '未命名文档');
            // setVersion(detail.document_version_id || 'v1.0.0'); // Wait, backend returns DocumentDetailPinnedVersion which has document_version_id

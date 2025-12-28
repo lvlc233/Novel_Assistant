@@ -1,208 +1,228 @@
 from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.document_service import (
+    create_folder4service, 
+    delete_folder4service,
+    rename_folder4service,
+    create_document4service,
+    get_document_detail4service,
+    get_document_versions4service,
+    delete_document4service,
+    get_document_detail_use_document_id_and_version_id4service,
+    rename_document4service,
+    update_document_content4service
+)
+from core.domain.models import (
+    DirectoryNode,
+    DocumentDetailPinnedVersion
+)
 from api.models import (
-    CreateDocumentRequest,
-    DeleteDocumentRequest,
-    SearchDocumentRequest,
     Response,
-    CreateDocumentResponse, 
-    SearchDocumentResponse,
     CreateFolderRequest,
     DeleteFolderRequest,
     UpdateFolderRequest,
-    UpdateDocumentRequest,
+    CreateDocumentRequest,
     GetDocumentDetailRequest,
-    MoveNodeRequest,
-    FolderResponse,
-    DocumentDetailResponse,
+    GetDocumentVersionsRequest,
+    DeleteDocumentRequest,
+    UpdateDocumentContentRequest,
+    UpdateDocumentRequest
 )
 from common.clients.pg.pg_client import get_session
 
 
-# from common.adapter.novel import DocumentAdapter, FolderAdapter
-# from api.services.document_service import (
-#     create_document4service,
-#     delete_document4service,    
-#     search_documents_by_title4service,
-#     search_documents_by_content4service,
-#     create_folder4service,
-#     delete_folder4service,
-#     update_folder4service,
-#     get_document_detail4service,
-#     update_document4service,
-#     move_node4service,
-# )
-
-
 router = APIRouter(tags=["document"])
-
-@router.post("/create_document")
-async def create_document4api(request: CreateDocumentRequest, session: AsyncSession = Depends(get_session))->Response[CreateDocumentResponse]:
-    """创建文档。
-    Args:
-        user_id: str, # 用户ID
-        novel_id: str, # 小说ID
-        folder_id: str | None, # 文件夹ID
-    Return:
-        document: CreateDocumentResponse, # 文档项
-            document_id: str, # 文档ID
-            title: str, # 标题名
-            current_version: str, # 当前版本
-            document_version_list: List[str], # 文档版本列表
-            body_text: str | None, # 文档内容
-            create_time: str, # 创建时间
-            update_time: str, # 更新时间
-    """
-    document_domain = await create_document4service(
-        user_id=request.user_id, 
-        novel_id=request.novel_id, 
-        folder_id=request.folder_id, 
-        session=session)
-    document = DocumentAdapter.from_domain(document_domain)
-    return Response.ok(data=document)
-
-@router.post("/delete_document")
-async def delete_document4api(request: DeleteDocumentRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
-    """删除文档。
-    Args:
-        document_id: str, # 文档ID
-    Return:
-        result: bool, # 是否删除成功
-    """
-    result = await delete_document4service(request.document_id, session)
-    return Response.ok(data=result)
-
-@router.post("/search_documents")
-async def search_documents4api(request: SearchDocumentRequest, session: AsyncSession = Depends(get_session)) -> Response[List[SearchDocumentResponse]]:
-    """搜索文档。
-    Args:
-        query: str, # 查询文本
-        novel_id: str | None, # 小说ID，可选
-        search_by_title: bool, # 是否根据标题搜索
-        search_by_content: bool, # 是否根据正文搜索
-        is_remove: bool, # 是否搜索已删除文档
-    Return:
-        response_data: List[SearchDocumentResponse], # 搜索结果列表
-            doc_id: str, # 文档ID
-            title: str, # 文档标题
-            body_text: str | None, # 文档正文
-    """
-    results = {}
-    # 并行执行搜索可能更好，但为了简单起见，这里按顺序执行
-    if request.search_by_content:
-        content_matches = await search_documents_by_content4service(request.is_remove, request.query, session, request.novel_id)
-        for doc in content_matches:
-            results[doc.doc_id] = doc
-            
-    if request.search_by_title:
-        title_matches = await search_documents_by_title4service(request.is_remove, request.query, session, request.novel_id)
-        for doc in title_matches:
-            results[doc.doc_id] = doc
-            
-
-    response_data = [DocumentAdapter.from_domain_to_search(doc) for doc in results.values()]
-    return Response.ok(data=response_data)
-
-
-
-
-# 文件夹相关
 @router.post("/create_folder")
-async def create_folder4api(request: CreateFolderRequest, session: AsyncSession = Depends(get_session)) -> Response[FolderResponse]:
+async def create_folder4api(request: CreateFolderRequest, session: AsyncSession = Depends(get_session)) -> Response[DirectoryNode]:
     """创建文件夹。
     Args:
         user_id: str, # 用户ID
         novel_id: str, # 小说ID
-        name: str, # 文件夹名称
-    Return:
-        folder: FolderResponse, # 文件夹
-            folder_id: str, # 文件夹ID
-            name: str, # 文件夹名称
+        name: str, # 文件夹名
     """
-    folder = await create_folder4service(request.user_id, request.novel_id, request.name, session)
-    return Response.ok(data=FolderResponse(folder_id=folder.folder_id, name=folder.folder_name))
+    
+    folder = await create_folder4service(
+        user_id=request.user_id, 
+        novel_id=request.novel_id, 
+        folder_name=request.name, 
+        session=session)
+ 
+    return Response.ok(data=folder)
 
+# 删除文件夹(并移除联系)
 @router.post("/delete_folder")
-async def delete_folder4api(request: DeleteFolderRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
-    """删除文件夹。
+async def delete_folder4api(
+    request: DeleteFolderRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[bool]:
+    """删除文件夹(并移除联系)。
     Args:
+        user_id: str, # 用户ID
+        novel_id: str, # 小说ID
         folder_id: str, # 文件夹ID
-    Return:
-        result: bool, # 是否删除成功
     """
-    result = await delete_folder4service(request.folder_id, session)
-    return Response.ok(data=result)
+    await delete_folder4service(
+        user_id=request.user_id, 
+        novel_id=request.novel_id, 
+        folder_id=request.folder_id,
+        session=session)
+    return Response.ok(data=True)
 
-@router.post("/update_folder")
-async def update_folder4api(request: UpdateFolderRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
-    """更新文件夹。
+# 重命名文件夹
+@router.post("/rename_folder")
+async def rename_folder4api(
+    request: UpdateFolderRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[str]:
+    """重命名文件夹。
     Args:
+        user_id: str, # 用户ID
+        novel_id: str, # 小说ID
         folder_id: str, # 文件夹ID
-        name: str, # 文件夹名称
-    Return:
-        result: bool, # 是否更新成功
+        name: str, # 文件夹名
     """
-    result = await update_folder4service(request.folder_id, request.name, session)
-    return Response.ok(data=result)
+    folder_new_name = await rename_folder4service(
+        user_id=request.user_id, 
+        novel_id=request.novel_id, 
+        folder_id=request.folder_id,
+        folder_name=request.name,
+        session=session)
+    return Response.ok(data=folder_new_name)
 
-@router.post("/get_document_detail")
-async def get_document_detail4api(request: GetDocumentDetailRequest, session: AsyncSession = Depends(get_session)) -> Response[DocumentDetailResponse]:
-    """获取文档详情。
+
+# 更新文档内容(创建新版本)
+@router.post("/update_document_content")
+async def update_document_content4api(
+    request: UpdateDocumentContentRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[str]:
+    """更新文档内容(创建新版本)。
     Args:
+        user_id: str, # 用户ID
+        novel_id: str, # 小说ID
         document_id: str, # 文档ID
-    Return:
-        response: DocumentDetailResponse, # 文档详情
-            document_id: str, # 文档ID
-            title: str, # 文档标题
-            body_text: str | None, # 文档内容
-            current_version_id: str, # 当前版本ID
-            update_time: str, # 更新时间
+        content: str, # 文档内容
     """
-    doc_domain = await get_document_detail4service(request.document_id, session)
-    response = DocumentDetailResponse(
-        document_id=doc_domain.doc_id,
-        title=doc_domain.title,
-        body_text=doc_domain.body_text,
-        current_version_id=doc_domain.current_version_id,
-        update_time=str(doc_domain.update_time)
-    )
-    return Response.ok(data=response)
+    version_id = await update_document_content4service(
+        user_id=request.user_id, 
+        document_id=request.document_id,
+        content=request.content,
+        session=session)
+    return Response.ok(data=version_id)
 
-@router.post("/update_document")
-async def update_document4api(request: UpdateDocumentRequest, session: AsyncSession = Depends(get_session)) -> Response[DocumentDetailResponse]:
+
+# 创建文档。
+@router.post("/create_document")
+async def create_document4api(
+    request: CreateDocumentRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[DirectoryNode]:
+    """创建文档。
+    Args:
+        user_id: str, # 用户ID
+        novel_id: str, # 小说ID
+        title: str, # 文档名
+        folder_id: str|None = None, # 文件夹ID,若存在,表示在文件夹下,否则不是。
+    """
+    document = await create_document4service(
+        user_id=request.user_id, 
+        novel_id=request.novel_id, 
+        document_title=request.title, 
+        folder_id=request.folder_id,
+        session=session)
+    return Response.ok(data=document)
+
+
+# 更新文档
+@router.post("/rename_document")
+async def rename_document4api(
+    request: UpdateDocumentRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[bool]:
     """更新文档。
     Args:
+        user_id: str, # 用户ID
         document_id: str, # 文档ID
-        title: str | None, # 文档标题
-        body_text: str | None, # 文档内容
-    Return:
-        response: DocumentDetailResponse, # 文档详情
-            document_id: str, # 文档ID
-            title: str, # 文档标题
-            body_text: str | None, # 文档内容
-            current_version_id: str, # 当前版本ID
-            update_time: str, # 更新时间
+        title: str # 文档名
     """
-    doc_domain = await update_document4service(request.document_id, request.title, request.body_text, session)
-    response = DocumentDetailResponse(
-        document_id=doc_domain.doc_id,
-        title=doc_domain.title,
-        body_text=doc_domain.body_text,
-        current_version_id=doc_domain.current_version_id,
-        update_time=str(doc_domain.update_time)
-    )
-    return Response.ok(data=response)
+    await rename_document4service(
+        user_id=request.user_id, 
+        document_id=request.document_id,
+        document_title=request.title,
+        session=session)
+    return Response.ok(data=True)
 
-@router.post("/move_node")
-async def move_node4api(request: MoveNodeRequest, session: AsyncSession = Depends(get_session)) -> Response[bool]:
-    """移动节点。
+# 参考章节详情(正文)
+@router.post("/get_document_detail")
+async def get_document_detail4api(
+    request: GetDocumentDetailRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[DocumentDetailPinnedVersion]:
+    """参考章节详情，返回该章节的详情。
     Args:
-        node_id: str, # 节点ID
-        target_parent_id: str | None, # 目标父节点ID（文件夹ID），为None表示根目录
-        sort_order: int, # 排序位置
-    Return:
-        result: bool, # 是否移动成功
+        document_id: str, # 文档ID
+        version_id: str|None=None, # 文档版本ID,若存在,表示获取该版本的详情,否则表示获取当前版本的文档。
     """
-    result = await move_node4service(request.node_id, request.target_parent_id, request.sort_order, session)
-    return Response.ok(data=result)
+    if request.version_id:
+        detail = await get_document_detail_use_document_id_and_version_id4service(
+            doc_id=request.document_id,
+            version_id=request.version_id,
+            session=session
+        )
+    else:
+        detail = await get_document_detail4service(
+            document_id=request.document_id,
+            session=session
+        )
+    return Response.ok(data=detail)
+
+# 查看章节版本列表
+@router.post("/get_document_versions")
+async def get_document_versions4api(
+    request: GetDocumentVersionsRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[List[dict]]:
+    """查看章节版本列表。
+    Args:
+        document_id: str, # 文档ID
+    """
+    versions = await get_document_versions4service(
+        document_id=request.document_id,
+        session=session)
+    
+    # Convert entities to dicts
+    data = [v.dict() if hasattr(v, 'dict') else v.__dict__ for v in versions]
+    # Filter out sqlalchemy internal state if needed, but __dict__ might include it.
+    # Safe way is to use pydantic if available or manual dict.
+    # Assuming SQLModel, .dict() works.
+    # If using SQLAlchemy models directly, need manual conversion or remove _sa_instance_state.
+    cleaned_data = []
+    for v in versions:
+        d = v.__dict__.copy()
+        if "_sa_instance_state" in d:
+            del d["_sa_instance_state"]
+        cleaned_data.append(d)
+        
+    return Response.ok(data=cleaned_data)
+    
+
+# 删除章节(并移除联系)
+@router.post("/delete_document")
+async def delete_document4api(
+    request: DeleteDocumentRequest,
+    session: AsyncSession = Depends(get_session)) -> Response[bool]:
+    """删除章节(并移除联系)，返还处理成功与否。
+    Args:
+        user_id: str, # 用户ID
+        novel_id: str, # 小说ID
+        document_id: str, # 文档ID
+    """
+    await delete_document4service(
+        user_id=request.user_id, 
+        novel_id=request.novel_id, 
+        document_id=request.document_id,
+        session=session)
+    return Response.ok(data=True)
+
+
+
+
+
+
+
+

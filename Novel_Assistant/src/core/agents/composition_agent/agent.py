@@ -1,4 +1,5 @@
 
+import imp
 from typing import Annotated,List
 from copilotkit.langgraph import HumanMessage
 from pydantic import BaseModel,Field
@@ -8,6 +9,7 @@ from langchain_core.messages import BaseMessage
 from langchain.agents import create_agent
 from langgraph.prebuilt.tool_node import ToolRuntime
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.graph import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 
 from common.utils import load_chat_model
@@ -15,14 +17,14 @@ from common.utils import load_chat_model
 from common.clients.pg.pg_client import PGClient,get_session
 
 
-class CompositionAgentRuntimeContext(BaseModel):
-    user_id:str=Field(...,description="用户id:(必选)")
-    current_document_id:str=Field(...,description="当前文档id:(必选)")
-    session_id:AsyncSession=Field(default_factory=lambda: get_session(),description="数据库连接会话id:(自动)")
+# class CompositionAgentRuntimeContext(BaseModel):
+#     user_id:str=Field(...,description="用户id:(必选)")
+#     current_document_id:str=Field(...,description="当前文档id:(必选)")
+#     session_id:AsyncSession=Field(default_factory=lambda: get_session(),description="数据库连接会话id:(自动)")
 
 class CompositionAgentState(BaseModel):
     # 基础信息相关
-    messages:Annotated[List[BaseMessage],]=Field(default_factory=list,description="用于历史记录恢复")
+    messages:Annotated[List[BaseMessage],add_messages]=Field(default_factory=list,description="用于历史记录恢复")
     agent_context:List[BaseMessage]=Field(description="对于Agent可见的上下文信息。")
     human_query:HumanMessage=Field(description="用户的查询")
     agent_response:BaseMessage=Field(description="Agent的回复")
@@ -41,5 +43,5 @@ composition_agent: CompiledStateGraph=create_agent(
     tools=[],
     system_prompt="你是一个专业的小说助手,可以回答用户关于小说的问题.",
     checkpointer=MemorySaver(),
-    context_schema=CompositionAgentRuntimeContext
+    # context_schema=CompositionAgentRuntimeContext
 )

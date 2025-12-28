@@ -90,7 +90,8 @@ class TreeSortSQLEntity(SQLModel, table=True):
     parent_id: str|None = Field(default=None,description="父节点ID", index=True)
     node_type: str = Field(description="节点类型")
     node_id: str = Field(description="节点ID", index=True)
-    node_sort_order: int = Field(default=0,description="排序,越小越靠前")
+    # TODO:  考虑是否需要自增
+    node_sort_order: int = Field(default=0,description="排序,越小越靠前") 
 
 
 

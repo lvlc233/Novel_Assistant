@@ -20,10 +20,11 @@ from api.routers import (
     user_api,
     novel_api,
     document_api,
+    # chat_api,
 )
 from api.error_handler import register_exception_handlers
 
-from core.agents.agent_runnable import chat_helper
+from core.agents import composition_agent
 
 from api.models import LangGraphAGUIAdapter
 
@@ -66,9 +67,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # app.include_router(user_api.router, prefix="/user")
     app.include_router(novel_api.router,prefix="/novel")
     app.include_router(document_api.router,prefix="/document")
+
 
     # Register global exception handlers
     register_exception_handlers(app)
@@ -80,7 +81,7 @@ def create_app() -> FastAPI:
             LangGraphAGUIAdapter (
                 name="sample_agent",
                 description="一个模拟智能体",
-                graph=chat_helper,
+                graph=composition_agent,
             )
         ],
     )

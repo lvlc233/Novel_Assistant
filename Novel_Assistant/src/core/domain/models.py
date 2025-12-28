@@ -20,11 +20,12 @@ class NovelItemUse2Overview(BaseModel):
 class DocumentDetailPinnedVersion(BaseModel):
     """指定版本的文档详情。
     """
-    doc_id: str = Field(description="文档ID")
-    version_id: str = Field(description="版本ID")
-    title: str = Field(description="文档标题")
-    body_text: str | None = Field(default=None,description="文档内容")
-    word_count: int = Field(default=0,description="字数")
+    document_id: str = Field(description="文档ID")
+    document_version_id: str = Field(description="版本ID")
+    document_title: str = Field(description="文档标题")
+    document_body_text: str | None = Field(default=None,description="文档内容")
+    document_word_count: int = Field(default=0,description="字数")
+
 
 class DirectoryNode(BaseModel):
     """目录节点（文件夹或文档）"""
@@ -53,5 +54,3 @@ class NovelDetail(BaseModel):
     novel_hiatus_interval: int = Field(description="断更间隔时间")
     novel_word_count: int = Field(description="小说字数")
     directory: List[DirectoryNode] = Field(default=[], description="目录树")
-
-

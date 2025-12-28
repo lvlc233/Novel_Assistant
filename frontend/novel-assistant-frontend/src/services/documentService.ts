@@ -112,6 +112,7 @@ export async function renameDocument(data: RenameDocumentDto): Promise<string> {
 }
 
 export interface GetDocumentDetailDto {
+    user_id: string;
     document_id: string;
     version_id?: string;
 }
