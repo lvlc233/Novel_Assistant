@@ -1,11 +1,13 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import DocumentCarousel from '@/components/Document/DocumentCarousel';
+
 import { Novel, KnowledgeBase } from '@/types/novel';
-import { NovelCreationData } from '@/components/Document/CreateNovelCard';
-import BottomInput from '@/components/base/BottomInput';
 import { getNovelList, createNovel, CreateNovelDto } from '@/services/novelService';
+
+import { NovelCreationData } from '@/components/Document/CreateNovelCard';
+import DocumentCarousel from '@/components/Document/DocumentCarousel';
+import BottomInput from '@/components/base/BottomInput';
 
 import { userId } from '@/services/mock';
 
@@ -127,7 +129,8 @@ export default function DocumentsPage() {
 
   return (
     <div className="min-h-screen bg-surface-primary flex flex-col items-center justify-center relative overflow-hidden animate-fade-in">
-        {/* Optional Back Button */}
+        {/* 返回首页按钮 */}
+        {/* TODO:或可以写为组件 */}
         <button 
             onClick={() => router.push('/home')}
             className="absolute top-8 left-8 z-50 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-lg hover:bg-white transition-all shadow-sm text-sm font-medium animate-slide-up"
@@ -136,6 +139,7 @@ export default function DocumentsPage() {
             ← 返回首页
         </button>
 
+        {/* TODO:或可以改变为组件+ Suspense的形式*/}
        {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="w-16 h-16 border-4 border-gray-200 border-t-black rounded-full animate-spin mb-4"></div>
@@ -155,6 +159,7 @@ export default function DocumentsPage() {
              </button>
           </div>
        ) : (
+      // 核心列表：小说卡片carousel
        <DocumentCarousel 
           novels={novels}
           onSelectNovel={handleSelectNovel}

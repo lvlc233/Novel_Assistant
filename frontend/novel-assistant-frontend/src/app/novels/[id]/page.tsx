@@ -6,10 +6,20 @@ import NovelHeader from '@/components/NovelDetail/NovelHeader';
 import NovelDirectory from '@/components/NovelDetail/NovelDirectory';
 import ChapterPreview from '@/components/NovelDetail/ChapterPreview';
 import BottomInput from '@/components/base/BottomInput';
+import { ArrowLeft } from 'lucide-react';
 
 import { userId } from '@/services/mock';
-import { getNovelDetail } from '@/services/novelService';
+import { 
+    createFolder,
+    createDocument,
+    renameFolder,
+    renameDocument
+} from '@/services/documentService';
+import {
+    getNovelDetail
+} from '@/services/novelService';
 
+//  小说详情页
 export default function NovelDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -70,59 +80,91 @@ export default function NovelDetailPage() {
       setSelectedChapterId(chapter.id);
   };
 
-  const handleCreateVolume = () => {
-      // TODO: Call backend API
-      const newVolume: Volume = {
-          id: `vol-${Date.now()}`,
-          title: '新建卷',
-          order: volumes.length + 1,
-          isExpanded: true,
-          chapters: []
-      };
-      setVolumes([...volumes, newVolume]);
-  };
-
-  const handleCreateChapter = (volumeId?: string) => {
-      // TODO: Call backend API
-      const newChapter: Chapter = {
-          id: `chap-${Date.now()}`,
-          title: '新建章节',
-          order: 0, 
-          currentVersionId: 'v1',
-          volumeId: volumeId,
-          versions: [
-              {
-                  id: 'v1',
-                  versionNumber: 1,
-                  content: '',
-                  updatedAt: new Date().toLocaleString(),
-                  note: '初始版本'
-              }
-          ]
-      };
-
-      if (volumeId) {
-          setVolumes(volumes.map(v => {
-              if (v.id === volumeId) {
-                  return { ...v, chapters: [...v.chapters, newChapter] };
-              }
-              return v;
-          }));
-      } else {
-          setOrphanChapters([...orphanChapters, newChapter]);
+  const handleCreateVolume = async () => {
+      try {
+          const newFolder = await createFolder({
+              user_id: userId,
+              novel_id: id,
+              name: '新建卷'
+          });
+          
+          const newVolume: Volume = {
+              id: newFolder.node_id,
+              title: newFolder.node_name,
+              order: newFolder.sort_order,
+              isExpanded: true,
+              chapters: []
+          };
+          setVolumes([...volumes, newVolume]);
+      } catch (e) {
+          console.error("Create folder failed", e);
       }
-      // Auto select
-      setSelectedChapterId(newChapter.id);
   };
 
-  const handleUpdateVolume = (id: string, data: Partial<Volume>) => {
-      // TODO: Call backend API
+  const handleCreateChapter = async (volumeId?: string) => {
+      try {
+          const newDoc = await createDocument({
+              user_id: userId,
+              novel_id: id,
+              title: '新建章节',
+              folder_id: volumeId
+          });
+
+          const newChapter: Chapter = {
+              id: newDoc.node_id,
+              title: newDoc.node_name,
+              order: newDoc.sort_order,
+              currentVersionId: 'v1',
+              volumeId: volumeId,
+              versions: [
+                  {
+                      id: 'v1',
+                      versionNumber: 1,
+                      content: '',
+                      updatedAt: new Date().toISOString(),
+                      note: '初始版本'
+                  }
+              ]
+          };
+
+          if (volumeId) {
+              setVolumes(volumes.map(v => {
+                  if (v.id === volumeId) {
+                      return { ...v, chapters: [...v.chapters, newChapter] };
+                  }
+                  return v;
+              }));
+          } else {
+              setOrphanChapters([...orphanChapters, newChapter]);
+          }
+          // Auto select
+          setSelectedChapterId(newChapter.id);
+      } catch (e) {
+          console.error("Create document failed", e);
+      }
+  };
+
+  const handleUpdateVolume = async (id: string, data: Partial<Volume>) => {
+      // Optimistic update
       setVolumes(volumes.map(v => v.id === id ? { ...v, ...data } : v));
+
+      // If title changed, call backend
+      if (data.title) {
+          try {
+             await renameFolder({
+                 user_id: userId,
+                 novel_id: params.id as string,
+                 folder_id: id,
+                 name: data.title
+             });
+          } catch (e) {
+              console.error("Rename folder failed", e);
+          }
+      }
   };
 
-  const handleUpdateChapter = (id: string, data: Partial<Chapter>) => {
-      // TODO: Call backend API
-      // Check orphan first
+  const handleUpdateChapter = async (id: string, data: Partial<Chapter>) => {
+      // Optimistic update
       const isOrphan = orphanChapters.some(c => c.id === id);
       if (isOrphan) {
           setOrphanChapters(orphanChapters.map(c => c.id === id ? { ...c, ...data } : c));
@@ -132,24 +174,42 @@ export default function NovelDetailPage() {
               chapters: v.chapters.map(c => c.id === id ? { ...c, ...data } : c)
           })));
       }
+
+      // If title changed, call backend
+      if (data.title) {
+          try {
+             await renameDocument({
+                 user_id: userId,
+                 novel_id: params.id as string,
+                 document_id: id,
+                 title: data.title
+             });
+          } catch (e) {
+              console.error("Rename document failed", e);
+          }
+      }
   };
 
   const handleEditContent = () => {
       if (selectedChapter) {
           console.log(`Navigating to edit chapter ${selectedChapter.id}`);
-          router.push(`/editor?chapterId=${selectedChapter.id}`);
+          router.push(`/editor?novelId=${id}&initialChapterId=${selectedChapter.id}`);
       }
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">加载中...</div>;
+    return (
+        <div className="flex items-center justify-center h-screen bg-[#F9F7F5]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800"></div>
+        </div>
+    );
   }
 
   if (error || !novel) {
     return (
-      <div className="flex items-center justify-center h-screen flex-col gap-4">
+      <div className="flex items-center justify-center h-screen flex-col gap-4 bg-[#F9F7F5]">
         <div className="text-red-500">{error || '小说不存在'}</div>
-        <button onClick={() => router.push('/novels')} className="text-blue-500 hover:underline">
+        <button onClick={() => router.push('/novels')} className="text-stone-500 hover:underline">
           返回列表
         </button>
       </div>
@@ -157,47 +217,62 @@ export default function NovelDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-        {/* Back Button */}
-        <button 
-            onClick={() => router.push('/novels')}
-            className="absolute top-8 left-8 z-50 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-lg hover:bg-white transition-all shadow-sm text-sm font-medium"
-        >
-            ← 返回列表
-        </button>
+    <div className="flex flex-col h-screen bg-[#F9F7F5] overflow-hidden">
+        {/* Navigation Bar */}
+        <nav className="h-16 bg-white/50 backdrop-blur-md border-b border-stone-200 flex items-center px-8 fixed top-0 left-0 right-0 z-50">
+            <button 
+                onClick={() => router.push('/novels')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-stone-100 transition-colors text-stone-600 font-medium text-sm"
+            >
+                <ArrowLeft className="w-4 h-4" />
+                <span>返回书架</span>
+            </button>
+            <div className="mx-4 h-4 w-px bg-stone-300"></div>
+            <span className="text-stone-900 font-serif font-bold truncate max-w-xs">{novel.title}</span>
+        </nav>
 
-        <div className="w-full max-w-6xl flex flex-col gap-8 px-4 pb-24 pt-24 mx-auto">
-            {/* Top Section */}
-            <NovelHeader novel={novel} />
+        {/* Main Content Area */}
+        <div className="flex-1 overflow-hidden pt-16 flex flex-col">
+            <div className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 flex flex-col gap-6 h-full">
+                
+                {/* Novel Info Header */}
+                <div className="shrink-0">
+                    <NovelHeader novel={novel} />
+                </div>
 
-            {/* Middle Section */}
-            <div className="flex gap-6 h-[600px]">
-                {/* Directory */}
-                <NovelDirectory 
-                    volumes={volumes}
-                    orphanChapters={orphanChapters}
-                    selectedChapterId={selectedChapterId}
-                    onSelectChapter={handleSelectChapter}
-                    onCreateVolume={handleCreateVolume}
-                    onCreateChapter={handleCreateChapter}
-                    onUpdateVolume={handleUpdateVolume}
-                    onUpdateChapter={handleUpdateChapter}
-                />
+                {/* Workspace (Directory + Preview) */}
+                <div className="flex-1 flex gap-6 min-h-0 pb-20">
+                    {/* Directory Panel */}
+                    <div className="shrink-0 h-full">
+                        <NovelDirectory 
+                            volumes={volumes}
+                            orphanChapters={orphanChapters}
+                            selectedChapterId={selectedChapterId}
+                            onSelectChapter={handleSelectChapter}
+                            onCreateVolume={handleCreateVolume}
+                            onCreateChapter={handleCreateChapter}
+                            onUpdateVolume={handleUpdateVolume}
+                            onUpdateChapter={handleUpdateChapter}
+                        />
+                    </div>
 
-                {/* Content Preview */}
-                <ChapterPreview 
-                    chapter={selectedChapter}
-                    onEdit={handleEditContent}
-                />
+                    {/* Preview Panel */}
+                    <div className="flex-1 h-full min-w-0">
+                        <ChapterPreview 
+                            chapter={selectedChapter}
+                            onEdit={handleEditContent}
+                        />
+                    </div>
+                </div>
             </div>
         </div>
 
-        {/* Bottom Input */}
+        {/* 底部输入框 */}
         <div className="fixed bottom-8 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-          <div className="pointer-events-auto w-full max-w-2xl">
+          <div className="pointer-events-auto w-full max-w-2xl shadow-2xl rounded-2xl overflow-hidden ring-1 ring-black/5">
             <BottomInput 
               position="static"
-              placeholder="快速指令 / 询问 AI..."
+              placeholder="询问 AI 助手或快速创建..."
               onSubmit={(val) => console.log('Doc Detail Input:', val)}
             />
           </div>
