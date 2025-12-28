@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Volume, Chapter } from '@/types/novel';
-import { ChevronRight, ChevronDown, Folder, FileText, MoreVertical } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FileText, MoreVertical, Plus, Edit2, Trash } from 'lucide-react';
 
 interface NovelDirectoryProps {
   volumes: Volume[];
@@ -20,7 +20,7 @@ interface ContextMenuState {
   type: 'root' | 'volume' | 'chapter';
   targetId?: string;
 }
-
+// 目录
 const NovelDirectory: React.FC<NovelDirectoryProps> = ({
   volumes,
   orphanChapters,
@@ -78,8 +78,10 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
     <div 
         key={chapter.id}
         className={`
-            group flex items-center gap-2 py-1 px-2 rounded-lg cursor-pointer transition-colors ml-6
-            ${selectedChapterId === chapter.id ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-700'}
+            group flex items-center gap-2 py-2 px-3 rounded-md cursor-pointer transition-all duration-200 ml-4
+            ${selectedChapterId === chapter.id 
+                ? 'bg-stone-800 text-white shadow-md' 
+                : 'hover:bg-stone-100 text-stone-600 hover:text-stone-900'}
         `}
         onClick={(e) => {
             e.stopPropagation();
@@ -87,11 +89,11 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
         }}
         onContextMenu={(e) => handleContextMenu(e, 'chapter', chapter.id)}
     >
-        {/* <FileText className="w-4 h-4 shrink-0" /> */}
+        <FileText className={`w-4 h-4 shrink-0 ${selectedChapterId === chapter.id ? 'text-stone-400' : 'text-stone-400 group-hover:text-stone-600'}`} />
         {editingId === chapter.id ? (
             <input 
                 autoFocus
-                className="bg-transparent border-b border-current outline-none w-full text-sm font-serif"
+                className="bg-transparent border-b border-white/50 outline-none w-full text-sm font-medium"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 onBlur={handleSaveEdit}
@@ -99,10 +101,10 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
                 onClick={(e) => e.stopPropagation()}
             />
         ) : (
-            <div className="flex items-baseline gap-2 overflow-hidden">
-                <span className="text-sm font-serif truncate">{chapter.title}</span>
-                <span className={`text-[10px] ${selectedChapterId === chapter.id ? 'text-gray-300' : 'text-gray-400'}`}>
-                    (v{chapter.versions.find(v => v.id === chapter.currentVersionId)?.versionNumber || 1}.0)
+            <div className="flex items-center justify-between w-full overflow-hidden">
+                <span className="text-sm font-medium truncate">{chapter.title}</span>
+                <span className={`text-[10px] shrink-0 ml-2 px-1.5 py-0.5 rounded-full ${selectedChapterId === chapter.id ? 'bg-white/10 text-stone-300' : 'bg-stone-200 text-stone-500'}`}>
+                    v{chapter.versions.find(v => v.id === chapter.currentVersionId)?.versionNumber || 1}.0
                 </span>
             </div>
         )}
@@ -112,28 +114,39 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
   return (
     <div 
         ref={containerRef}
-        className="w-64 h-full border-2 border-dashed border-gray-300 rounded-xl p-4 overflow-y-auto relative"
+        className="w-72 h-full bg-white rounded-xl border border-stone-200 shadow-sm flex flex-col overflow-hidden"
         onContextMenu={(e) => handleContextMenu(e, 'root')}
     >
-      <h3 className="font-bold text-lg font-serif mb-4 flex items-center gap-2">
-          <ChevronDown className="w-5 h-5" />
-          目录
-      </h3>
+      <div className="p-4 border-b border-stone-100 bg-stone-50/50 flex justify-between items-center">
+          <h3 className="font-bold text-stone-800 flex items-center gap-2">
+              <Folder className="w-4 h-4 text-stone-500" />
+              目录结构
+          </h3>
+          <button 
+            onClick={() => onCreateChapter()} 
+            className="p-1.5 hover:bg-stone-200 rounded-md text-stone-500 transition-colors"
+            title="新建章节"
+          >
+              <Plus className="w-4 h-4" />
+          </button>
+      </div>
 
-      <div className="space-y-1">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
         {/* Volumes */}
         {volumes.map(volume => (
-            <div key={volume.id}>
+            <div key={volume.id} className="mb-1">
                 <div 
-                    className="flex items-center gap-2 py-1 px-2 hover:bg-gray-100 rounded-lg cursor-pointer text-black font-bold"
+                    className="flex items-center gap-2 py-2 px-2 hover:bg-stone-100 rounded-lg cursor-pointer text-stone-800 font-bold transition-colors"
                     onClick={() => onUpdateVolume(volume.id, { isExpanded: !volume.isExpanded })}
                     onContextMenu={(e) => handleContextMenu(e, 'volume', volume.id)}
                 >
-                    {volume.isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <div className="p-0.5 rounded hover:bg-stone-200 transition-colors">
+                        {volume.isExpanded ? <ChevronDown className="w-4 h-4 text-stone-400" /> : <ChevronRight className="w-4 h-4 text-stone-400" />}
+                    </div>
                     {editingId === volume.id ? (
                         <input 
                             autoFocus
-                            className="bg-transparent border-b border-black outline-none w-full text-sm font-serif"
+                            className="bg-transparent border-b border-stone-300 outline-none w-full text-sm font-bold"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             onBlur={handleSaveEdit}
@@ -141,26 +154,40 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
                             onClick={(e) => e.stopPropagation()}
                         />
                     ) : (
-                        <span className="text-sm font-serif truncate">{volume.title}</span>
+                        <span className="text-sm truncate select-none">{volume.title}</span>
                     )}
                 </div>
                 
                 {/* Volume Chapters */}
-                {volume.isExpanded && (
-                    <div className="mt-1 mb-2">
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${volume.isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="border-l border-stone-200 ml-4 pl-1 my-1 space-y-0.5">
                         {volume.chapters.map(renderChapterItem)}
                     </div>
-                )}
+                </div>
             </div>
         ))}
 
         {/* Orphan Chapters (Always below volumes) */}
-        {orphanChapters.map(renderChapterItem)}
+        {orphanChapters.length > 0 && (
+             <div className="mt-2 pt-2 border-t border-stone-100">
+                <div className="text-xs font-bold text-stone-400 px-3 py-1 mb-1 uppercase tracking-wider">未分类章节</div>
+                {orphanChapters.map(renderChapterItem)}
+             </div>
+        )}
         
         {/* Empty State */}
         {volumes.length === 0 && orphanChapters.length === 0 && (
-            <div className="text-center text-gray-400 text-xs py-8 font-serif">
-                右键点击创建章节
+            <div className="flex flex-col items-center justify-center h-48 text-stone-400 gap-3">
+                <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-stone-300" />
+                </div>
+                <span className="text-sm font-medium">暂无章节</span>
+                <button 
+                    onClick={() => onCreateChapter()}
+                    className="text-xs bg-stone-800 text-white px-3 py-1.5 rounded-md hover:bg-stone-700 transition-colors"
+                >
+                    立即创建
+                </button>
             </div>
         )}
       </div>
@@ -168,47 +195,48 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
       {/* Context Menu */}
       {contextMenu.visible && (
         <div 
-            className="fixed bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-50 py-1 w-32 animate-fade-in"
+            className="fixed bg-white border border-stone-200 rounded-lg shadow-xl z-50 py-1 w-40 animate-scale-up"
             style={{ top: contextMenu.y, left: contextMenu.x }}
         >
             {contextMenu.type === 'root' && (
                 <>
                     <button 
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 text-xs font-bold"
+                        className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
                         onClick={() => { onCreateVolume(); setContextMenu(prev => ({ ...prev, visible: false })); }}
                     >
-                        创建卷
+                        <Folder className="w-4 h-4" /> 创建卷
                     </button>
                     <button 
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 text-xs font-bold"
+                        className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
                         onClick={() => { onCreateChapter(); setContextMenu(prev => ({ ...prev, visible: false })); }}
                     >
-                        创建章节
+                        <FileText className="w-4 h-4" /> 创建章节
                     </button>
                 </>
             )}
             {contextMenu.type === 'volume' && (
                 <>
                     <button 
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 text-xs font-bold"
+                        className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
                         onClick={() => { onCreateChapter(contextMenu.targetId); setContextMenu(prev => ({ ...prev, visible: false })); }}
                     >
-                        创建章节
+                        <Plus className="w-4 h-4" /> 添加章节
                     </button>
+                    <div className="h-px bg-stone-100 my-1"></div>
                     <button 
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 text-xs font-bold"
+                        className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
                         onClick={() => { 
                             const vol = volumes.find(v => v.id === contextMenu.targetId);
                             if (vol) startEditing(vol.id, vol.title);
                         }}
                     >
-                        重命名
+                        <Edit2 className="w-4 h-4" /> 重命名
                     </button>
                 </>
             )}
             {contextMenu.type === 'chapter' && (
                 <button 
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100 text-xs font-bold"
+                    className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
                     onClick={() => { 
                         // Find chapter in volumes or orphans
                         let chap = orphanChapters.find(c => c.id === contextMenu.targetId);
@@ -221,7 +249,7 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
                         if (chap) startEditing(chap.id, chap.title);
                     }}
                 >
-                    重命名
+                    <Edit2 className="w-4 h-4" /> 重命名
                 </button>
             )}
         </div>

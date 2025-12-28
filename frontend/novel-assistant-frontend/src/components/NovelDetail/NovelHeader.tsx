@@ -1,5 +1,6 @@
 import React from 'react';
 import { Novel } from '@/types/novel';
+import { Book, Clock, FileText, Tag } from 'lucide-react';
 
 interface NovelHeaderProps {
   novel: Novel;
@@ -7,53 +8,63 @@ interface NovelHeaderProps {
 
 const NovelHeader: React.FC<NovelHeaderProps> = ({ novel }) => {
   return (
-    <div className="flex gap-8 w-full h-[280px]">
-      {/* Cover */}
-      <div className="w-52 h-full border-2 border-black rounded-lg flex items-center justify-center relative overflow-hidden bg-white shrink-0 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-         {novel.cover ? (
-             <img src={novel.cover} alt={novel.title} className="w-full h-full object-cover" />
-         ) : (
-             <div className="flex flex-col items-center justify-center w-full h-full bg-white relative">
-                  {/* Mock abstract art like in the sketch */}
-                  <div className="absolute top-8 left-8 w-8 h-8 bg-black rounded-full"></div>
-                  <div className="absolute bottom-0 w-full h-1/2 bg-black transform skew-y-[-10deg] origin-bottom-left"></div>
-             </div>
-         )}
+    <div className="w-full flex flex-col md:flex-row gap-8 animate-fade-in-up">
+      {/* Cover Section */}
+      <div className="shrink-0">
+        <div className="w-48 h-64 relative rounded-lg shadow-xl overflow-hidden group transition-transform hover:-translate-y-1 duration-300">
+           {novel.cover ? (
+               <img src={novel.cover} alt={novel.title} className="w-full h-full object-cover" />
+           ) : (
+               <div className="w-full h-full bg-gradient-to-br from-stone-800 to-stone-600 flex flex-col items-center justify-center p-6 text-white">
+                    <div className="w-12 h-12 border-2 border-white/30 rounded-full flex items-center justify-center mb-4">
+                        <Book className="w-6 h-6 text-white/80" />
+                    </div>
+                    <h3 className="text-center font-serif font-bold text-lg leading-tight line-clamp-3 opacity-90">
+                        {novel.title}
+                    </h3>
+                    <div className="absolute inset-0 bg-black/10 mix-blend-multiply"></div>
+                    {/* Decorative spine effect */}
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/10"></div>
+               </div>
+           )}
+        </div>
       </div>
 
-      {/* Info */}
-      <div className="flex-1 flex flex-col pt-2">
-          <h1 className="text-5xl font-serif font-bold mb-4 tracking-wide">{novel.title}</h1>
-          
-          {/* Meta Info */}
-          <div className="flex items-center gap-2 text-xs text-gray-500 font-serif mb-6 uppercase tracking-wider">
-              <span className="font-bold text-black text-sm">小说简介</span>
-              <span className="text-gray-300">|</span>
-              <span>{novel.status}</span>
-              <span className="text-gray-300">|</span>
-              <span>{novel.wordCount} 字</span>
-              <span className="text-gray-300">|</span>
-              <span>{novel.createdAt}</span>
-              <span className="text-gray-300">|</span>
-              <span>{novel.updatedAt}</span>
+      {/* Info Section */}
+      <div className="flex-1 flex flex-col py-1">
+          <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-4xl font-serif font-bold text-stone-900 mb-2 tracking-tight">
+                    {novel.title}
+                </h1>
+                <div className="flex flex-wrap gap-3 mb-6">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 
+                        ${novel.status === '连载中' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-stone-100 text-stone-600 border border-stone-200'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${novel.status === '连载中' ? 'bg-emerald-500' : 'bg-stone-400'}`}></div>
+                        {novel.status}
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-stone-50 text-stone-600 border border-stone-200 flex items-center gap-1.5">
+                        <FileText className="w-3 h-3" />
+                        {novel.wordCount} 字
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-stone-50 text-stone-600 border border-stone-200 flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        {novel.updatedAt} 更新
+                    </span>
+                </div>
+              </div>
           </div>
 
-          {/* Synopsis (Dashed Lines) */}
-          <div className="flex-1 relative">
-               <div className="absolute inset-0 flex flex-col gap-[28px]">
-                   {Array.from({ length: 5 }).map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="w-full border-b border-dashed border-gray-400 h-[28px]"
-                      ></div>
-                   ))}
-               </div>
-               
-               <div className="absolute inset-0 pt-0.5 px-1">
-                   <p className="font-serif leading-[29px] text-gray-800 line-clamp-5">
-                       {novel.synopsis}
-                   </p>
-               </div>
+          {/* Synopsis Card */}
+          <div className="flex-1 bg-white rounded-xl border border-stone-200 p-5 shadow-sm relative overflow-hidden group">
+               <div className="absolute top-0 left-0 w-1 h-full bg-stone-200 group-hover:bg-stone-400 transition-colors"></div>
+               <h3 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                   <Tag className="w-3 h-3" />
+                   简介
+               </h3>
+               <p className="font-serif text-stone-700 leading-relaxed text-justify line-clamp-4 hover:line-clamp-none transition-all duration-300">
+                   {novel.synopsis || "暂无简介..."}
+               </p>
           </div>
       </div>
     </div>
