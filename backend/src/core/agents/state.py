@@ -27,7 +27,6 @@ class KDBuildState(BaseModel):
 
     # 知识图谱
     cypher:List[str]=Field(default_factory=list,description="当前处理的查询")
-
 """
     chat助手状态
 """
@@ -37,5 +36,4 @@ class ChatHelperState(BaseModel):
     history:Annotated[List[AnyMessage],add_messages]=Field(default_factory=list)
     role:str=Field(default_factory=str,description="角色身份")
     # now_memory_load:bool=Field(default_factory=bool,description="是否需要加载记忆")
-
 
