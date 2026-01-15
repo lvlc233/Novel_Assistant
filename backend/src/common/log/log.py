@@ -1,108 +1,46 @@
-"""日志配置模块。.
+"""日志配置模块。
 
-本模块使用 loguru 实现结构化日志，支持按环境区分配置、文件轮转，
-并为不同组件（API、Graph、LLM）提供分层日志。
+本模块使用 loguru 实现结构化日志，支持按环境区分配置、文件轮转。
+简化配置：统一输出到控制台和文件，移除复杂的采样和分层。
 """
 
 import os
 import sys
-
 from loguru import logger
 
 APP_ENV = os.getenv("APP_ENV", "dev").lower()
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
-#  -------------- 环境差异化配置 --------------
-CFG = {
-    # 开发环境
-    "dev": {
-        "console_lvl": "DEBUG",
-        "file_lvl": "DEBUG",
-        "serialize": False,
-        "colorize": True,
-        "sample": 1.0,
-        "remote": False,
-    },
-    # 测试环境
-    "test": {
-        "console_lvl": "INFO",
-        "file_lvl": "DEBUG",
-        "serialize": True,
-        "colorize": True,
-        "sample": 1.0,
-        "remote": False,
-    },
-    # 生产环境
-    "prod": {
-        "console_lvl": "ERROR",
-        "file_lvl": "WARNING",
-        "serialize": True,
-        "colorize": False,
-        "sample": 0.01,
-        "remote": True,
-    },
-}
-C = CFG[APP_ENV]
-
-# -------------- 公共文件配置 --------------
-COMMON_FILE = {
-    "rotation": "1 day",
-    "retention": "15 days",
-    "compression": "gz",
-    "encoding": "utf-8",
-    "enqueue": True,
-    "colorize": False,  # 文件日志不需要颜色，避免ANSI转义码
+# 环境配置
+LOG_CONFIG = {
+    "dev": {"level": "DEBUG", "serialize": False},
+    "test": {"level": "INFO", "serialize": True},
+    "prod": {"level": "WARNING", "serialize": True},
 }
 
+config = LOG_CONFIG.get(APP_ENV, LOG_CONFIG["dev"])
 
-def _sampler(record: dict) -> bool:
-    """按采样率丢弃日志."""
-    import random
-
-    return random.random() < C["sample"]
-
-
-# 4. -------------- 统一 filter --------------
-def env_filter(record) -> bool:
-    return _sampler(record)
-
-
-# 5. -------------- 移除默认 + 控制台 --------------
+# 移除默认handler
 logger.remove()
+
+# 控制台输出
 logger.add(
     sys.stderr,
-    level=C["console_lvl"],
-    colorize=C["colorize"],
-    format="<green>{time:MM-DD HH:mm:ss}</green> | "
-    "<level>{level: <8}</level> | "
-    "<cyan>{extra[layer]: <5}</cyan> | "
-    "{message}",
-    filter=env_filter,
+    level=config["level"],
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
 )
 
+# 文件输出 (按天轮转，保留15天)
+logger.add(
+    os.path.join(LOG_DIR, f"app_{APP_ENV}.log"),
+    rotation="1 day",
+    retention="15 days",
+    compression="zip",
+    encoding="utf-8",
+    level=config["level"],
+    serialize=config["serialize"],
+    enqueue=True,
+)
 
-#  -------------- 三种sink --------------
-def add_layer_sink(path: str, layer: str):
-    logger.add(
-        os.path.join(LOG_DIR, f"{APP_ENV}_{path}"),
-        filter=lambda r: r["extra"].get("layer") == layer and env_filter(r),
-        level=C["file_lvl"],
-        serialize=C["serialize"],
-        **COMMON_FILE,
-    )
-
-
-add_layer_sink("api.jsonl", "API")
-add_layer_sink("graph.jsonl", "GRAPH")
-add_layer_sink("llm.jsonl", "LLM")
-add_layer_sink("db.jsonl", "DB")
-
-
-api_logger = logger.bind(layer="API")
-graph_logger = logger.bind(layer="GRAPH")
-llm_logger = logger.bind(layer="LLM")
-db_logger = logger.bind(layer="DB")
-
-
-__all__ = ["api_logger", "graph_logger", "llm_logger", "db_logger"]
+__all__ = ["logger"]

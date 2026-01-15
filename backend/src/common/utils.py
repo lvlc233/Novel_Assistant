@@ -7,10 +7,15 @@ from typing import Union
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from common.configer.agent.model_configs import global_model_config
+import os
 
+# TODO:  这里的工具可以整理一番
+# -----------------------------------------------------------------------------
+# Common Utility Functions
+# -----------------------------------------------------------------------------
 """
-    通用工具函数
+    通用工具函数模块
+    包含: UUID生成, 密码哈希, 时间处理, 区域标准化, 消息处理, 文本统计, 模型加载等
 """
 def create_uuid() -> str:
     """创建一个 UUID 字符串。"""
@@ -141,27 +146,21 @@ def load_chat_model(
     node_name: str|None = None,
 ) -> Union[BaseChatModel]:
     """加载一个聊天模型.
-    需在模型配置文件中配置模型节点.
+    默认使用 gpt-3.5-turbo (或通过环境变量指定)
 
     Args:
-        node_name: 模型节点名称,如果为空,则使用默认节点.
+        node_name: 模型节点名称, 暂保留作为区分不同用途的标识.
 
     Returns:
         BaseChatModel: 加载的聊天模型.
     """
-    if not node_name or node_name not in [k.node_name for k in global_model_config.nodes_config]:
-        node_name = "default"
-    model_name = global_model_config.get_model_name(node_name)
-    api_key = global_model_config.get_api_key(node_name)
-    base_url = global_model_config.get_base_url(node_name)
-    config = global_model_config.get_config(node_name)
+    model_name = "gpt-3.5-turbo"
+    if node_name in ["composition_agent", "master_agent", "atom_entity_node", "dependence_entity_node", "complete_node", "cypher_node"]:
+        model_name = "gpt-4"
 
     return init_chat_model(
         model=model_name,
         model_provider="openai",
-        api_key=api_key,
-        base_url=base_url,
-        **config,
     )
 
 

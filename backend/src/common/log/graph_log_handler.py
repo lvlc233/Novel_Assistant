@@ -11,7 +11,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.load import dumpd
 from langchain_core.messages import AIMessage
 
-from common.log.log import graph_logger, llm_logger
+from common.log.log import logger
 from common.utils import get_run_id_for_node, pick_msg_fields, value_colour_for_dict,_safe_to_dict
 
 
@@ -60,7 +60,7 @@ class NodeLogHandler(BaseCallbackHandler):
         else:
             merged_state = other_state_colored
 
-        graph_logger.opt(ansi=True).info(f"""
+        logger.opt(ansi=True).info(f"""
     <bold><bg green>START NODE:</bg green></bold>
         <bold>{node_name}:</bold>
         <bold>RUN ID:</bold> {current_run_id}
@@ -105,7 +105,7 @@ class NodeLogHandler(BaseCallbackHandler):
             merged_state = {"messages": messages} | other_state_colored
         else:
             merged_state = other_state_colored
-        graph_logger.opt(ansi=True).info(f"""
+        logger.opt(ansi=True).info(f"""
     <bold><bg white>NODE END:</bg white></bold>
         <bold>RUN ID:</bold> {current_run_id}
         <bold>PARENT RUN ID:</bold> {parent_run_id}
@@ -128,7 +128,7 @@ class LLMLogHandler(BaseCallbackHandler):
         invoke_params = value_colour_for_dict(
             copy.deepcopy(kwargs["invocation_params"]), colour="green"
         )
-        llm_logger.opt(ansi=True).info(f"""
+        logger.opt(ansi=True).info(f"""
     <bold><bg green>LLM INVOKE:</bg green></bold>
         <bold>RUN ID:</bold> <green>{run_id}</green>
         <bold>IN NODE:</bold> <green>{in_node}</green>
@@ -151,7 +151,7 @@ class LLMLogHandler(BaseCallbackHandler):
         additional_kwargs = output_message.additional_kwargs
         additional_kwargs = value_colour_for_dict(copy.deepcopy(additional_kwargs), colour="green")
         token_usage = value_colour_for_dict(copy.deepcopy(outputs.llm_output["token_usage"]), colour="green")
-        graph_logger.opt(ansi=True).info(f"""
+        logger.opt(ansi=True).info(f"""
     <bold><bg white>LLM END:</bg white></bold>
         <bold>RUN ID:</bold> <green>{run_id}</green>
         <bold>MODEL NAME:</bold> <green>{model_name}</green>
@@ -163,7 +163,7 @@ class LLMLogHandler(BaseCallbackHandler):
     def on_llm_error(self, error, **kwargs):
         """Purpose: 记录 LLM 调用出错时的错误信息."""
         err_kw = value_colour_for_dict(kwargs["invocation_params"], colour="red")
-        llm_logger.error(f"""
+        logger.error(f"""
     <bold><bg red>LLM INVOKE:</bg red></bold>
         <bold>ERROR:</bold> <red>{error}</red>
         <bold>ERROR KWARGS:</bold> {json.dumps(err_kw, indent=4, ensure_ascii=False)}

@@ -23,6 +23,10 @@ dependencies = [
     "langchain-openai",
     "pip>=25.3",
     "copilotkit==0.1.70",
+    "uvicorn>=0.38.0",
+    "sqlalchemy>=2.0.45",
+    "langchain-text-splitters>=1.1.0",
+    "pydantic-settings>=2.12.0",
 ]
 
 
@@ -33,15 +37,9 @@ dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
 requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["core", "common", "api","services"]
-[tool.setuptools.package-dir]
-"core" = "src/core"
-"common" = "src/common"
-"api" = "src/api"
-"services" = "src/services"
-
-
+[tool.setuptools.packages.find]
+where = ["src","alembic"]              
+include = ["*"]    
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 

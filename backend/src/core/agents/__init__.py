@@ -1,10 +1,5 @@
-"""
-智能体模块
+from core.agents.composition.graph import composition_agent
+from core.agents.kd_builder.graph import kd_build_agent
+from core.agents.master.graph import master_agent
 
-该模块定义了智能体的组成部分，包括智能体的运行时、智能体的状态、智能体的事件处理等。
-"""
-
-from core.agents.composition_agent.agent import composition_agent
-
-
-__all__ = ["composition_agent"]
+__all__ = ["composition_agent", "kd_build_agent", "master_agent"]

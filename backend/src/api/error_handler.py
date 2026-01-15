@@ -9,7 +9,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from api.models import Response
+from api.base import Response
 from common.errors import BaseError
 
 

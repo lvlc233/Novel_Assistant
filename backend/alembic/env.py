@@ -1,14 +1,19 @@
+import sys
+import os
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
-from dotenv import load_dotenv
 from alembic import context
-import os
 
-# 加载 .env 文件
-load_dotenv()
+# Ensure src is in python path
+# This allows importing modules from src/ directory (e.g. common, infrastructure)
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
+
+from common.config import settings
+from infrastructure.pg.pg_models import *  # noqa: F401
+from common.errors import DBURLNotFoundError
 
 # Alembic 配置对象，用来读取 alembic.ini 里的设置
 config = context.config
@@ -17,11 +22,6 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# 下面两行把项目里所有 SQLModel 实体导入，目的是把这些表注册到 SQLModel.metadata，
-# 这样 alembic revision --autogenerate 才能比较出模型与数据库的差异
-from common.clients.pg.pg_models import *  # noqa: F401
-# from common.clients.pg.checkpoint_models import *  # noqa: F401
-from common.errors import DBURLNotFoundError
 # 要检测/生成的目标元数据，所有模型都挂在这个 metadata 上
 target_metadata = SQLModel.metadata
 
@@ -32,7 +32,7 @@ def run_migrations_offline() -> None:
     适合 DBA 审核 SQL 或 CI 中生成脚本。
     """
     # 优先用环境变量 DATABASE_URL，否则读 alembic.ini 的 sqlalchemy.url
-    url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    url = settings.SQLALCHEMY_DATABASE_URI
     if not url:
         raise DBURLNotFoundError(url)          # 自定义异常：找不到数据库地址
 
@@ -65,7 +65,7 @@ async def run_async_migrations() -> None:
     """
     # 读取 alembic.ini 的 [alembic] 段，并强制把 url 换成环境变量 DATABASE_URL
 
-    db_url = os.getenv("DATABASE_URL")
+    db_url = settings.SQLALCHEMY_DATABASE_URI
 
     # 手动创建引擎以控制 SSL 参数
     connectable = create_async_engine(
@@ -80,6 +80,7 @@ async def run_async_migrations() -> None:
 
     # 迁移完成后关闭引擎
     await connectable.dispose()
+
 
 def run_migrations_online() -> None:
     """

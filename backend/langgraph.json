@@ -1,9 +1,0 @@
-{
-  "$schema": "https://langgra.ph/schema.json",
-  "dependencies": ["."],
-  "graphs": {
-    "agent": "src/core/agent/agent_kd_build.py:_kd_build_agent"
-  },
-  "env": ".env",
-  "image_distro": "wolfi"
-}

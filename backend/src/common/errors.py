@@ -51,6 +51,14 @@ class UserPasswordError(BaseError):
         self.user_name = user_name
         self.password = password
 
+class UserLoginError(BaseError):
+    """用户登录失败异常"""
+
+    def __init__(self, user_name: str, password: str):
+        super().__init__("5104", message=f"用户登录失败: {user_name}")
+        self.user_name = user_name
+        self.password = password
+
 """
     小说相关异常: 52xx
 """

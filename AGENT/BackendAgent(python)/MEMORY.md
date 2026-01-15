@@ -53,3 +53,28 @@ path: "/AGENT/BackendAgent(python)/"
 **八、测试与验收（“能跑”不是标准，“可回归”才是）**
 - **最小测试闭环**：每个模块至少覆盖 Service 的核心逻辑 + Router 的主路径（CRUD/分页/鉴权/错误码/SSE事件）。
 - **围绕契约做断言**：请求/响应 schema、分页字段、状态机字段（pending/processing/completed/failed）必须可回归
+
+**九、项目演进记录 (Novel Assistant Refactoring Journey)**
+*(2026-01-15 B1-B5 Backend Refactoring)*
+
+**1. 原始状态 (Before)**
+- **结构混乱**: 业务逻辑与路由耦合在 `api/routers` 单文件中；Agents 散落在 `agent_runnable` 和 `core/agents`，结构不统一。
+- **配置硬编码**: 数据库 URL、Host、Port、Log Level 直接写死在代码中，难以适应多环境。
+- **类型系统混用**: Agent State 混用 Pydantic BaseModel 和 TypedDict，导致 LangGraph 兼容性问题。
+- **基础设施缺失**: Alembic 存在但无法运行（环境配置加载失败）；`PGClient` 功能不全，依赖全局 Session。
+- **路由管理**: 在 `app.py` 中硬编码路由前缀，导致维护困难。
+
+**2. 重构后状态 (After)**
+- **Clean Architecture (3+1)**: 
+    - **Api**: 仅负责路由分发和参数校验 (`src/api/routes/{feature}`).
+    - **Service**: 纯业务逻辑，通过依赖注入接收 Session (`src/services/{feature}`).
+    - **Infrastructure**: 统一的数据访问层 (`src/infrastructure/pg`), `PGClient` 封装通用 CRUD。
+    - **Data/Model**: 纯净的 SQLModel 实体 (`src/infrastructure/pg/pg_models.py`) 和 Pydantic Schema (`src/api/routes/{feature}/schema.py`).
+- **统一配置管理**: 引入 `src/common/config.py` (Pydantic Settings)，统一管理环境变量，消除硬编码。
+- **Agent 模块化**: 
+    - 采用 **Co-location** 模式：`Graph`, `Nodes`, `State`, `Prompts` 放置在同一模块目录下 (`src/core/agents/{agent_name}`).
+    - 统一使用 **TypedDict** 作为 State 定义，符合 LangGraph 最佳实践。
+- **工程化提升**:
+    - **依赖管理**: 强制使用 `uv`。
+    - **DB 迁移**: 修复 Alembic 环境配置，支持自动生成迁移脚本。
+    - **异常处理**: 建立 `src/common/errors.py` 异常体系和全局 Error Handler。
