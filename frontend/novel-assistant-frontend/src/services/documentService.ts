@@ -1,8 +1,16 @@
+import { DirectoryNodeDto } from '@/services/models';
+import { request } from '@/lib/request';
+import { mockNovels, USE_MOCK } from '@/services/mockData';
 
-import { config } from '@/config';
-import { DirectoryNodeDto,ApiResponse} from '@/services/models';
-
-const DOCUMENT_API_BASE_URL = config.novel.documentApiBaseUrl;
+/**
+ * 开发者: FrontendAgent(react)
+ * 当前版本: FE-REF-20260121-01
+ * 创建时间: 2026-01-20 21:48
+ * 更新时间: 2026-01-21 11:40
+ * 更新记录:
+ * - [2026-01-21 11:40:FE-REF-20260121-01: 在何处使用: 编辑器/目录相关接口；如何使用: createFolder/createDocument 等；实现概述: 引入 mockData 并在 USE_MOCK=true 时返回模拟数据。]
+ * - [2026-01-20 21:48:FE-REF-20260120-02: 在何处使用: 编辑器/目录相关接口；如何使用: 调用 createFolder/createDocument/getDocumentDetail 等；实现概述: 补齐 getDocumentDetail 返回类型，移除 any。]
+ */
 
 // --- Folder & Document Operations ---
 
@@ -13,14 +21,30 @@ export interface CreateFolderDto {
 }
 
 export async function createFolder(data: CreateFolderDto): Promise<DirectoryNodeDto> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/create_folder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<DirectoryNodeDto> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Create folder failed');
-    return result.data;
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novel = mockNovels.find(n => n.id === data.novel_id);
+        if (novel) {
+            const newVolume = {
+                id: `mock-vol-${Date.now()}`,
+                title: data.name,
+                order: (novel.volumes?.length || 0) + 1,
+                isExpanded: true,
+                chapters: []
+            };
+            novel.volumes = novel.volumes || [];
+            novel.volumes.push(newVolume);
+            return {
+                node_id: newVolume.id,
+                node_name: newVolume.title,
+                node_type: 'folder',
+                sort_order: newVolume.order,
+                children: []
+            };
+        }
+        throw new Error('Novel not found');
+    }
+    return request.post<DirectoryNodeDto>('/create_folder', data);
 }
 
 export interface DeleteFolderDto {
@@ -30,14 +54,16 @@ export interface DeleteFolderDto {
 }
 
 export async function deleteFolder(data: DeleteFolderDto): Promise<boolean> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/delete_folder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<boolean> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Delete folder failed');
-    return result.data;
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novel = mockNovels.find(n => n.id === data.novel_id);
+        if (novel && novel.volumes) {
+            novel.volumes = novel.volumes.filter(v => v.id !== data.folder_id);
+            return true;
+        }
+        return false;
+    }
+    return request.post<boolean>('/delete_folder', data);
 }
 
 export interface RenameFolderDto {
@@ -48,14 +74,19 @@ export interface RenameFolderDto {
 }
 
 export async function renameFolder(data: RenameFolderDto): Promise<string> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/rename_folder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<string> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Rename folder failed');
-    return result.data;
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novel = mockNovels.find(n => n.id === data.novel_id);
+        if (novel && novel.volumes) {
+            const vol = novel.volumes.find(v => v.id === data.folder_id);
+            if (vol) {
+                vol.title = data.name;
+                return data.name;
+            }
+        }
+        throw new Error('Folder not found');
+    }
+    return request.post<string>('/rename_folder', data);
 }
 
 export interface CreateDocumentDto {
@@ -66,14 +97,41 @@ export interface CreateDocumentDto {
 }
 
 export async function createDocument(data: CreateDocumentDto): Promise<DirectoryNodeDto> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/create_document`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<DirectoryNodeDto> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Create document failed');
-    return result.data;
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novel = mockNovels.find(n => n.id === data.novel_id);
+        if (novel) {
+            const newChapter = {
+                id: `mock-chap-${Date.now()}`,
+                title: data.title,
+                order: 1, // Simplified order
+                currentVersionId: 'v1',
+                versions: [{ id: 'v1', versionNumber: 1, content: '', updatedAt: new Date().toISOString() }]
+            };
+
+            if (data.folder_id) {
+                const vol = novel.volumes?.find(v => v.id === data.folder_id);
+                if (vol) {
+                    newChapter.order = (vol.chapters?.length || 0) + 1;
+                    vol.chapters.push(newChapter);
+                } else {
+                    throw new Error('Folder not found');
+                }
+            } else {
+                 newChapter.order = (novel.orphanChapters?.length || 0) + 1;
+                 novel.orphanChapters = novel.orphanChapters || [];
+                 novel.orphanChapters.push(newChapter);
+            }
+             return {
+                node_id: newChapter.id,
+                node_name: newChapter.title,
+                node_type: 'document',
+                sort_order: newChapter.order,
+            };
+        }
+        throw new Error('Novel not found');
+    }
+    return request.post<DirectoryNodeDto>('/create_document', data);
 }
 
 export interface DeleteDocumentDto {
@@ -83,14 +141,30 @@ export interface DeleteDocumentDto {
 }
 
 export async function deleteDocument(data: DeleteDocumentDto): Promise<boolean> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/delete_document`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<boolean> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Delete document failed');
-    return result.data;
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novel = mockNovels.find(n => n.id === data.novel_id);
+        if (novel) {
+            // Check volumes
+            if (novel.volumes) {
+                for (const vol of novel.volumes) {
+                     if (vol.chapters.some(c => c.id === data.document_id)) {
+                         vol.chapters = vol.chapters.filter(c => c.id !== data.document_id);
+                         return true;
+                     }
+                }
+            }
+            // Check orphan chapters
+            if (novel.orphanChapters) {
+                 if (novel.orphanChapters.some(c => c.id === data.document_id)) {
+                     novel.orphanChapters = novel.orphanChapters.filter(c => c.id !== data.document_id);
+                     return true;
+                 }
+            }
+        }
+        return false;
+    }
+    return request.post<boolean>('/delete_document', data);
 }
 
 export interface RenameDocumentDto {
@@ -101,14 +175,32 @@ export interface RenameDocumentDto {
 }
 
 export async function renameDocument(data: RenameDocumentDto): Promise<string> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/rename_document`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<string> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Rename document failed');
-    return result.data;
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novel = mockNovels.find(n => n.id === data.novel_id);
+        if (novel) {
+            // Check volumes
+            if (novel.volumes) {
+                for (const vol of novel.volumes) {
+                     const chap = vol.chapters.find(c => c.id === data.document_id);
+                     if (chap) {
+                         chap.title = data.title;
+                         return data.title;
+                     }
+                }
+            }
+             // Check orphan chapters
+            if (novel.orphanChapters) {
+                 const chap = novel.orphanChapters.find(c => c.id === data.document_id);
+                 if (chap) {
+                     chap.title = data.title;
+                     return data.title;
+                 }
+            }
+        }
+        throw new Error('Document not found');
+    }
+    return request.post<string>('/rename_document', data);
 }
 
 export interface GetDocumentDetailDto {
@@ -117,16 +209,52 @@ export interface GetDocumentDetailDto {
     version_id?: string;
 }
 
-// Adjust return type based on backend response
-export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<any> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/get_document_detail`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<any> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Get document detail failed');
-    return result.data;
+export interface DocumentDetailResponse {
+    document_id: string;
+    document_version_id: string;
+    document_title: string;
+    document_body_text: string | null;
+    document_word_count: number;
+}
+
+export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<DocumentDetailResponse> {
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        for (const novel of mockNovels) {
+            // Check volumes
+            if (novel.volumes) {
+                for (const vol of novel.volumes) {
+                    const chap = vol.chapters.find(c => c.id === data.document_id);
+                    if (chap) {
+                        const version = chap.versions.find(v => v.id === (data.version_id || chap.currentVersionId));
+                        return {
+                            document_id: chap.id,
+                            document_version_id: version?.id || 'v1',
+                            document_title: chap.title,
+                            document_body_text: version?.content || '',
+                            document_word_count: (version?.content || '').length
+                        };
+                    }
+                }
+            }
+             // Check orphan chapters
+            if (novel.orphanChapters) {
+                 const chap = novel.orphanChapters.find(c => c.id === data.document_id);
+                 if (chap) {
+                    const version = chap.versions.find(v => v.id === (data.version_id || chap.currentVersionId));
+                    return {
+                        document_id: chap.id,
+                        document_version_id: version?.id || 'v1',
+                        document_title: chap.title,
+                        document_body_text: version?.content || '',
+                        document_word_count: (version?.content || '').length
+                    };
+                 }
+            }
+        }
+        throw new Error('Document not found');
+    }
+    return request.post<DocumentDetailResponse>('/get_document_detail', data);
 }
 
 export interface UpdateDocumentContentDto {
@@ -137,12 +265,41 @@ export interface UpdateDocumentContentDto {
 }
 
 export async function updateDocumentContent(data: UpdateDocumentContentDto): Promise<string> {
-    const response = await fetch(`${DOCUMENT_API_BASE_URL}/update_document_content`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-    const result: ApiResponse<string> = await response.json();
-    if (result.code !== '200') throw new Error(result.message || 'Update document content failed');
-    return result.data;
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novel = mockNovels.find(n => n.id === data.novel_id);
+        if (novel) {
+             let chap: any = null;
+             // Check volumes
+            if (novel.volumes) {
+                for (const vol of novel.volumes) {
+                    chap = vol.chapters.find(c => c.id === data.document_id);
+                    if (chap) break;
+                }
+            }
+            if (!chap && novel.orphanChapters) {
+                chap = novel.orphanChapters.find(c => c.id === data.document_id);
+            }
+            
+            if (chap) {
+                // Update content
+                const currentVersion = chap.versions.find((v: any) => v.id === chap.currentVersionId);
+                if (currentVersion) {
+                    currentVersion.content = data.content;
+                    currentVersion.updatedAt = new Date().toISOString();
+                } else {
+                     chap.versions.push({
+                         id: 'v1',
+                         versionNumber: 1,
+                         content: data.content,
+                         updatedAt: new Date().toISOString()
+                     });
+                     chap.currentVersionId = 'v1';
+                }
+                return "success";
+            }
+        }
+        throw new Error('Document not found');
+    }
+    return request.post<string>('/update_document_content', data);
 }

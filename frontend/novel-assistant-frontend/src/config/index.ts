@@ -1,26 +1,21 @@
 /**
- * 全局配置中心
- * 用于统一管理后端 API 地址、WebSocket 连接等配置
+ * Global Config Center
+ * Prefer Environment Variables
  */
 
-// 小说服务基础地址
-const NOVEL_SERVICE_URL = "http://localhost:8426";
+const getEnvVar = (key: string, defaultValue: string) => {
+  if (typeof process !== 'undefined' && process.env[key]) {
+    return process.env[key] as string;
+  }
+  return defaultValue;
+};
+
+// Backend API URL
+const API_BASE_URL = getEnvVar("NEXT_PUBLIC_API_URL", "http://localhost:8426");
 
 export const config = {
-  // 小说配置
   novel: {
-    baseUrl: NOVEL_SERVICE_URL,
-    // API 基础路径
-    apiBaseUrl: `${NOVEL_SERVICE_URL}/novel`,
-    //小说 API 基础路径
-    novelApiBaseUrl: `${NOVEL_SERVICE_URL}/novel`,
-    //文档 API 基础路径
-    documentApiBaseUrl: `${NOVEL_SERVICE_URL}/document`,
-    // 小说 Agent 相关配置
-    agents: {
-      baseUrl: NOVEL_SERVICE_URL,
-      // CopilotKit 端点
-      copilotEndpoint: `${NOVEL_SERVICE_URL}/copilotkit`,
-    },
+    baseUrl: API_BASE_URL,
+    apiBaseUrl: `${API_BASE_URL}`,
   },
 };

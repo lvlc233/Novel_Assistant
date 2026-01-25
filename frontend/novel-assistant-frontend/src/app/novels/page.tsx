@@ -4,12 +4,22 @@ import { useRouter } from 'next/navigation';
 
 import { Novel, KnowledgeBase } from '@/types/novel';
 import { getNovelList, createNovel, CreateNovelDto } from '@/services/novelService';
+import { logger } from '@/lib/logger';
 
-import { NovelCreationData } from '@/components/Document/CreateNovelCard';
-import DocumentCarousel from '@/components/Document/DocumentCarousel';
-import BottomInput from '@/components/base/BottomInput';
+import { NovelCreationData } from '@/components/novel-manager/CreateNovelCard';
+import DocumentCarousel from '@/components/novel-manager/DocumentCarousel';
+import BottomInput from '@/components/common/BottomInput';
 
 import { userId } from '@/services/mock';
+
+/**
+ * 开发者: FrontendAgent(react)
+ * 当前版本: FE-REF-20260120-01
+ * 创建时间: 2026-01-20 21:40
+ * 更新时间: 2026-01-20 21:40
+ * 更新记录:
+ * - [2026-01-20 21:40:FE-REF-20260120-01: 在何处使用: /novels 作品列表；如何使用: 进入页面自动拉取列表/创建作品；实现概述: 移除 console/alert，统一错误收口到页面状态与 logger。]
+ */
 
 export default function DocumentsPage() {
   const router = useRouter();
@@ -27,9 +37,10 @@ export default function DocumentsPage() {
         
         const data = await getNovelList(userId);
         setNovels(data);
-      } catch (err: any) {
-        console.error('Error fetching novels:', err);
-        setError(err.message || '连接服务器失败，请检查后端服务是否启动');
+      } catch (err: unknown) {
+        logger.error('Error fetching novels:', err);
+        const message = err instanceof Error ? err.message : '连接服务器失败，请检查后端服务是否启动';
+        setError(message);
       } finally {
         setIsLoading(false);
       }
@@ -85,12 +96,12 @@ export default function DocumentsPage() {
 
   const handleSelectNovel = (novel: Novel) => {
     // Navigate to novel detail page
-    console.log('Selected novel:', novel);
+    logger.debug('Selected novel:', novel);
     router.push(`/novels/${novel.id}`);
   };
 
   const handleEditNovel = (novel: Novel) => {
-    console.log('Edit novel:', novel);
+    logger.debug('Edit novel:', novel);
     // Logic for editing novel metadata (maybe same page or modal?)
     // For now, go to detail page
     router.push(`/novels/${novel.id}`);
@@ -102,7 +113,7 @@ export default function DocumentsPage() {
 
   const handleCreateNovel = async (data: NovelCreationData) => {
       try {
-        console.log("Creating novel with data:", data);
+        logger.debug('Creating novel with data:', data);
         
         // 构造 DTO
         const createDto: CreateNovelDto = {
@@ -120,10 +131,10 @@ export default function DocumentsPage() {
         setIsCreating(false);
         // Navigate to the new novel page
         router.push(`/novels/${newNovel.id}`);
-      } catch (err: any) {
-        console.error("Failed to create novel:", err);
-        // TODO: 显示错误 Toast
-        alert(`创建失败: ${err.message}`);
+      } catch (err: unknown) {
+        logger.error('Failed to create novel:', err);
+        const message = err instanceof Error ? err.message : '创建失败';
+        setError(`创建失败: ${message}`);
       }
   };
 
@@ -179,7 +190,7 @@ export default function DocumentsPage() {
             <BottomInput 
               position="static"
               placeholder="快速指令 / 询问 AI..."
-              onSubmit={(val) => console.log('Doc Input:', val)}
+              onSubmit={(val) => logger.debug('Doc Input:', val)}
             />
           </div>
           <button 

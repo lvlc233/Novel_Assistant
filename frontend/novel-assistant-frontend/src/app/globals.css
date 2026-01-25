@@ -146,45 +146,6 @@ html {
   to { opacity: 1; transform: scale(1); }
 }
 
-.copilotKitWindow {
-  /* 1. 脱离文档流，相对于视口定位 */
-  position: fixed !important;
-
-  /* 2. 距离视口顶部 4vh → 下面留出 4vh 空白 */
-  top: 2vh !important;
-
-  /* 3. 距离视口左侧 2vw */
-  left: 1% !important;
-
-  /* 4. 不再从底部定位，彻底解除“粘底” */
-  bottom: auto !important;
-
-  /* 5. 宽度 = 视口宽度的 24 % */
-  width: 24vw !important;
-
-  /* 6. 高度 = 视口高度的 92 % */
-  height: 96% !important;
-
-  /* 初始状态：面板藏在左侧屏幕外 */
-  transform: translateX(-150%) !important;
-
-  /* 滑入/滑出动画 */
-  transition: all 0.35s cubic-bezier(0.7, 0.5, 0.2, 0.7);
-  z-index: 2;
-}
-
-.copilotKitSidebar .copilotKitWindow {
-  min-height: auto !important;           /* 关掉撑满 */
-}
-
-.copilotKitWindow.open {
-  transform: translateX(0) !important; /* 当面板添加 open 类时，取消平移，面板滑入可视区 */
-}
-
-.copilotKitAssistantMessage{
-  background-color: var(--surface-hover);
-}
-
 /* 全局滚动条样式 (From base.css) */
 ::-webkit-scrollbar {
   width: 6px;

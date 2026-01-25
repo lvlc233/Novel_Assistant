@@ -1,52 +1,63 @@
 "use client";
-import React, { useState, Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import DocumentEditor from '@/components/DocumentEdit/DocumentEditor';
-import { CopilotSidebar } from '@copilotkit/react-ui';
-import CustomChatButton from '@/components/Sidebar/Button/Button';
-import CustomHeader from '@/components/Sidebar/Header/Header';
-import CustomInput from '@/components/Sidebar/Input/Input';
-import MailIcon from '@/components/Mail/MailIcon';
+import DocumentEditor from '@/components/editor/DocumentEditor';
+import AIAssistant from '@/components/editor/AIAssistant';
 
+// Wrap content in Suspense for useSearchParams
 function EditorContent() {
-  const [isCopilotOpen, setIsCopilotOpen] = useState(true);
   const searchParams = useSearchParams();
   const novelId = searchParams.get('novelId');
   const initialChapterId = searchParams.get('initialChapterId');
+  
+  const [isAiExpanded, setIsAiExpanded] = useState(true);
 
-      
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* CopilotSidebar - 左侧AI助手侧边栏 */}
-      <CopilotSidebar
-        defaultOpen={isCopilotOpen}
-        clickOutsideToClose={false}
-        labels={{
-          title: "AI 写作助手",
-          initial: "你好！我是你的AI写作助手，有什么可以帮助你的吗？",
-          placeholder: "输入你的问题...",
-        }}
-        onSetOpen={setIsCopilotOpen}
-        Button={CustomChatButton}
-        Header={CustomHeader}   
-        Input={CustomInput}  
-      />
-   
-      {/* 文档编辑器 */}
-      <DocumentEditor 
-        isChatExpanded={isCopilotOpen} 
-        novelId={novelId}
-        initialChapterId={initialChapterId}
-      />
-      {/* 邮件图标 - 悬浮在页面右上角 */}
-      <MailIcon onClick={() => console.log('邮件图标被点击')} />
+    <div className="flex w-full h-screen bg-white overflow-hidden relative">
+        {/* Left: AI Assistant Sidebar */}
+        <div 
+            className={`
+                h-full flex-shrink-0 z-20 
+                transition-all duration-300 ease-in-out overflow-hidden
+                ${isAiExpanded ? 'w-[400px]' : 'w-0'}
+            `}
+        >
+            <div className="w-[400px] h-full">
+                <AIAssistant isExpanded={isAiExpanded} onToggle={() => setIsAiExpanded(!isAiExpanded)} />
+            </div>
+        </div>
+        
+        {/* Floating Toggle Button (When AI is collapsed) */}
+        {!isAiExpanded && (
+             <div className="absolute left-6 bottom-8 z-50">
+                 <button 
+                    onClick={() => setIsAiExpanded(true)}
+                    className="w-12 h-12 bg-black rounded-full shadow-xl flex items-center justify-center text-white hover:scale-110 transition-transform cursor-pointer"
+                    title="打开助手"
+                 >
+                    {/* Re-import MessageSquare if needed, or use inline svg */}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                 </button>
+             </div>
+        )}
+
+        {/* Right: Main Editor Area */}
+        <div className="flex-1 h-full relative z-10 min-w-0">
+            <DocumentEditor 
+                isChatExpanded={isAiExpanded}
+                novelId={novelId}
+                initialChapterId={initialChapterId}
+            />
+        </div>
     </div>
   );
 }
 
 export default function EditorPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen">加载编辑器...</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading editor...</div>}>
       <EditorContent />
     </Suspense>
   );

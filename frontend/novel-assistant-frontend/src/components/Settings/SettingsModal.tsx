@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, X, ChevronDown, ChevronRight, Save, RotateCcw, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings, X, ChevronDown, ChevronRight, RotateCcw, Check } from 'lucide-react';
+import { logger } from '@/lib/logger';
+
+/**
+ * 开发者: FrontendAgent(react)
+ * 当前版本: FE-REF-20260120-02
+ * 创建时间: 2026-01-20 21:48
+ * 更新时间: 2026-01-20 21:48
+ * 更新记录:
+ * - [2026-01-20 21:48:FE-REF-20260120-02: 在何处使用: 系统设置弹窗；如何使用: 由父组件控制 isOpen/onClose；实现概述: 清理未使用 import，移除直接 console 输出，避免误用类 API Key 占位符。]
+ */
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,7 +39,7 @@ const MOCK_AGENTS: AgentConfig[] = [
     config: {
       base_url: 'https://api.openai.com/v1',
       model_name: 'gpt-4',
-      api_key: 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'
+      api_key: ''
     }
   },
   {
@@ -40,7 +50,7 @@ const MOCK_AGENTS: AgentConfig[] = [
     config: {
       base_url: 'https://api.anthropic.com',
       model_name: 'claude-3-opus',
-      api_key: 'sk-ant-xxxxxxxxxxxxxxxx'
+      api_key: ''
     }
   },
   {
@@ -51,7 +61,7 @@ const MOCK_AGENTS: AgentConfig[] = [
     config: {
       base_url: 'https://api.deepseek.com',
       model_name: 'deepseek-chat',
-      api_key: 'sk-ds-xxxxxxxxxxxxxxxx'
+      api_key: ''
     }
   }
 ];
@@ -70,13 +80,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   // Save single config (mock)
   const handleSave = (id: string) => {
     // In real app, this would make an API call
-    console.log('Saving config for agent:', id);
+    logger.debug('Saving config for agent:', id);
     // Show quick feedback?
   };
 
   // Global confirm
   const handleConfirm = () => {
-    console.log('Global confirm:', agents);
+    logger.debug('Global confirm:', agents);
     setShowToast(true);
     setTimeout(() => {
       setShowToast(false);

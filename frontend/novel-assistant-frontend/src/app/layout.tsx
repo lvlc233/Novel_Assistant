@@ -1,14 +1,10 @@
 // 顶级节点
 import type { Metadata } from "next";
-import { CopilotKit } from "@copilotkit/react-core";
 import "./globals.css";
-import "@copilotkit/react-ui/styles.css";
-
-import "../components/Sidebar/Header/Header.css";
-import "../components/Sidebar/Button/Button.css";
-import "../components/Sidebar/Input/Input.css";
-import "../components/DocumentEdit/document-editor.css";
-import "../components/Table/table-of-contents.css";
+import { MailProvider } from "@/contexts/MailContext";
+import { MailboxDrawer } from "@/components/mail/MailboxDrawer";
+import { MailButton } from "@/components/mail/MailButton";
+import { NotificationToast } from "@/components/mail/NotificationToast";
 
 export const metadata: Metadata = {
   title: "小说助手",
@@ -23,9 +19,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={"antialiased"}>
-        <CopilotKit runtimeUrl="/api/copilotkit">
+        <MailProvider>
           {children}
-        </CopilotKit>
+          
+          {/* Global Mail UI */}
+          <MailboxDrawer />
+          <NotificationToast />
+          
+          {/* Global Floating Entry Button (Positioned Top Right) */}
+          <div className="fixed top-6 right-8 z-50">
+             <MailButton />
+          </div>
+        </MailProvider>
       </body>
     </html>
   );

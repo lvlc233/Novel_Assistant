@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Novel, Volume, Chapter, ChapterVersion } from '@/types/novel';
-import NovelHeader from '@/components/NovelDetail/NovelHeader';
-import NovelDirectory from '@/components/NovelDetail/NovelDirectory';
-import ChapterPreview from '@/components/NovelDetail/ChapterPreview';
-import BottomInput from '@/components/base/BottomInput';
+import { Novel, Volume, Chapter } from '@/types/novel';
+import NovelHeader from '@/components/novel-detail/NovelHeader';
+import NovelDirectory from '@/components/novel-detail/NovelDirectory';
+import ChapterPreview from '@/components/novel-detail/ChapterPreview';
+import BottomInput from '@/components/common/BottomInput';
 import { ArrowLeft } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 import { userId } from '@/services/mock';
 import { 
@@ -18,6 +19,15 @@ import {
 import {
     getNovelDetail
 } from '@/services/novelService';
+
+/**
+ * 开发者: FrontendAgent(react)
+ * 当前版本: FE-REF-20260120-01
+ * 创建时间: 2026-01-20 21:40
+ * 更新时间: 2026-01-20 21:40
+ * 更新记录:
+ * - [2026-01-20 21:40:FE-REF-20260120-01: 在何处使用: /novels/[id] 作品详情；如何使用: 进入页面拉取详情/目录操作；实现概述: 移除直接 console 输出，统一走 logger，并收口错误信息到页面状态。]
+ */
 
 //  小说详情页
 export default function NovelDetailPage() {
@@ -49,9 +59,10 @@ export default function NovelDetailPage() {
         } else if (data.orphanChapters && data.orphanChapters.length > 0) {
             setSelectedChapterId(data.orphanChapters[0].id);
         }
-      } catch (err: any) {
-        console.error('Error fetching novel detail:', err);
-        setError(err.message || '获取小说详情失败');
+      } catch (err: unknown) {
+        logger.error('Error fetching novel detail:', err);
+        const message = err instanceof Error ? err.message : '获取小说详情失败';
+        setError(message);
       } finally {
         setIsLoading(false);
       }
@@ -97,7 +108,7 @@ export default function NovelDetailPage() {
           };
           setVolumes([...volumes, newVolume]);
       } catch (e) {
-          console.error("Create folder failed", e);
+          logger.error('Create folder failed', e);
       }
   };
 
@@ -140,7 +151,7 @@ export default function NovelDetailPage() {
           // Auto select
           setSelectedChapterId(newChapter.id);
       } catch (e) {
-          console.error("Create document failed", e);
+          logger.error('Create document failed', e);
       }
   };
 
@@ -158,7 +169,7 @@ export default function NovelDetailPage() {
                  name: data.title
              });
           } catch (e) {
-              console.error("Rename folder failed", e);
+              logger.error('Rename folder failed', e);
           }
       }
   };
@@ -185,14 +196,14 @@ export default function NovelDetailPage() {
                  title: data.title
              });
           } catch (e) {
-              console.error("Rename document failed", e);
+              logger.error('Rename document failed', e);
           }
       }
   };
 
   const handleEditContent = () => {
       if (selectedChapter) {
-          console.log(`Navigating to edit chapter ${selectedChapter.id}`);
+          logger.debug('Navigating to edit chapter', selectedChapter.id);
           router.push(`/editor?novelId=${id}&initialChapterId=${selectedChapter.id}`);
       }
   };
@@ -273,7 +284,7 @@ export default function NovelDetailPage() {
             <BottomInput 
               position="static"
               placeholder="询问 AI 助手或快速创建..."
-              onSubmit={(val) => console.log('Doc Detail Input:', val)}
+              onSubmit={(val) => logger.debug('Doc Detail Input:', val)}
             />
           </div>
         </div>

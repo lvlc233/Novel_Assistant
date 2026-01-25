@@ -1,51 +1,41 @@
 "use client";
 import React, { useState } from 'react';
-import Dashboard from '@/components/Home/Dashboard';
-import BottomInput from '@/components/base/BottomInput';
-import SystemIntroduction from '@/components/Home/SystemIntroduction';
-import SettingsModal from '@/components/Settings/SettingsModal';
-import { Settings } from 'lucide-react';
+import Dashboard from '@/components/dashboard/Dashboard';
+import BottomInput from '@/components/common/BottomInput';
+import SystemIntroduction from '@/components/dashboard/SystemIntroduction';
+import SettingsModal from '@/components/settings/SettingsModal';
 
 export default function HomePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
-    // 整屏奶白背景
-    <div className="min-h-screen bg-surface-primary relative overflow-x-hidden">
-      {/* Settings Button */}
-      <button 
-        onClick={() => setIsSettingsOpen(true)}
-        className="absolute top-6 right-8 z-50 p-3 bg-white/80 backdrop-blur-sm rounded-full shadow-sm hover:bg-white hover:scale-110 hover:shadow-md transition-all group"
-      >
-        <Settings className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" />
-      </button>
-
-      {/* Settings Modal */}
+    // 整屏奶白背景，无滚动
+    <div className="h-screen w-screen bg-surface-primary relative overflow-hidden flex flex-col">
+      {/* Settings Modal - still needed for functionality, but triggered differently now (e.g. from Dashboard card) */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
       {/* 占满屏幕的 flex 容器，让子元素居中 */}
-      <main className="min-h-screen flex items-center justify-start flex-col pt-16 pb-24">
+      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-[1920px] mx-auto">
           {/* 动画层 */}
-          <div className="animate-fade-in w-full">
-            <div>
+          <div className="animate-fade-in w-full flex flex-col items-center justify-center gap-8 md:gap-12">
+            <div className="w-full flex justify-center">
               {/* 仪表盘 */}
               <Dashboard onOpenSettings={() => setIsSettingsOpen(true)} />
             </div>
-            <div>
+            <div className="w-full">
               {/* 系统介绍栏 */}
               <SystemIntroduction/>
             </div>
           </div>
+          
+          <div className="h-24 w-full shrink-0"></div> {/* Spacer for BottomInput */}
+          
           <BottomInput 
             position="fixed"
             placeholder="快速指令 / 询问 AI..."
             onSubmit={(val) => console.log('Home Input:', val)}
-            
           />
       </main>
-
-      
-
     </div>
   );
 }

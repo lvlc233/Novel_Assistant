@@ -1,15 +1,20 @@
-// 导入数据模型
-import { NovelOverviewDto, DirectoryNodeDto, NovelDetailDto ,ApiResponse} from '@/services/models';
-
-import { Novel, Volume, Chapter, ChapterVersion } from '@/types/novel';
-import { config } from '@/config';
-
-const NOVEL_API_BASE_URL = config.novel.novelApiBaseUrl;
-
-
+import { NovelOverviewDto, DirectoryNodeDto, NovelDetailDto } from '@/services/models';
+import { Novel, Volume, Chapter } from '@/types/novel';
+import { request } from '@/lib/request';
+import { mockNovels, USE_MOCK } from '@/services/mockData';
 
 /**
- * 数据模型映射：DTO -> Domain Model
+ * 开发者: FrontendAgent(react)
+ * 当前版本: FE-REF-20260121-01
+ * 创建时间: 2026-01-20 21:48
+ * 更新时间: 2026-01-21 11:30
+ * 更新记录:
+ * - [2026-01-21 11:30:FE-REF-20260121-01: 在何处使用: 小说列表/详情页面；如何使用: getNovelList/getNovelDetail/createNovel；实现概述: 引入 mockData 并在 USE_MOCK=true 时返回模拟数据。]
+ * - [2026-01-20 21:48:FE-REF-20260120-02: 在何处使用: 小说列表/详情页面；如何使用: getNovelList/getNovelDetail/createNovel；实现概述: createNovel 对齐后端返回 NovelOverviewDto 并复用映射，移除 any。]
+ */
+
+/**
+ * Data Model Mapping: DTO -> Domain Model
  */
 function mapDtoToModel(dto: NovelOverviewDto): Novel {
   return {
@@ -18,10 +23,9 @@ function mapDtoToModel(dto: NovelOverviewDto): Novel {
     cover: dto.novel_cover_image_url || '',
     synopsis: dto.novel_summary || '暂无简介',
     wordCount: dto.novel_word_count || 0,
-    status: dto.novel_state === 'COMPLETED' ? '完结' : '连载中', // TODO: 完善状态映射
+    status: dto.novel_state === 'COMPLETED' ? '完结' : '连载中',
     updatedAt: new Date(dto.novel_update_time).toLocaleString(),
     createdAt: new Date(dto.novel_create_time).toLocaleDateString(),
-    // 默认值
     volumes: [],
     orphanChapters: []
   };
@@ -31,7 +35,6 @@ function mapDirectoryToVolumesAndChapters(directory: DirectoryNodeDto[]): { volu
   const volumes: Volume[] = [];
   const orphanChapters: Chapter[] = [];
 
-  // Sort by order
   const sortedDir = [...directory].sort((a, b) => a.sort_order - b.sort_order);
 
   sortedDir.forEach(node => {
@@ -45,13 +48,12 @@ function mapDirectoryToVolumesAndChapters(directory: DirectoryNodeDto[]): { volu
               title: child.node_name,
               order: child.sort_order,
               volumeId: node.node_id,
-              currentVersionId: 'v1', // Placeholder
+              currentVersionId: 'v1',
               versions: [
-                 // Placeholder version if needed, or empty
                  {
                      id: 'v1',
                      versionNumber: 1,
-                     content: '', // No content in detail API
+                     content: '',
                      updatedAt: child.update_time || new Date().toISOString()
                  }
               ]
@@ -104,76 +106,32 @@ function mapDetailDtoToModel(dto: NovelDetailDto): Novel {
 }
 
 /**
- * 获取小说列表
- * @param userId 用户ID
- * @returns Novel[]
+ * Get Novel List
  */
 export async function getNovelList(userId: string): Promise<Novel[]> {
-  try {
-    console.log(`[getNovelList] Requesting: ${NOVEL_API_BASE_URL}/get_novels with user_id: ${userId}`);
-    const response = await fetch(`${NOVEL_API_BASE_URL}/get_novels`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ user_id: userId }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[getNovelList] API Error (${response.status}):`, errorText);
-      throw new Error(`API Error: ${response.status} - ${errorText}`);
-    }
-
-    const data: ApiResponse<NovelOverviewDto[]> = await response.json();
-
-    if (data.code === `200` && Array.isArray(data.data)) {
-      return data.data.map(mapDtoToModel);
-    } else {
-      console.error('[getNovelList] Business Error:', data);
-      throw new Error(data.message || '获取小说列表失败');
-    }
-  } catch (error) {
-    console.error('[getNovelList] Network/Parse Error:', error);
-    throw error;
+  if (USE_MOCK) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return mockNovels;
   }
+  const data = await request.post<NovelOverviewDto[]>('/get_novels', { user_id: userId });
+  if (Array.isArray(data)) {
+    return data.map(mapDtoToModel);
+  }
+  return [];
 }
 
 /**
- * 获取小说详情
- * @param userId 用户ID
- * @param novelId 小说ID
- * @returns Novel
+ * Get Novel Detail
  */
 export async function getNovelDetail(userId: string, novelId: string): Promise<Novel> {
-  try {
-    console.log(`[getNovelDetail] Requesting: ${NOVEL_API_BASE_URL}/get_novel_detail`, { userId, novelId });
-    const response = await fetch(`${NOVEL_API_BASE_URL}/get_novel_detail`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ user_id: userId, novel_id: novelId }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[getNovelDetail] API Error (${response.status}):`, errorText);
-      throw new Error(`API Error: ${response.status} - ${errorText}`);
-    }
-
-    const data: ApiResponse<NovelDetailDto> = await response.json();
-
-    if (data.code === `200` && data.data) {
-      return mapDetailDtoToModel(data.data);
-    } else {
-      console.error('[getNovelDetail] Business Error:', data);
-      throw new Error(data.message || '获取小说详情失败');
-    }
-  } catch (error) {
-    console.error('[getNovelDetail] Network/Parse Error:', error);
-    throw error;
+  if (USE_MOCK) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const novel = mockNovels.find(n => n.id === novelId);
+    if (novel) return novel;
+    throw new Error('Novel not found');
   }
+  const data = await request.post<NovelDetailDto>('/get_novel_detail', { user_id: userId, novel_id: novelId });
+  return mapDetailDtoToModel(data);
 }
 
 export interface CreateNovelDto {
@@ -185,37 +143,26 @@ export interface CreateNovelDto {
 }
 
 /**
- * 创建小说
- * @param data 创建小说请求参数
- * @returns Created Novel
+ * Create Novel
  */
 export async function createNovel(data: CreateNovelDto): Promise<Novel> {
-  try {
-    console.log(`[createNovel] Requesting: ${NOVEL_API_BASE_URL}/create_novel`, data);
-    const response = await fetch(`${NOVEL_API_BASE_URL}/create_novel`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[createNovel] API Error (${response.status}):`, errorText);
-      throw new Error(`API Error: ${response.status} - ${errorText}`);
+    if (USE_MOCK) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const newNovel: Novel = {
+        id: `mock-${Date.now()}`,
+        title: data.novel_name,
+        cover: data.novel_cover_image_url || '',
+        synopsis: data.novel_summary || '暂无简介',
+        wordCount: 0,
+        status: '连载中',
+        updatedAt: new Date().toLocaleString(),
+        createdAt: new Date().toLocaleDateString(),
+        volumes: [],
+        orphanChapters: []
+      };
+      mockNovels.push(newNovel);
+      return newNovel;
     }
-
-    const responseData: ApiResponse<NovelOverviewDto> = await response.json();
-
-    if (responseData.code === "200" && responseData.data) {
-      return mapDtoToModel(responseData.data);
-    } else {
-      console.error('[createNovel] Business Error:', responseData);
-      throw new Error(responseData.message || '创建小说失败');
-    }
-  } catch (error) {
-    console.error('[createNovel] Network/Parse Error:', error);
-    throw error;
-  }
+    const result = await request.post<NovelOverviewDto>('/create_novel', data);
+    return mapDtoToModel(result);
 }

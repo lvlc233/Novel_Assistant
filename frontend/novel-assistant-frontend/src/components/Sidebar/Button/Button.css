@@ -1,8 +1,0 @@
-/* button.css —— */
-.copilotKitButtonWrapper {
-  position: fixed;
-  bottom: 24px;
-  left: 24px;
-  transform: translateY(-50%);
-  z-index: 1;
-}
