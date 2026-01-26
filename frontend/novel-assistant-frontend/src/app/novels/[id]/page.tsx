@@ -1,12 +1,17 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { SlotInjector } from '@/components/common/SlotInjector';
+import NovelPluginSettingsModal from '@/components/novel-detail/NovelPluginSettingsModal';
+import NovelSettingsModal from '@/components/novel-detail/NovelSettingsModal';
+
 import { Novel, Volume, Chapter } from '@/types/novel';
 import NovelHeader from '@/components/novel-detail/NovelHeader';
 import NovelDirectory from '@/components/novel-detail/NovelDirectory';
 import ChapterPreview from '@/components/novel-detail/ChapterPreview';
 import BottomInput from '@/components/common/BottomInput';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Settings2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
 
 import { userId } from '@/services/mock';
@@ -14,7 +19,9 @@ import {
     createFolder,
     createDocument,
     renameFolder,
-    renameDocument
+    renameDocument,
+    deleteFolder,
+    deleteDocument
 } from '@/services/documentService';
 import {
     getNovelDetail
@@ -22,10 +29,11 @@ import {
 
 /**
  * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260120-01
+ * 当前版本: FE-REF-20260125-03
  * 创建时间: 2026-01-20 21:40
- * 更新时间: 2026-01-20 21:40
+ * 更新时间: 2026-01-25 12:30
  * 更新记录:
+ * - [2026-01-25 12:30:FE-REF-20260125-03: 接入 AppLayout, 添加插件配置入口]
  * - [2026-01-20 21:40:FE-REF-20260120-01: 在何处使用: /novels/[id] 作品详情；如何使用: 进入页面拉取详情/目录操作；实现概述: 移除直接 console 输出，统一走 logger，并收口错误信息到页面状态。]
  */
 
@@ -41,6 +49,10 @@ export default function NovelDetailPage() {
   const [selectedChapterId, setSelectedChapterId] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Plugin Settings
+  const [isPluginSettingsOpen, setIsPluginSettingsOpen] = useState(false);
+  const [isNovelSettingsOpen, setIsNovelSettingsOpen] = useState(false);
 
   useEffect(() => {
     const fetchNovelDetail = async () => {
@@ -201,6 +213,49 @@ export default function NovelDetailPage() {
       }
   };
 
+  const handleDeleteVolume = async (volumeId: string) => {
+      try {
+          await deleteFolder({
+              user_id: userId,
+              novel_id: id,
+              folder_id: volumeId
+          });
+          setVolumes(volumes.filter(v => v.id !== volumeId));
+          // If selected chapter was in deleted volume, clear selection
+          if (selectedChapter && selectedChapter.volumeId === volumeId) {
+              setSelectedChapterId(undefined);
+          }
+      } catch (e) {
+          logger.error('Delete volume failed', e);
+      }
+  };
+
+  const handleDeleteChapter = async (chapterId: string) => {
+      try {
+          await deleteDocument({
+              user_id: userId,
+              novel_id: id,
+              document_id: chapterId
+          });
+          
+          const isOrphan = orphanChapters.some(c => c.id === chapterId);
+          if (isOrphan) {
+              setOrphanChapters(orphanChapters.filter(c => c.id !== chapterId));
+          } else {
+              setVolumes(volumes.map(v => ({
+                  ...v,
+                  chapters: v.chapters.filter(c => c.id !== chapterId)
+              })));
+          }
+
+          if (selectedChapterId === chapterId) {
+              setSelectedChapterId(undefined);
+          }
+      } catch (e) {
+          logger.error('Delete chapter failed', e);
+      }
+  };
+
   const handleEditContent = () => {
       if (selectedChapter) {
           logger.debug('Navigating to edit chapter', selectedChapter.id);
@@ -210,84 +265,121 @@ export default function NovelDetailPage() {
 
   if (isLoading) {
     return (
-        <div className="flex items-center justify-center h-screen bg-[#F9F7F5]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800"></div>
-        </div>
+        <AppLayout>
+            <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800"></div>
+            </div>
+        </AppLayout>
     );
   }
 
   if (error || !novel) {
     return (
-      <div className="flex items-center justify-center h-screen flex-col gap-4 bg-[#F9F7F5]">
-        <div className="text-red-500">{error || '小说不存在'}</div>
-        <button onClick={() => router.push('/novels')} className="text-stone-500 hover:underline">
-          返回列表
-        </button>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center h-full flex-col gap-4">
+            <div className="text-red-500">{error || '小说不存在'}</div>
+            <button onClick={() => router.push('/novels')} className="text-stone-500 hover:underline">
+            返回列表
+            </button>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#F9F7F5] overflow-hidden">
-        {/* Navigation Bar */}
-        <nav className="h-16 bg-white/50 backdrop-blur-md border-b border-stone-200 flex items-center px-8 fixed top-0 left-0 right-0 z-50">
+    <AppLayout>
+        {/* Inject Header Content */}
+        <SlotInjector slotId="header-breadcrumb">
+             <div className="flex items-center gap-2">
+                 <button 
+                     onClick={() => router.push('/novels')}
+                     className="text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1"
+                 >
+                     <ArrowLeft className="w-4 h-4" />
+                     书架
+                 </button>
+                 <span className="text-text-disabled">/</span>
+                 <span className="font-serif font-bold text-text-primary">{novel.title}</span>
+             </div>
+        </SlotInjector>
+
+        <SlotInjector slotId="header-actions">
             <button 
-                onClick={() => router.push('/novels')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-stone-100 transition-colors text-stone-600 font-medium text-sm"
+                onClick={() => setIsPluginSettingsOpen(true)}
+                className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded-full transition-colors"
+                title="插件配置"
             >
-                <ArrowLeft className="w-4 h-4" />
-                <span>返回书架</span>
+                <Settings2 className="w-5 h-5" />
             </button>
-            <div className="mx-4 h-4 w-px bg-stone-300"></div>
-            <span className="text-stone-900 font-serif font-bold truncate max-w-xs">{novel.title}</span>
-        </nav>
+        </SlotInjector>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-hidden pt-16 flex flex-col">
-            <div className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 flex flex-col gap-6 h-full">
-                
-                {/* Novel Info Header */}
-                <div className="shrink-0">
-                    <NovelHeader novel={novel} />
-                </div>
-
-                {/* Workspace (Directory + Preview) */}
-                <div className="flex-1 flex gap-6 min-h-0 pb-20">
-                    {/* Directory Panel */}
-                    <div className="shrink-0 h-full">
-                        <NovelDirectory 
-                            volumes={volumes}
-                            orphanChapters={orphanChapters}
-                            selectedChapterId={selectedChapterId}
-                            onSelectChapter={handleSelectChapter}
-                            onCreateVolume={handleCreateVolume}
-                            onCreateChapter={handleCreateChapter}
-                            onUpdateVolume={handleUpdateVolume}
-                            onUpdateChapter={handleUpdateChapter}
-                        />
+        <div className="flex flex-col h-full relative overflow-hidden">
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 flex flex-col gap-6 h-full">
+                    
+                    {/* Novel Info Header - Simplified in Detail Page since we have TopNav now? 
+                        Maybe keep it for cover and stats. 
+                    */}
+                    <div className="shrink-0">
+                        <NovelHeader novel={novel} />
                     </div>
 
-                    {/* Preview Panel */}
-                    <div className="flex-1 h-full min-w-0">
-                        <ChapterPreview 
-                            chapter={selectedChapter}
-                            onEdit={handleEditContent}
-                        />
+                    {/* Workspace (Directory + Preview) */}
+                    <div className="flex-1 flex gap-6 min-h-0 pb-20">
+                        {/* Directory Panel */}
+                        <div className="shrink-0 h-full w-80">
+                            <NovelDirectory 
+                                volumes={volumes}
+                                orphanChapters={orphanChapters}
+                                selectedChapterId={selectedChapterId}
+                                onSelectChapter={handleSelectChapter}
+                                onCreateVolume={handleCreateVolume}
+                                onCreateChapter={handleCreateChapter}
+                                onUpdateVolume={handleUpdateVolume}
+                                onUpdateChapter={handleUpdateChapter}
+                                onDeleteVolume={handleDeleteVolume}
+                                onDeleteChapter={handleDeleteChapter}
+                            />
+                        </div>
+
+                        {/* Preview Panel */}
+                        <div className="flex-1 h-full min-w-0">
+                            <ChapterPreview 
+                                chapter={selectedChapter}
+                                onEdit={handleEditContent}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        {/* 底部输入框 */}
-        <div className="fixed bottom-8 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-          <div className="pointer-events-auto w-full max-w-2xl shadow-2xl rounded-2xl overflow-hidden ring-1 ring-black/5">
-            <BottomInput 
-              position="static"
-              placeholder="询问 AI 助手或快速创建..."
-              onSubmit={(val) => logger.debug('Doc Detail Input:', val)}
-            />
-          </div>
+            {/* 底部输入框 */}
+            <div className="fixed bottom-8 left-64 right-0 z-50 flex justify-center px-4 pointer-events-none">
+              <div className="pointer-events-auto w-full max-w-2xl shadow-2xl rounded-2xl overflow-hidden ring-1 ring-black/5 bg-surface-white">
+                <BottomInput 
+                  position="static"
+                  placeholder="询问 AI 助手或快速创建..."
+                  onSubmit={(val) => logger.debug('Doc Detail Input:', val)}
+                />
+              </div>
+            </div>
         </div>
-    </div>
+        
+        <NovelPluginSettingsModal 
+            isOpen={isPluginSettingsOpen} 
+            onClose={() => setIsPluginSettingsOpen(false)}
+            novelId={id}
+        />
+
+        {novel && (
+            <NovelSettingsModal
+                isOpen={isNovelSettingsOpen}
+                onClose={() => setIsNovelSettingsOpen(false)}
+                novel={novel}
+                onUpdate={(updated) => setNovel(updated)}
+            />
+        )}
+    </AppLayout>
   );
 }

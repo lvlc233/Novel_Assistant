@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Send, MoreHorizontal, User, Bot, Search, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
+import { Settings, Plus, Send, MoreHorizontal, User, Bot, ChevronLeft } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -8,10 +8,11 @@ interface Message {
 }
 
 interface AIAssistantProps {
-    isExpanded: boolean;
-    onToggle: () => void;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function AIAssistant({ isExpanded, onToggle }: AIAssistantProps) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([

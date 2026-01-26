@@ -68,5 +68,7 @@ export default {
       }
     },
   },
-  plugins: [],
+  plugins: [
+    typography,
+  ],
 } satisfies Config;

@@ -42,4 +42,7 @@ export interface Novel {
   knowledgeBases?: KnowledgeBase[];
   volumes?: Volume[];
   orphanChapters?: Chapter[];
+  type?: string;
+  genre?: string;
+  plugins?: { id: string; enabled: boolean; config: Record<string, unknown> }[];
 }

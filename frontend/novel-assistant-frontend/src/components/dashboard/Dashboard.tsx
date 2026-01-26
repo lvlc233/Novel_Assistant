@@ -2,39 +2,41 @@
 // 仪表盘
 import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Settings, Plus, LayoutGrid, Sparkles, BarChart3, Database } from 'lucide-react';
+import { FileText, Settings, Plus, LayoutGrid, Sparkles, BarChart3, Database, Brain, Bot, FileEdit, Briefcase } from 'lucide-react';
 import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
+import PluginManagerModal, { PluginType } from './PluginManagerModal';
 import { logger } from '@/lib/logger';
 
 /**
  * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260120-03
+ * 当前版本: FE-REF-20260125-03
  * 创建时间: 2026-01-20 22:35
- * 更新时间: 2026-01-20 22:35
+ * 更新时间: 2026-01-25 16:30
  * 更新记录:
  * - [2026-01-20 22:35:FE-REF-20260120-03: 在何处使用: 首页仪表盘；如何使用: 点击插件卡片展开扇形选择区；实现概述: 重构布局为 Fan Interaction，移除知识库入口以匹配设计稿。]
+ * - [2026-01-25 15:30:FE-REF-20260125-01: 更新插件列表为实际业务模块（记忆、知识库、Agent）；添加点击跳转逻辑。]
+ * - [2026-01-25 15:45:FE-REF-20260125-02: 修复滚动方向为横向；移除卡片旋转以修复渲染问题；点击卡片弹出模态框而非跳转。]
+ * - [2026-01-25 16:30:FE-REF-20260125-03: 拆分 Agent 为文档助手和项目助手。]
  */
 
 interface DashboardProps {
   onOpenSettings?: () => void;
 }
 
-// 模拟插件数据
+// 插件数据
 const PLUGINS = [
-    { id: 'writer', name: 'Writer Agent', icon: <Sparkles className="w-6 h-6" />, type: 'system', color: 'bg-accent-primary text-white' },
-    { id: 'reviewer', name: 'Reviewer', icon: <FileText className="w-6 h-6" />, type: 'system', color: 'bg-accent-secondary text-white' },
-    { id: 'marketing', name: 'Marketing', icon: <BarChart3 className="w-6 h-6" />, type: 'custom', color: 'bg-surface-white' },
-    { id: 'data', name: 'Data Analyst', icon: <Database className="w-6 h-6" />, type: 'custom', color: 'bg-surface-white' },
-    { id: 'character', name: 'Character Bot', icon: <Sparkles className="w-6 h-6" />, type: 'custom', color: 'bg-surface-white' },
-    { id: 'translator', name: 'Translator', icon: <FileText className="w-6 h-6" />, type: 'custom', color: 'bg-surface-white' },
-    { id: 'coder', name: 'Code Assistant', icon: <Settings className="w-6 h-6" />, type: 'custom', color: 'bg-surface-white' },
+    { id: 'memory', name: '记忆管理', icon: <Brain />, type: 'system', color: 'bg-white', route: '/memories' },
+    { id: 'knowledge', name: '知识库', icon: <Database />, type: 'system', color: 'bg-white', route: '/knowledge-bases' },
+    { id: 'doc_agent', name: '文档助手', icon: <FileEdit />, type: 'system', color: 'bg-white', route: '/agents' },
+    { id: 'project_agent', name: '项目助手', icon: <Briefcase />, type: 'system', color: 'bg-white', route: '/agents' },
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const router = useRouter();
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isPluginsExpanded, setIsPluginsExpanded] = useState(false);
+  const [selectedPlugin, setSelectedPlugin] = useState<PluginType | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCreateSelect = (type: 'blank' | 'template' | 'import') => {
@@ -46,10 +48,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const handlePluginClick = () => {
     setIsPluginsExpanded(!isPluginsExpanded);
   };
+  
+  const handlePluginCardClick = (id: string) => {
+      if (['memory', 'knowledge', 'agent', 'doc_agent', 'project_agent'].includes(id)) {
+          setSelectedPlugin(id as PluginType);
+      } else {
+          // Fallback or other plugins
+          logger.warn('Unknown plugin clicked:', id);
+      }
+  };
 
   // Horizontal scroll wheel handler
   const handleWheel = (e: React.WheelEvent) => {
-    if (scrollContainerRef.current && isPluginsExpanded) {
+    // Only intercept if we are in the expanded plugin area and scrolling vertically
+    if (scrollContainerRef.current && isPluginsExpanded && e.deltaY !== 0) {
+        // Prevent default browser vertical scroll if possible? 
+        // React synthetic events don't support preventDefault on passive listeners easily, 
+        // but here we are just translating the motion.
         scrollContainerRef.current.scrollLeft += e.deltaY;
     }
   };
@@ -72,7 +87,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
               title="作品管理"
               icon={<FileText className="w-8 h-8" />}
               rotation="rotate-0" // handled by parent wrapper
-              color="bg-surface-white"
+              color="bg-white"
               onClick={() => router.push('/novels')}
             />
         </div>
@@ -83,7 +98,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
               title="系统配置"
               icon={<Settings className="w-8 h-8" />}
               rotation="rotate-0"
-              color="bg-surface-white"
+              color="bg-white"
               onClick={onOpenSettings}
             />
         </div>
@@ -100,8 +115,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                 className={`
                     rounded-[24px] transition-all duration-500
                     ${isPluginsExpanded 
-                        ? 'h-[340px] bg-surface-white/40 backdrop-blur-md border-2 border-dashed border-border-primary/50' 
-                        : 'h-[280px] bg-surface-white shadow-xl group-hover:shadow-2xl border border-white/50 overflow-hidden'}
+                        ? 'h-[340px] bg-white/40 backdrop-blur-md border-2 border-dashed border-border-primary/50' 
+                        : 'h-[280px] bg-white shadow-xl group-hover:shadow-2xl border border-white/50 overflow-hidden'}
                 `}
             >
                 {/* Collapsed State Content: Single "Coming Soon / Plugins" Card Look */}
@@ -112,9 +127,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                     onClick={handlePluginClick}
                 >
                      <div className="w-16 h-16 rounded-2xl bg-surface-secondary flex items-center justify-center mb-4 text-accent-secondary">
-                        <Plus className="w-8 h-8" />
+                        <LayoutGrid className="w-8 h-8" />
                      </div>
-                     <h3 className="text-xl font-serif font-bold text-text-primary">插件+</h3>
+                     <h3 className="text-xl font-serif font-bold text-gray-800">扩展功能</h3>
                 </div>
 
                 {/* Expanded State Content: Fan Scroll Area */}
@@ -141,19 +156,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                     {/* Scrollable Fan List */}
                     <div 
                         ref={scrollContainerRef}
-                        className="flex-1 overflow-x-auto flex items-center px-8 gap-8 scrollbar-hide cursor-grab active:cursor-grabbing snap-x"
-                        onWheel={handleWheel}
+                        className="flex-1 overflow-x-auto overflow-y-hidden flex items-center px-8 gap-8 scrollbar-hide cursor-grab active:cursor-grabbing snap-x"
                     >
-                         {/* Add Plugin Button (First Item) */}
-                         <div className="snap-center shrink-0 py-4">
-                            <FeatureCard
-                                title="添加插件"
-                                icon={<Plus className="w-8 h-8" />}
-                                color="bg-surface-white/80 border-2 border-dashed border-border-primary hover:border-accent-primary hover:text-accent-primary"
-                                onClick={() => setIsCreateMenuOpen(true)}
-                            />
-                         </div>
-
                          {/* Plugin Cards */}
                          {PLUGINS.map((plugin, idx) => (
                              <div key={plugin.id} className="snap-center shrink-0 py-4">
@@ -161,8 +165,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                                     title={plugin.name}
                                     icon={plugin.icon}
                                     color={plugin.color}
-                                    // Subtle rotation for organic feel in the list
-                                    rotation={idx % 2 === 0 ? 'rotate-1' : '-rotate-1'}
+                                    // Remove rotation to fix rendering issues and improve clarity
+                                    rotation="rotate-0"
+                                    onClick={() => handlePluginCardClick(plugin.id)}
                                 />
                              </div>
                          ))}
@@ -177,6 +182,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       </div>
 
       <QuickCreateMenu isOpen={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} onSelect={handleCreateSelect} />
+      
+      {selectedPlugin && (
+          <PluginManagerModal 
+            type={selectedPlugin} 
+            onClose={() => setSelectedPlugin(null)} 
+          />
+      )}
 
     </div>
   );

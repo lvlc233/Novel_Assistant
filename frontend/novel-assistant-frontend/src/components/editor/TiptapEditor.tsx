@@ -29,7 +29,17 @@ const TiptapEditor = ({ content, onChange, editable = true }: TiptapEditorProps)
     },
     editorProps: {
         attributes: {
-            class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none mx-auto focus:outline-none min-h-[500px] px-4 py-8'
+            class: 'prose prose-stone prose-lg max-w-none mx-auto focus:outline-none min-h-[500px] px-12 py-12 font-serif text-stone-800 leading-loose tracking-wide indent-8 text-justify bg-transparent'
+        },
+        transformPastedHTML: (html) => {
+            // Remove all style attributes to ensure clean paste
+            return html.replace(/style="[^"]*"/g, "");
+        },
+        transformPastedText: (text) => {
+            // Simple cleanup for common issues: 
+            // 1. Remove excessive newlines (more than 2 -> 2)
+            // 2. Trim lines
+            return text.replace(/\n{3,}/g, '\n\n');
         }
     }
   })

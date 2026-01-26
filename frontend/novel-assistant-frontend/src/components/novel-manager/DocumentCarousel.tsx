@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { KnowledgeBase, Novel } from '@/types/novel';
 import NovelCard from './NovelCard';
 import CreateNovelCard from './CreateNovelCard';
@@ -23,7 +23,7 @@ interface DocumentCarouselProps {
   onCreateNovel: (data: NovelCreationData) => void;
   onDeleteNovel: (id: string) => void;
   onEditNovel?: (novel: Novel) => void;
-  onOpenKnowledgeBase?: (novel: Novel) => void;
+  onOpenPluginConfig?: (novel: Novel) => void;
   // Controlled props
   activeIndex?: number;
   onIndexChange?: (index: number) => void;
@@ -44,8 +44,8 @@ const DocumentCarousel: React.FC<DocumentCarouselProps> = ({
   onDeleteNovel,
   // 编辑作品回调
   onEditNovel,
-  // 打开知识库回调
-  onOpenKnowledgeBase,
+  // 打开插件配置回调
+  onOpenPluginConfig,
   // 受控索引
   activeIndex: controlledIndex,
   // 索引变化回调
@@ -169,7 +169,12 @@ const DocumentCarousel: React.FC<DocumentCarouselProps> = ({
   if (isCreating) {
     return (
       // 单个卡片
-      <div className="flex items-center justify-center w-full h-[600px]">
+      <div 
+        className="flex items-center justify-center w-full h-[600px]"
+        // Handle keyboard navigation inside the card if focused?
+        // Actually, we want to stop propagation if user is typing in input
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
         <CreateNovelCard 
           onCancel={() => handleToggleCreating(false)} 
           onCreate={(data) => {
@@ -228,20 +233,22 @@ const DocumentCarousel: React.FC<DocumentCarouselProps> = ({
                     const position = i === 0 ? 'left' : i === 1 ? 'center' : 'right';
                     const item = items[itemIndex];
                     
-                    // We need a unique key that represents the item itself, not the position.
-                    // If we use index, Framer Motion might get confused when positions swap.
-                    // But we are rendering 3 slots.
-                    // Let's stick to index-position key to force re-render or better,
-                    // use the item ID if possible.
-                    const key = item.type === 'novel' ? item.data!.id : 'create-card';
+                    // Generate a stable but unique key
+                    const baseKey = item.type === 'novel' ? item.data!.id : 'create-card';
+                    
+                    // If an item appears multiple times (e.g. totalItems < 3), we must suffix the key
+                    // to avoid React "duplicate key" errors.
+                    // We suffix with the position index to ensure uniqueness for that specific slot.
+                    const isDuplicate = visibleIndices.filter(idx => idx === itemIndex).length > 1;
+                    const key = isDuplicate ? `${baseKey}-pos-${i}` : baseKey;
                     
                     return (
                         <motion.div 
-                            key={key} // Use stable key for Framer Motion to track elements
+                            key={key} // Use unique key to prevent React errors
                             className="absolute top-1/2 cursor-pointer w-72 flex items-center justify-center"
                             initial={false}
                             animate={position}
-                            variants={variants as any}
+                            variants={variants as Variants}
                             onClick={() => {
                                 if (position === 'left') handlePrev();
                                 if (position === 'right') handleNext();
@@ -257,7 +264,7 @@ const DocumentCarousel: React.FC<DocumentCarouselProps> = ({
                                     isActive={position === 'center'}
                                     onEdit={onEditNovel}
                                     onDelete={onDeleteNovel}
-                                    onOpenKnowledgeBase={onOpenKnowledgeBase}
+                                    onOpenPluginConfig={onOpenPluginConfig}
                                 />
                             ) : (
                                 <CreateCardPlaceholder onClick={() => {

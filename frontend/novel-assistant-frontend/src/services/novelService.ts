@@ -1,7 +1,7 @@
 import { NovelOverviewDto, DirectoryNodeDto, NovelDetailDto } from '@/services/models';
 import { Novel, Volume, Chapter } from '@/types/novel';
 import { request } from '@/lib/request';
-import { mockNovels, USE_MOCK } from '@/services/mockData';
+import { mockNovels, USE_MOCK, saveMockData } from '@/services/mockData';
 
 /**
  * 开发者: FrontendAgent(react)
@@ -24,6 +24,7 @@ function mapDtoToModel(dto: NovelOverviewDto): Novel {
     synopsis: dto.novel_summary || '暂无简介',
     wordCount: dto.novel_word_count || 0,
     status: dto.novel_state === 'COMPLETED' ? '完结' : '连载中',
+    type: dto.novel_type || '玄幻',
     updatedAt: new Date(dto.novel_update_time).toLocaleString(),
     createdAt: new Date(dto.novel_create_time).toLocaleDateString(),
     volumes: [],
@@ -127,7 +128,14 @@ export async function getNovelDetail(userId: string, novelId: string): Promise<N
   if (USE_MOCK) {
     await new Promise(resolve => setTimeout(resolve, 500));
     const novel = mockNovels.find(n => n.id === novelId);
-    if (novel) return novel;
+    if (novel) {
+        // Return a shallow copy of the novel and its arrays to prevent state mutation issues
+        return {
+            ...novel,
+            volumes: novel.volumes ? [...novel.volumes] : [],
+            orphanChapters: novel.orphanChapters ? [...novel.orphanChapters] : []
+        };
+    }
     throw new Error('Novel not found');
   }
   const data = await request.post<NovelDetailDto>('/get_novel_detail', { user_id: userId, novel_id: novelId });
@@ -140,6 +148,9 @@ export interface CreateNovelDto {
   novel_summary?: string;
   novel_cover_image_url?: string;
   kd_id_list?: string[];
+  novel_type?: string;
+  novel_genre?: string;
+  plugins?: { id: string; enabled: boolean; config: any }[];
 }
 
 /**
@@ -149,12 +160,15 @@ export async function createNovel(data: CreateNovelDto): Promise<Novel> {
     if (USE_MOCK) {
       await new Promise(resolve => setTimeout(resolve, 500));
       const newNovel: Novel = {
-        id: `mock-${Date.now()}`,
+        id: `mock-${crypto.randomUUID()}`,
         title: data.novel_name,
         cover: data.novel_cover_image_url || '',
         synopsis: data.novel_summary || '暂无简介',
         wordCount: 0,
         status: '连载中',
+        type: data.novel_type || '小说',
+        genre: data.novel_genre || '玄幻',
+        plugins: data.plugins || [],
         updatedAt: new Date().toLocaleString(),
         createdAt: new Date().toLocaleDateString(),
         volumes: [],
@@ -166,3 +180,53 @@ export async function createNovel(data: CreateNovelDto): Promise<Novel> {
     const result = await request.post<NovelOverviewDto>('/create_novel', data);
     return mapDtoToModel(result);
 }
+
+export interface UpdateNovelDto {
+  novel_id: string;
+  user_id: string;
+  novel_name?: string;
+  novel_summary?: string;
+  novel_cover_image_url?: string;
+  plugins?: { id: string; enabled: boolean; config: Record<string, unknown> }[];
+}
+
+/**
+ * Update Novel
+ */
+export async function updateNovel(data: UpdateNovelDto): Promise<Novel> {
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const novelIndex = mockNovels.findIndex(n => n.id === data.novel_id);
+        if (novelIndex > -1) {
+            mockNovels[novelIndex] = {
+                ...mockNovels[novelIndex],
+                title: data.novel_name ?? mockNovels[novelIndex].title,
+                synopsis: data.novel_summary ?? mockNovels[novelIndex].synopsis,
+                cover: data.novel_cover_image_url ?? mockNovels[novelIndex].cover,
+                plugins: data.plugins ?? mockNovels[novelIndex].plugins,
+                updatedAt: new Date().toLocaleString()
+            };
+            saveMockData();
+            return mockNovels[novelIndex];
+        }
+        throw new Error('Novel not found');
+    }
+    const result = await request.post<NovelOverviewDto>('/update_novel', data);
+    return mapDtoToModel(result);
+}
+
+/**
+ * Delete Novel
+ */
+export async function deleteNovel(userId: string, novelId: string): Promise<void> {
+    if (USE_MOCK) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const index = mockNovels.findIndex(n => n.id === novelId);
+        if (index > -1) {
+            mockNovels.splice(index, 1);
+        }
+        return;
+    }
+    await request.post('/delete_novel', { user_id: userId, novel_id: novelId });
+}
+

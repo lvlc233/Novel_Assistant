@@ -1,6 +1,7 @@
 import { DirectoryNodeDto } from '@/services/models';
 import { request } from '@/lib/request';
-import { mockNovels, USE_MOCK } from '@/services/mockData';
+import { Chapter } from '@/types/novel';
+import { mockNovels, USE_MOCK, saveMockData } from '@/services/mockData';
 
 /**
  * 开发者: FrontendAgent(react)
@@ -26,14 +27,18 @@ export async function createFolder(data: CreateFolderDto): Promise<DirectoryNode
         const novel = mockNovels.find(n => n.id === data.novel_id);
         if (novel) {
             const newVolume = {
-                id: `mock-vol-${Date.now()}`,
+                id: `mock-vol-${crypto.randomUUID()}`,
                 title: data.name,
                 order: (novel.volumes?.length || 0) + 1,
                 isExpanded: true,
                 chapters: []
             };
             novel.volumes = novel.volumes || [];
-            novel.volumes.push(newVolume);
+            // Ensure no duplicate ID (extremely unlikely with UUID but good practice)
+            if (!novel.volumes.find(v => v.id === newVolume.id)) {
+                novel.volumes.push(newVolume);
+            }
+            saveMockData();
             return {
                 node_id: newVolume.id,
                 node_name: newVolume.title,
@@ -59,6 +64,7 @@ export async function deleteFolder(data: DeleteFolderDto): Promise<boolean> {
         const novel = mockNovels.find(n => n.id === data.novel_id);
         if (novel && novel.volumes) {
             novel.volumes = novel.volumes.filter(v => v.id !== data.folder_id);
+            saveMockData();
             return true;
         }
         return false;
@@ -81,6 +87,7 @@ export async function renameFolder(data: RenameFolderDto): Promise<string> {
             const vol = novel.volumes.find(v => v.id === data.folder_id);
             if (vol) {
                 vol.title = data.name;
+                saveMockData();
                 return data.name;
             }
         }
@@ -102,7 +109,7 @@ export async function createDocument(data: CreateDocumentDto): Promise<Directory
         const novel = mockNovels.find(n => n.id === data.novel_id);
         if (novel) {
             const newChapter = {
-                id: `mock-chap-${Date.now()}`,
+                id: `mock-chap-${crypto.randomUUID()}`,
                 title: data.title,
                 order: 1, // Simplified order
                 currentVersionId: 'v1',
@@ -122,11 +129,13 @@ export async function createDocument(data: CreateDocumentDto): Promise<Directory
                  novel.orphanChapters = novel.orphanChapters || [];
                  novel.orphanChapters.push(newChapter);
             }
+             saveMockData();
              return {
                 node_id: newChapter.id,
                 node_name: newChapter.title,
                 node_type: 'document',
                 sort_order: newChapter.order,
+                children: []
             };
         }
         throw new Error('Novel not found');
@@ -185,6 +194,7 @@ export async function renameDocument(data: RenameDocumentDto): Promise<string> {
                      const chap = vol.chapters.find(c => c.id === data.document_id);
                      if (chap) {
                          chap.title = data.title;
+                         saveMockData();
                          return data.title;
                      }
                 }
@@ -194,6 +204,7 @@ export async function renameDocument(data: RenameDocumentDto): Promise<string> {
                  const chap = novel.orphanChapters.find(c => c.id === data.document_id);
                  if (chap) {
                      chap.title = data.title;
+                     saveMockData();
                      return data.title;
                  }
             }
@@ -269,7 +280,7 @@ export async function updateDocumentContent(data: UpdateDocumentContentDto): Pro
         await new Promise(resolve => setTimeout(resolve, 500));
         const novel = mockNovels.find(n => n.id === data.novel_id);
         if (novel) {
-             let chap: any = null;
+             let chap: Chapter | undefined = undefined;
              // Check volumes
             if (novel.volumes) {
                 for (const vol of novel.volumes) {
@@ -283,7 +294,7 @@ export async function updateDocumentContent(data: UpdateDocumentContentDto): Pro
             
             if (chap) {
                 // Update content
-                const currentVersion = chap.versions.find((v: any) => v.id === chap.currentVersionId);
+                const currentVersion = chap.versions.find((v) => v.id === chap!.currentVersionId);
                 if (currentVersion) {
                     currentVersion.content = data.content;
                     currentVersion.updatedAt = new Date().toISOString();
@@ -296,6 +307,7 @@ export async function updateDocumentContent(data: UpdateDocumentContentDto): Pro
                      });
                      chap.currentVersionId = 'v1';
                 }
+                saveMockData();
                 return "success";
             }
         }

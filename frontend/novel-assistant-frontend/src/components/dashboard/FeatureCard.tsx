@@ -54,7 +54,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
         {iconElement ? React.cloneElement(iconElement, { strokeWidth: 1.5, className: "w-8 h-8" }) : icon}
       </div>
       
-      <h3 className="text-xl font-serif font-bold text-text-primary tracking-wide text-center px-4">
+      <h3 className="text-xl font-serif font-bold text-gray-800 tracking-wide text-center px-4">
         {title}
       </h3>
       

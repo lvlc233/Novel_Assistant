@@ -7,7 +7,7 @@ interface NovelCardProps {
   isActive?: boolean;
   onEdit?: (novel: Novel) => void;
   onDelete?: (id: string) => void;
-  onOpenKnowledgeBase?: (novel: Novel) => void;
+  onOpenPluginConfig?: (novel: Novel) => void;
 }
 
 const NovelCard: React.FC<NovelCardProps> = ({ 
@@ -15,7 +15,7 @@ const NovelCard: React.FC<NovelCardProps> = ({
   isActive = false,
   onEdit, 
   onDelete, 
-  onOpenKnowledgeBase 
+  onOpenPluginConfig 
 }) => {
   const [mode, setMode] = useState<'view' | 'delete' | 'edit'>('view');
   const [editTitle, setEditTitle] = useState(novel.title);
@@ -102,11 +102,11 @@ const NovelCard: React.FC<NovelCardProps> = ({
           className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-black/10 shadow-inner transform transition-all duration-200 hover:scale-125 hover:brightness-90"
           title="编辑"
         />
-        {/* Green: Knowledge Base */}
+        {/* Green: Plugin Config */}
         <button 
-          onClick={(e) => { e.stopPropagation(); onOpenKnowledgeBase?.(novel); }}
+          onClick={(e) => { e.stopPropagation(); onOpenPluginConfig?.(novel); }}
           className="w-3 h-3 rounded-full bg-[#27C93F] border border-black/10 shadow-inner transform transition-all duration-200 hover:scale-125 hover:brightness-90"
-          title="知识库"
+          title="插件配置"
         />
       </div>
 

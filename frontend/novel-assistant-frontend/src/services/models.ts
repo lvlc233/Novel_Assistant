@@ -9,6 +9,7 @@ export interface NovelOverviewDto {
   novel_create_time: string;
   novel_update_time: string;
   novel_hiatus_interval: number;
+  novel_type?: string;
 }
 
 export interface DirectoryNodeDto {
@@ -32,6 +33,8 @@ export interface NovelDetailDto {
   novel_update_time: string;
   novel_hiatus_interval: number;
   novel_word_count: number;
+  novel_type?: string;
+  plugins?: { id: string; enabled: boolean; config: Record<string, unknown> }[];
   directory: DirectoryNodeDto[];
 }
 

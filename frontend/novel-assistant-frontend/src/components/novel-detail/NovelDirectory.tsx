@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Volume, Chapter } from '@/types/novel';
-import { ChevronRight, ChevronDown, Folder, FileText, Plus, Edit2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FileText, Plus, Edit2, Trash2 } from 'lucide-react';
 
 /**
  * 开发者: FrontendAgent(react)
@@ -20,6 +20,8 @@ interface NovelDirectoryProps {
   onUpdateChapter: (chapterId: string, data: Partial<Chapter>) => void;
   onCreateVolume: () => void;
   onCreateChapter: (volumeId?: string) => void;
+  onDeleteVolume: (volumeId: string) => void;
+  onDeleteChapter: (chapterId: string) => void;
 }
 
 interface ContextMenuState {
@@ -38,7 +40,9 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
   onUpdateVolume,
   onUpdateChapter,
   onCreateVolume,
-  onCreateChapter
+  onCreateChapter,
+  onDeleteVolume,
+  onDeleteChapter
 }) => {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, type: 'root' });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -123,7 +127,7 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
   return (
     <div 
         ref={containerRef}
-        className="w-72 h-full bg-white rounded-xl border border-stone-200 shadow-sm flex flex-col overflow-hidden"
+        className="w-full h-full bg-white flex flex-col overflow-hidden"
         onContextMenu={(e) => handleContextMenu(e, 'root')}
     >
       <div className="p-4 border-b border-stone-100 bg-stone-50/50 flex justify-between items-center">
@@ -211,13 +215,21 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
                 <>
                     <button 
                         className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
-                        onClick={() => { onCreateVolume(); setContextMenu(prev => ({ ...prev, visible: false })); }}
+                        onClick={(e) => { 
+                            e.stopPropagation();
+                            onCreateVolume(); 
+                            setContextMenu(prev => ({ ...prev, visible: false })); 
+                        }}
                     >
                         <Folder className="w-4 h-4" /> 创建卷
                     </button>
                     <button 
                         className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
-                        onClick={() => { onCreateChapter(); setContextMenu(prev => ({ ...prev, visible: false })); }}
+                        onClick={(e) => { 
+                            e.stopPropagation();
+                            onCreateChapter(); 
+                            setContextMenu(prev => ({ ...prev, visible: false })); 
+                        }}
                     >
                         <FileText className="w-4 h-4" /> 创建章节
                     </button>
@@ -241,9 +253,19 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
                     >
                         <Edit2 className="w-4 h-4" /> 重命名
                     </button>
+                    <button 
+                        className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-red-600 flex items-center gap-2"
+                        onClick={() => { 
+                            if (contextMenu.targetId) onDeleteVolume(contextMenu.targetId);
+                            setContextMenu(prev => ({ ...prev, visible: false }));
+                        }}
+                    >
+                        <Trash2 className="w-4 h-4" /> 删除卷
+                    </button>
                 </>
             )}
             {contextMenu.type === 'chapter' && (
+                <>
                 <button 
                     className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-stone-700 flex items-center gap-2"
                     onClick={() => { 
@@ -260,6 +282,16 @@ const NovelDirectory: React.FC<NovelDirectoryProps> = ({
                 >
                     <Edit2 className="w-4 h-4" /> 重命名
                 </button>
+                <button 
+                    className="w-full text-left px-4 py-2 hover:bg-stone-50 text-sm text-red-600 flex items-center gap-2"
+                    onClick={() => { 
+                        if (contextMenu.targetId) onDeleteChapter(contextMenu.targetId);
+                        setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                >
+                    <Trash2 className="w-4 h-4" /> 删除章节
+                </button>
+                </>
             )}
         </div>
       )}

@@ -2,6 +2,8 @@ import { Novel } from '@/types/novel';
 
 export const USE_MOCK = true;
 
+const STORAGE_KEY = 'novel-assistant-mock-data';
+
 export const mockNovels: Novel[] = [
   {
     id: '1',
@@ -96,3 +98,26 @@ export const mockNovels: Novel[] = [
     orphanChapters: []
   }
 ];
+
+// Load from localStorage if available
+if (typeof window !== 'undefined') {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+                mockNovels.length = 0;
+                mockNovels.push(...parsed);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to load mock data", e);
+    }
+}
+
+export const saveMockData = () => {
+    if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mockNovels));
+    }
+};
+
