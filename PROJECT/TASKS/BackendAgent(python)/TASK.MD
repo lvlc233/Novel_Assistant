@@ -1,41 +1,34 @@
 
-
 # 后端任务
 
 # 介绍
-后端的任务
+后端重构任务：基于 `PROJECT/DOCUMENTS/项目统一技术架构文档(重要).md` (v1.1) 进行全面重构，支持插件化架构。
 
 ## 任务状态图例
 - 🔴 **Pending**: 待处理
 - 🟡 **In Progress**: 进行中
 - 🟢 **Completed**: 已完成
 - ⚪ **Depreciated**: 已废弃
-- 🔵 Review & Rework: 审核或重做
+- 🔵 **Review & Rework**: 审核或重做
 
 ## 任务列表
 | ID | 模块 | 任务描述 | 负责人 | 状态 | 开始时间 | 完成时间 | 验收标准 | 关联任务及其关系 | 细节 |
 |---|---|---|---|---|---|---|---|---|---|
-| B1 | 整个后端项目 | 根据TODO需求重构后端项目 | BackendAgent(python) | 🟢 | 2026-01-15 | 2026-01-15 | 完成所有后端TODO标记,生成操作结果,等待管理员审核 | | ... |
-| B2 | 整个后端项目 | 重构基础设施:pgsql | BackendAgent(python) | 🟢 | 2026-01-15 | 2026-01-15 | 重构相关的项目结构和代码,并生成一份"重构造基础设施:pgsql"的操作日志以说明进行了什么操作,将什么移除将什么添加等 | B1->B2 | 按规格生成 |
-| B3 | 整个后端项目 | 重构基础设施:工具,支持,等辅助代码的内容 | BackendAgent(python) | 🟢 | 2026-01-15 | 2026-01-15 | 重构相关的项目结构和代码,并生成一份"重构造基础设施:辅助工具整理"的操作日志以说明进行了什么操作,将什么移除将什么添加等 | B1->B3 | 按规格生成,按照实际真实的需求删除和添加,不要有多余的残留 |
-| B4 | 整个后端项目 | 重构service | BackendAgent(python) | 🟢 | 2026-01-15 | 2026-01-15 | 重构相关的项目结构和代码,并生成一份"重构造service"的操作日志以说明进行了什么操作,将什么移除将什么添加等 | B1->B4 | 按规格生成 |
-| B5 | 整个后端项目 | 重构controller | BackendAgent(python) | 🟢 | 2026-01-15 | 2026-01-15 | 重构相关的项目结构和代码,并生成一份"重构造controller"的操作日志以说明进行了什么操作,将什么移除将什么添加等 | B1->B5 | 按规格生成 |
-| B6 | 整个后端项目 | 重构core | BackendAgent(python) | 🟢 | 2026-01-15 | 2026-01-15 | 重构相关的项目结构和代码,并生成一份"重构造core"的操作日志以说明进行了什么操作,将什么移除将什么添加等 | B1->B6 | 按规格生成 |
-| B7 | 核心/插件 | 实现插件(Plugin)与作品(Work)的数据库模型与迁移 | BackendAgent(python) | 🔴 | | | SQLModel模型定义与Alembic迁移 | B6->B7 | 参考REFACTOR_V2_PLAN.md |
-| B8 | 核心/插件 | 实现插件注册表与管理API | BackendAgent(python) | 🔴 | | | /plugins 接口可用 | B7->B8 | |
-| B9 | 业务/作品 | 实现作品管理与插件配置API | BackendAgent(python) | 🔴 | | | /works 接口支持插件配置 | B8->B9 | |
-| B10 | Agent/编排 | 重构MasterAgent支持基于插件的动态路由 | BackendAgent(python) | 🔴 | | | Agent可感知已启用插件 | B9->B10 | |
+| B1 | 基础设施 | **数据库模型重构 (Models)**<br>1. 实现 `Plugin`, `Work`, `WorkPluginMapping` 表<br>2. 实现 `Node`, `NodeRelationship`, `DocumentVersion` 表<br>3. 实现 `AgentManager`, `KnowledgeBase`, `Memory` 表<br>4. 生成并执行 Alembic 迁移脚本 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 数据库表结构与设计文档一致，alembic upgrade 成功 | | 已完成: Plugin, Work, Node, User模型及迁移 |
+| B2 | 核心服务 | **插件服务 (PluginService)**<br>实现插件注册、查询、全局配置管理逻辑。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 能正确读写 Plugin 表，处理默认配置与 Schema | B1->B2 | 已完成: 基础CRUD |
+| B3 | 核心服务 | **作品服务 (WorkService)**<br>实现作品创建、元数据更新、插件启用/配置覆盖逻辑。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 能创建 Work，并正确关联 WorkPluginMapping | B1->B3 | 已完成: 基础CRUD与插件映射 |
+| B4 | 核心服务 | **节点服务 (NodeService)**<br>实现节点(文档/文件夹)的增删改查、版本管理、关系管理。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 支持无限层级目录，支持文档版本回滚 | B1->B4 | 已完成: 基础节点操作与文档版本 |
+| B5 | 接口层 | **插件管理 API (500xx)**<br>实现 `/plugins` 相关 RESTful 接口。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 接口符合文档定义，Swagger 测试通过 | B2->B5 | 已集成到 app.py |
+| B6 | 接口层 | **作品管理 API (510xx)**<br>实现 `/works` 相关接口 (含插件配置子资源)。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 接口符合文档定义，Swagger 测试通过 | B3->B6 | 已集成到 app.py |
+| B7 | 接口层 | **文档管理 API (511xx)**<br>实现 `/works/{id}/documents` (nodes) 相关接口。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 接口符合文档定义，Swagger 测试通过 | B4->B7 | 实现为 /nodes API |
+| B8 | Agent体系 | **Agent管理服务与API (62xxx)**<br>实现 Agent 的动态注册、配置持久化及管理接口。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 能动态读取 Agent 配置 | B1->B8 | 已完成: 基础CRUD与API |
+| B9 | Agent体系 | **LangGraph 持久化集成**<br>配置 PostgresCheckpointer，实现 Agent 状态入库。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | Agent 对话历史可恢复 | B8->B9 | 已实现自定义 PostgresCheckpointer 并集成到 Graph 和 API |
 
+| B10 | 验证 | **端到端验证**<br>验证从创建作品->开启插件->创建文档->Agent 辅助的完整流程。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 核心链路跑通，E2E 测试通过 | B5,B6,B7,B9->B10 | 已验证: 注册->作品->插件(启用)->节点->Agent(持久化)(含 Outline Agent) |
 
+| B11 | Agent体系 | **知识Agent (KD Agent)**<br>完善并测试知识提取 Agent (KD_build_agent) 的逻辑与流式输出。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 单元测试通过，能生成 Cypher 语句 | B10->B11 | 已集成到服务层，通过 E2E 测试，Mock 模型支持结构化输出 |
 
+| B12 | 系统重构 | **移除用户系统**<br>移除所有用户相关的代码、数据库表、API接口，使系统变为单用户/无用户模式。 | BackendAgent(python) | 🟢 | 2026-01-26 | 2026-01-26 | 代码中无 user 相关逻辑，数据库移除 user 表，E2E 测试通过 | B1,B10->B12 | 已完成: 删除 UserSQLEntity, user router, user service |
 
-## 常见的任务类型。
-- 初始化Agent状态: (这个任务一般不会在TASK文档中,但确实是一个常见的任务,建议每次Agent完成一个模块的功能后切换新上下文并初始化Agent状态,使其恢复记忆并继续往下执行任务，目的是情况代码阅读和操作时影响。)
-- 完成任务总结: (同初始化任务,但这个任务是在Agent完成所有任务后执行,用于更新Agent的记忆,使其生成一致的上下文,相当于人工总结,但是强烈建议每次总结的内容都使用增量而非覆盖的方式。哪怕Agent犯错了。)
-
-- 分析任务需求: 要求Agent针对某一个场景或业务的需求进行专业性的分析,范围可大可以小,例如分析业务逻辑,也可以分析某个数据库设计(业务的角度出发)
-- 技术分析: 要求Agent针对某一个技术问题进行专业性的分析,例如分析某个框架的使用方法,也可以分析某个算法的实现原理(实现的角度出发,推荐使用Context7以获取专注的技术文档)
-- 文档记录: 要求Agent完成或进行一个任务的时候生成相关文档以给开发者或其他Agent或恢复记忆使用。
-- 组件实现: 要求Agent根据实现某个任务中的局部组件，强制要求Agent一步步的搭建某个模块而非一次性完成某个任务。
-- 验收任务: 在一个大的任务完成后,由于功能点很分散,各个组件之间也没有文档说明之间的传递/依赖关系,因此推荐在完成任务的时候，要求AI重新审核从任务开始到任务结束的所有文档和代码,并梳理关系,测试审核功能是否符合需求,是否有未实现的内容....最终生成一个面向功能模块化问答。(通常该文档既可以作为Agent的`项目经历`以复用: `项目经历(之后引入)`)
-- 阅读项目: 一般用于旧项目或未接入该模板的项目，要求Agent根据项目的代码和文档，进行分析和总结，一般要求Agent逐步的阅读,一边阅读一边更新自己的记忆。也就是增量式阅读。
+## 历史归档
+(B1-B6 已归档，详情见 Git 历史或旧版 LOG)

@@ -15,14 +15,14 @@
 |---|---|---|---|---|---|---|---|---|---|
 | F1 | 整个前端项目 | 根据规格重新梳理整个前端 | FrontendAgent(react) | 🟢 | 2026-01-15 | 2026-01-15 | 生成梳理文档准备重新构造,生成操作结果,等待管理员审核 | | 产物: PROJECT/DOCUMENTS/FRONTEND_COMBING_REPORT.md |
 | F2 | 整个前端项目 | 准备重构 | FrontendAgent(react) | 🟢 | 2026-01-15 | 2026-01-15 | 生成重构文档,生成操作结果,等待管理员审核 | F1之后 | 产物: PROJECT/DOCUMENTS/FRONTEND_REFACTOR_PLAN.md |
-| F3 | 基础架构 | 初始化项目框架与网络层 | FrontendAgent(react) | 🟡 | 2026-01-25 |  | Next.js 14, Zustand, Tailwind, request.ts 封装完成 | F2之后 | 遵循 /api/v1, 统一响应 {code, data, message}, 错误码 50000 处理 |
-| F4 | 核心布局 | 实现应用 Shell 与插件插槽系统 | FrontendAgent(react) | 🔴 |  |  | 侧边栏, 顶部导航, 插件渲染插槽可用 | F3之后 | 对应架构中的"插件UI插槽与面板布局" |
-| F5 | 插件管理 | 实现全局插件管理模块 (500xx) | FrontendAgent(react) | 🔴 |  |  | 插件列表展示, 详情, 启用/禁用, 配置更新 | F3, F4之后 | 接口: /plugins/* |
-| F6 | 作品管理 | 实现作品管理模块 (510xx) | FrontendAgent(react) | 🔴 |  |  | 作品CRUD, 作品级插件配置, 封面上传 | F3, F4之后 | 接口: /works/* |
-| F7 | 文档编辑 | 实现文档与节点管理 (511xx) + Tiptap编辑器 | FrontendAgent(react) | 🔴 |  |  | Tiptap集成, 节点CRUD, 关系管理 | F6之后 | 核心: 富文本编辑, 节点拖拽/管理 |
-| F8 | 知识库插件 | 实现知识库模块前端 (60xxx) | FrontendAgent(react) | 🔴 |  |  | KB列表, 详情, 知识点切片管理 | F5之后 | 接口: /plugs/kds/* |
-| F9 | 记忆插件 | 实现记忆模块前端 (61xxx) | FrontendAgent(react) | 🔴 |  |  | 记忆列表, 详情, 增删改查 | F5之后 | 接口: /plugs/memories/* |
-| F10 | Agent编排 | 实现Agent管理与对话界面 (62xxx) | FrontendAgent(react) | 🔴 |  |  | Agent列表, 历史记录, SSE流式对话 | F5, F7之后 | 接口: /plugs/agents/*, 支持 stream/interrupt |
+| F3 | 基础架构 | 初始化项目框架与网络层 | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | Next.js 14, Zustand, Tailwind, request.ts 封装完成 | F2之后 | 遵循 /api/v1, 统一响应 {code, data, message}, 错误码 50000 处理 |
+| F4 | 核心布局 | 实现应用 Shell 与插件插槽系统 | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | 侧边栏, 顶部导航, 插件渲染插槽可用 | F4之后 | 对应架构中的"插件UI插槽与面板布局" |
+| F5 | 插件管理 | 实现全局插件管理模块 (500xx) | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | 插件列表页, 安装/卸载/启用/禁用逻辑 | F4之后 | 对应架构中的"500xx 插件管理模块" |
+| F6 | 作品管理 | 实现作品管理模块 (510xx) | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | 作品CRUD, 作品级插件配置, 封面上传 | F3, F4之后 | 接口: /works/* |
+| F7 | 文档编辑 | 实现文档与节点管理 (511xx) + Tiptap编辑器 | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | Tiptap集成, 节点CRUD, 关系管理 | F6之后 | 核心: 富文本编辑, 节点拖拽/管理 |
+| F8 | 知识库插件 | 实现知识库模块前端 (60xxx) | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | KB列表, 详情, 知识点切片管理 | F5之后 | 接口: /plugs/kds/* |
+| F9 | 记忆插件 | 实现记忆模块前端 (61xxx) | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | 记忆列表, 详情, 增删改查 | F5之后 | 接口: /plugs/memories/* |
+| F10 | Agent编排 | 实现Agent管理与对话界面 (62xxx) | FrontendAgent(react) | 🟢 | 2026-01-25 | 2026-01-25 | Agent列表, 历史记录, SSE流式对话 | F5, F7之后 | 接口: /plugs/agents/*, 支持 stream/interrupt |
 
 ## 常见的任务类型。
 - 初始化Agent状态: (这个任务一般不会在TASK文档中,但确实是一个常见的任务,建议每次Agent完成一个模块的功能后切换新上下文并初始化Agent状态,使其恢复记忆并继续往下执行任务，目的是情况代码阅读和操作时影响。)
