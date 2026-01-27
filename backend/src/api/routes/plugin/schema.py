@@ -6,9 +6,9 @@ class PluginMetaResponse(BaseModel):
     id: UUID
     name: str
     enabled: bool
-    # description: Optional[str] = None # TODO:严格按照统一标准文档来。这里不需要
-    # from_type: Literal["system", "custom"] TODO:严格按照统一标准文档来。这里不需要
-    # scope_type: Literal["global", "work", "document"] TODO:严格按照统一标准文档来。这里不需要
+    description: Optional[str] = None
+    from_type: Literal["system", "custom"]
+    scope_type: Literal["global", "work", "document"]
 
 class PluginResponse(BaseModel):
     id: UUID
