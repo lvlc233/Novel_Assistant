@@ -267,12 +267,19 @@ const CreateNovelCard: React.FC<CreateNovelCardProps> = ({
                             hover:border-black hover:bg-gray-50 transition-colors
                             relative group overflow-hidden bg-white shadow-sm
                           ">
-                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={handleFileChange} />
-                            {formData.cover ? (
-                              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500 text-center p-2 break-all">
-                                {formData.cover.name}
-                              </div>
-                            ) : (
+                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={handleFileChange} accept="image/*" />
+          {formData.cover ? (
+            <div className="w-full h-full relative group">
+              <img 
+                src={URL.createObjectURL(formData.cover)} 
+                alt="Cover preview" 
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                 <span className="text-white text-xs">点击更换</span>
+              </div>
+            </div>
+          ) : (
                               <div className="text-center p-4">
                                 <Upload className="w-8 h-8 text-gray-300 mx-auto group-hover:text-black transition-colors mb-2" />
                                 <span className="text-xs text-gray-400 group-hover:text-black transition-colors font-serif block">
@@ -429,6 +436,17 @@ const CreateNovelCard: React.FC<CreateNovelCardProps> = ({
                                 </span>
                              </div>
 
+                             {/* Plugin Description - Always Visible */}
+                             <div className="p-4 bg-blue-50 rounded-xl flex gap-3 border border-blue-100 mb-6">
+                                <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                  <p className="text-sm text-blue-900 font-medium">关于此插件</p>
+                                  <p className="text-xs text-blue-700 leading-relaxed">
+                                    {availablePlugins.find(p => p.id === activePluginId)?.manifest.description || "暂无描述"}
+                                  </p>
+                                </div>
+                             </div>
+
                              {!selectedPlugins.has(activePluginId) ? (
                                 <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                                    <Settings className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -442,16 +460,6 @@ const CreateNovelCard: React.FC<CreateNovelCardProps> = ({
                                 </div>
                              ) : (
                                 <div className="space-y-6">
-                                   <div className="p-4 bg-blue-50 rounded-xl flex gap-3 border border-blue-100">
-                                      <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                                      <div className="space-y-1">
-                                        <p className="text-sm text-blue-900 font-medium">关于此插件</p>
-                                        <p className="text-xs text-blue-700 leading-relaxed">
-                                          {availablePlugins.find(p => p.id === activePluginId)?.manifest.description}
-                                        </p>
-                                      </div>
-                                   </div>
-
                                    <div className="space-y-4">
                                       <div>
                                          <label className="text-xs font-bold text-gray-500 mb-2 block uppercase">模型选择</label>

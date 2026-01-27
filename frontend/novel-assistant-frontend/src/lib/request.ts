@@ -8,6 +8,7 @@ import { AppError, ErrorCodes } from "@/lib/error";
  * 创建时间: 2026-01-20 21:40
  * 更新时间: 2026-01-25 11:40
  * 更新记录:
+ * - [2026-01-26 20:10:FE-REF-20260126-01: 将 API_PREFIX 设置为 "/api/v1" 以匹配后端路由。]
  * - [2026-01-25 11:40:FE-REF-20260125-01: 对齐 v1.1 架构文档，引入 AppError，支持统一错误码处理，优化 URL 拼接逻辑。]
  */
 
@@ -47,7 +48,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
 }
 
 // TODO: 当后端完全迁移到 /api/v1 时，将其设置为 "/api/v1"
-const API_PREFIX = ""; 
+const API_PREFIX = "/api/v1"; 
 
 /**
  * Unified Request Client
@@ -127,11 +128,19 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
       // Handle HTTP Error
       if (!response.ok) {
         let errorMessage = `HTTP Error ${response.status}`;
+        let errorCode: string | number = response.status;
+        
         try {
           const errorData: unknown = await response.json();
-          if (errorData && typeof errorData === "object" && "message" in (errorData as Record<string, unknown>)) {
-            const msg = (errorData as Record<string, unknown>).message;
-            if (typeof msg === "string" && msg.trim()) errorMessage = msg;
+          if (errorData && typeof errorData === "object") {
+            const record = errorData as Record<string, unknown>;
+            if ("message" in record) {
+                const msg = record.message;
+                if (typeof msg === "string" && msg.trim()) errorMessage = msg;
+            }
+            if ("code" in record) {
+                errorCode = record.code as string | number;
+            }
           }
         } catch {
           // ignore
@@ -143,7 +152,7 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
           continue;
         }
 
-        throw new AppError(errorMessage, response.status);
+        throw new AppError(errorMessage, errorCode);
       }
 
       if (response.status === 204) {
@@ -155,12 +164,12 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
       // Handle Business Error
       if (isApiResponse(data)) {
         // 成功
-        if (data.code === ErrorCodes.SUCCESS) {
+        if (String(data.code) === ErrorCodes.SUCCESS) {
            return data.data as T;
         }
         
         // 系统错误或业务错误
-        const isSystem = data.code === ErrorCodes.SYSTEM_ERROR;
+        const isSystem = String(data.code) === ErrorCodes.SYSTEM_ERROR;
         const msg = data.message || "Business Error";
         throw new AppError(msg, data.code, null, isSystem);
       }
@@ -183,7 +192,7 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
       logger.error(`Request Error [${init.method || 'GET'} ${url}]:`, error);
       
       // 可以在这里做全局错误处理，比如 401 跳转登录
-      if (error instanceof AppError && error.code === ErrorCodes.UNAUTHORIZED) {
+      if (error instanceof AppError && String(error.code) === ErrorCodes.UNAUTHORIZED) {
           // window.location.href = '/login'; 
           // TODO: 使用事件总线或回调处理
       }

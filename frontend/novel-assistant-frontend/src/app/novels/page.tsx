@@ -13,17 +13,17 @@ import DocumentCarousel from '@/components/novel-manager/DocumentCarousel';
 import NovelPluginConfigModal from '@/components/novel-manager/NovelPluginConfigModal';
 import BottomInput from '@/components/common/BottomInput';
 
-import { userId } from '@/services/mock';
+// userId is no longer needed for backend API but kept for function signature compatibility
+const userId = "";
 
 /**
  * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260125-03
+ * 当前版本: FE-REF-20260126-02
  * 创建时间: 2026-01-20 21:40
- * 更新时间: 2026-01-25 12:15
+ * 更新时间: 2026-01-26 20:45
  * 更新记录:
+ * - [2026-01-26 20:45:FE-REF-20260126-02: 彻底移除 Mock 数据依赖，userId 传空（后端基于 Token）。]
  * - [2026-01-25 12:15:FE-REF-20260125-03: 集成知识库服务，移除 mock 数据。]
- * - [2026-01-25 12:00:FE-REF-20260125-02: 接入 AppLayout 统一布局。]
- * - [2026-01-20 21:40:FE-REF-20260120-01: 在何处使用: /novels 作品列表；如何使用: 进入页面自动拉取列表/创建作品；实现概述: 移除 console/alert，统一错误收口到页面状态与 logger。]
  */
 
 export default function DocumentsPage() {
@@ -40,8 +40,9 @@ export default function DocumentsPage() {
       try {
         setIsLoading(true);
         
+        // userId is not used by backend, passing empty string
         const [novelsData, kbsData] = await Promise.all([
-            getNovelList(userId),
+            getNovelList(""), 
             knowledgeBaseService.getKnowledgeBases()
         ]);
 
@@ -107,13 +108,11 @@ export default function DocumentsPage() {
   };
 
   const handleDeleteNovel = async (id: string) => {
-    if (confirm('Are you sure you want to delete this novel?')) {
-      try {
-        await deleteNovel(userId, id);
-        setNovels(prev => prev.filter(n => n.id !== id));
-      } catch (err) {
-        logger.error('Failed to delete novel:', err);
-      }
+    try {
+      await deleteNovel(userId, id);
+      setNovels(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      logger.error('Failed to delete novel:', err);
     }
   };
 

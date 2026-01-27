@@ -1,6 +1,6 @@
 import { Novel } from '@/types/novel';
 
-export const USE_MOCK = true;
+export const USE_MOCK = false;
 
 const STORAGE_KEY = 'novel-assistant-mock-data';
 

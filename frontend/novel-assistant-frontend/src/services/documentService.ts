@@ -1,27 +1,43 @@
-import { DirectoryNodeDto } from '@/services/models';
 import { request } from '@/lib/request';
-import { Chapter } from '@/types/novel';
+import { NodeDTO } from '@/services/models';
 import { mockNovels, USE_MOCK, saveMockData } from '@/services/mockData';
+import { Chapter } from '@/types/novel';
 
 /**
- * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260121-01
- * 创建时间: 2026-01-20 21:48
- * 更新时间: 2026-01-21 11:40
- * 更新记录:
- * - [2026-01-21 11:40:FE-REF-20260121-01: 在何处使用: 编辑器/目录相关接口；如何使用: createFolder/createDocument 等；实现概述: 引入 mockData 并在 USE_MOCK=true 时返回模拟数据。]
- * - [2026-01-20 21:48:FE-REF-20260120-02: 在何处使用: 编辑器/目录相关接口；如何使用: 调用 createFolder/createDocument/getDocumentDetail 等；实现概述: 补齐 getDocumentDetail 返回类型，移除 any。]
+ * Service for managing documents and folders (nodes).
+ * Aligned with backend /nodes endpoints.
  */
 
-// --- Folder & Document Operations ---
+// Types matching backend
+export interface CreateNodeRequest {
+  parent_id?: string | null;
+  node_name: string;
+  node_type: 'document' | 'folder';
+}
+
+export interface UpdateNodeRequest {
+  node_name?: string;
+  content?: string;
+  parent_id?: string | null;
+}
+
+export interface NodeDetailResponse {
+  node_id: string;
+  node_name: string;
+  content?: string;
+  node_type: 'document' | 'folder';
+  word_count: number;
+}
+
+// Frontend DTOs (keeping existing interfaces where possible for compatibility)
 
 export interface CreateFolderDto {
-  user_id: string;
+  user_id?: string; // Ignored by backend
   novel_id: string;
   name: string;
 }
 
-export async function createFolder(data: CreateFolderDto): Promise<DirectoryNodeDto> {
+export async function createFolder(data: CreateFolderDto): Promise<NodeDTO> {
     if (USE_MOCK) {
         await new Promise(resolve => setTimeout(resolve, 500));
         const novel = mockNovels.find(n => n.id === data.novel_id);
@@ -34,7 +50,6 @@ export async function createFolder(data: CreateFolderDto): Promise<DirectoryNode
                 chapters: []
             };
             novel.volumes = novel.volumes || [];
-            // Ensure no duplicate ID (extremely unlikely with UUID but good practice)
             if (!novel.volumes.find(v => v.id === newVolume.id)) {
                 novel.volumes.push(newVolume);
             }
@@ -44,16 +59,28 @@ export async function createFolder(data: CreateFolderDto): Promise<DirectoryNode
                 node_name: newVolume.title,
                 node_type: 'folder',
                 sort_order: newVolume.order,
-                children: []
+                parent_id: null
             };
         }
         throw new Error('Novel not found');
     }
-    return request.post<DirectoryNodeDto>('/create_folder', data);
+    
+    const response = await request.post<NodeDetailResponse>(`/works/${data.novel_id}/nodes`, {
+      node_name: data.name,
+      node_type: 'folder'
+    });
+    
+    return {
+      node_id: response.node_id,
+      node_name: response.node_name,
+      node_type: response.node_type,
+      sort_order: 0, // Backend might not return sort_order in NodeDetailResponse, strictly speaking it's in NodeDTO
+      parent_id: null
+    };
 }
 
 export interface DeleteFolderDto {
-  user_id: string;
+  user_id?: string;
   novel_id: string;
   folder_id: string;
 }
@@ -69,11 +96,12 @@ export async function deleteFolder(data: DeleteFolderDto): Promise<boolean> {
         }
         return false;
     }
-    return request.post<boolean>('/delete_folder', data);
+    await request.delete(`/nodes/${data.folder_id}`);
+    return true;
 }
 
 export interface RenameFolderDto {
-    user_id: string;
+    user_id?: string;
     novel_id: string;
     folder_id: string;
     name: string;
@@ -93,17 +121,20 @@ export async function renameFolder(data: RenameFolderDto): Promise<string> {
         }
         throw new Error('Folder not found');
     }
-    return request.post<string>('/rename_folder', data);
+    const response = await request.patch<NodeDetailResponse>(`/nodes/${data.folder_id}`, {
+      node_name: data.name
+    });
+    return response.node_name;
 }
 
 export interface CreateDocumentDto {
-    user_id: string;
+    user_id?: string;
     novel_id: string;
     title: string;
     folder_id?: string | null;
 }
 
-export async function createDocument(data: CreateDocumentDto): Promise<DirectoryNodeDto> {
+export async function createDocument(data: CreateDocumentDto): Promise<NodeDTO> {
     if (USE_MOCK) {
         await new Promise(resolve => setTimeout(resolve, 500));
         const novel = mockNovels.find(n => n.id === data.novel_id);
@@ -111,7 +142,7 @@ export async function createDocument(data: CreateDocumentDto): Promise<Directory
             const newChapter = {
                 id: `mock-chap-${crypto.randomUUID()}`,
                 title: data.title,
-                order: 1, // Simplified order
+                order: 1,
                 currentVersionId: 'v1',
                 versions: [{ id: 'v1', versionNumber: 1, content: '', updatedAt: new Date().toISOString() }]
             };
@@ -135,16 +166,29 @@ export async function createDocument(data: CreateDocumentDto): Promise<Directory
                 node_name: newChapter.title,
                 node_type: 'document',
                 sort_order: newChapter.order,
-                children: []
+                parent_id: data.folder_id
             };
         }
         throw new Error('Novel not found');
     }
-    return request.post<DirectoryNodeDto>('/create_document', data);
+    
+    const response = await request.post<NodeDetailResponse>(`/works/${data.novel_id}/nodes`, {
+      node_name: data.title,
+      node_type: 'document',
+      parent_id: data.folder_id
+    });
+
+    return {
+      node_id: response.node_id,
+      node_name: response.node_name,
+      node_type: response.node_type,
+      sort_order: 0,
+      parent_id: data.folder_id
+    };
 }
 
 export interface DeleteDocumentDto {
-    user_id: string;
+    user_id?: string;
     novel_id: string;
     document_id: string;
 }
@@ -173,11 +217,12 @@ export async function deleteDocument(data: DeleteDocumentDto): Promise<boolean> 
         }
         return false;
     }
-    return request.post<boolean>('/delete_document', data);
+    await request.delete(`/nodes/${data.document_id}`);
+    return true;
 }
 
 export interface RenameDocumentDto {
-    user_id: string;
+    user_id?: string;
     novel_id: string;
     document_id: string;
     title: string;
@@ -211,11 +256,14 @@ export async function renameDocument(data: RenameDocumentDto): Promise<string> {
         }
         throw new Error('Document not found');
     }
-    return request.post<string>('/rename_document', data);
+    const response = await request.patch<NodeDetailResponse>(`/nodes/${data.document_id}`, {
+      node_name: data.title
+    });
+    return response.node_name;
 }
 
 export interface GetDocumentDetailDto {
-    user_id: string;
+    user_id?: string;
     document_id: string;
     version_id?: string;
 }
@@ -265,11 +313,19 @@ export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<Doc
         }
         throw new Error('Document not found');
     }
-    return request.post<DocumentDetailResponse>('/get_document_detail', data);
+    
+    const response = await request.get<NodeDetailResponse>(`/nodes/${data.document_id}`);
+    return {
+      document_id: response.node_id,
+      document_version_id: 'latest', // Backend versioning not fully exposed yet
+      document_title: response.node_name,
+      document_body_text: response.content || '',
+      document_word_count: response.word_count
+    };
 }
 
 export interface UpdateDocumentContentDto {
-    user_id: string;
+    user_id?: string;
     novel_id: string;
     document_id: string;
     content: string;
@@ -313,5 +369,9 @@ export async function updateDocumentContent(data: UpdateDocumentContentDto): Pro
         }
         throw new Error('Document not found');
     }
-    return request.post<string>('/update_document_content', data);
+    
+    await request.patch<NodeDetailResponse>(`/nodes/${data.document_id}`, {
+      content: data.content
+    });
+    return "success";
 }

@@ -1,45 +1,61 @@
 
-export interface NovelOverviewDto {
-  novel_id: string;
-  novel_name: string;
-  novel_cover_image_url: string;
-  novel_summary: string;
-  novel_state: string;
-  novel_word_count: number;
-  novel_create_time: string;
-  novel_update_time: string;
-  novel_hiatus_interval: number;
-  novel_type?: string;
+import { Novel } from '@/types/novel';
+
+/**
+ * Backend DTOs
+ */
+export interface WorkMetaDTO {
+  work_id: string;
+  work_cover_image_url?: string;
+  work_name?: string;
+  work_summary?: string;
+  work_state: "完成" | "进行中";
+  work_type: string;
+  created_time: string;
+  updated_time: string;
 }
 
-export interface DirectoryNodeDto {
+export interface NodeDTO {
   node_id: string;
   node_name: string;
-  node_type: 'folder' | 'document';
+  description?: string;
+  node_type: "document" | "folder";
+  parent_id?: string | null;
   sort_order: number;
-  children: DirectoryNodeDto[];
-  word_count?: number;
-  update_time?: string;
-  create_time?: string;
 }
 
-export interface NovelDetailDto {
-  novel_id: string;
-  novel_name: string;
-  novel_cover_image_url?: string;
-  novel_summary?: string;
-  novel_state: string;
-  novel_create_time: string;
-  novel_update_time: string;
-  novel_hiatus_interval: number;
-  novel_word_count: number;
-  novel_type?: string;
-  plugins?: { id: string; enabled: boolean; config: Record<string, unknown> }[];
-  directory: DirectoryNodeDto[];
+export interface EdgeDTO {
+  from_nodes: string[];
+  to_nodes: string[];
 }
 
-export interface ApiResponse<T> {
-  code: string;
-  message: string;
-  data: T;
+export interface WorkDetailResponse {
+  works_meta: WorkMetaDTO;
+  works_document: NodeDTO[];
+  works_documents_relationship: EdgeDTO[];
 }
+
+export interface WorkMetaResponse {
+  work_meta: WorkMetaDTO;
+}
+
+export interface WorkPluginMetaResponse {
+    plugin_id: string;
+    name: string;
+    enabled: boolean;
+    description?: string;
+}
+
+export interface WorkPluginDetailResponse {
+    plugin_id: string;
+    name: string;
+    description?: string;
+    enabled: boolean;
+    config: Record<string, unknown>;
+    from_type: "system" | "custom";
+    scope_type: "global" | "work" | "document";
+    tags: string[];
+}
+
+// Re-export specific DTOs if needed by components, or create mappers.
+// For now, services will consume these and return domain models.
