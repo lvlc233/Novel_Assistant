@@ -1,107 +1,187 @@
 from datetime import datetime
-from common.utils import create_uuid,get_now_time
-from sqlmodel import Field, SQLModel, table
-from sqlalchemy import TIMESTAMP
-from typing import Literal
+from typing import Dict, List, Optional
 
+from sqlalchemy import JSON, TIMESTAMP, Column
+from sqlmodel import Field, Relationship, SQLModel
 
-class DocumentMetadataSQLEntity(SQLModel, table=True):
+from common.enums import NovelState, PluginFromType, PluginScopeType
+from common.utils import create_uuid, get_now_time
+
+# --- 7.1 Core & Plugin ---
+
+class PluginSQLEntity(SQLModel, table=True):
+    """插件注册表: 定义系统中所有可用的插件（能力）。
     """
-        文档.
-    """
-    __tablename__ = "document_metadata"
+    __tablename__ = "plugin"
 
-    document_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="文档ID")
-    user_id: str = Field(description="用户ID", index=True)
-    novel_id: str = Field(description="小说ID", index=True)
-    folder_id: str|None = Field(default=None,description="文件夹ID:检索冗余", index=True)
-    document_title: str = Field(default="未命名文档",description="文档标题")
-    document_current_version_id: str = Field(description="当前版本")     
-    document_update_time: datetime = Field(default_factory=lambda: get_now_time(),sa_type=TIMESTAMP(timezone=True),description="更新时间")  
-    document_is_remove: bool = Field(default=False,description="是否删除")
+    id: str = Field(default_factory=create_uuid, primary_key=True, description="插件ID")
+    name: str = Field(index=True, unique=True, description="插件名称")
+    description: str | None = Field(default=None, description="插件描述")
+    
+    # 插件类型与作用域
+    from_type: str = Field(default=PluginFromType.SYSTEM.value, description="来源: system(系统内置), custom(用户自定义)")
+    scope_type: str = Field(default=PluginScopeType.WORK.value, description="作用域: global(全局), work(作品级), document(文档级)")
+    
+    # 全局开关
+    enabled: bool = Field(default=True, description="全局启用状态")
+    
+    # 配置定义 (Schema) 与 默认配置
+    config_schema: Dict = Field(default={}, sa_column=Column(JSON), description="配置Schema定义")
+    default_config: Dict = Field(default={}, sa_column=Column(JSON), description="默认配置值")
+    
+    tags: List[str] = Field(default=[], sa_column=Column(JSON), description="标签列表")
+
+    # Relationships
+    work_mappings: List["WorkPluginMappingSQLEntity"] = Relationship(back_populates="plugin")
+
+
+class WorkSQLEntity(SQLModel, table=True):
+    """作品表: 项目的核心实体（如一本小说）。
+    """
+    __tablename__ = "work"
+
+    id: str = Field(default_factory=create_uuid, primary_key=True, description="作品ID")
+    # user_id removed
+
+    name: str = Field(default="未命名作品", description="作品名称")
+    cover_image_url: str | None = Field(default=None, description="封面图片URL")
+    summary: str | None = Field(default=None, description="作品简介")
+    
+    # 作品类型，对应某种 WorkType 插件的标识
+    work_type: str = Field(default="novel", description="作品类型标识")
+    
+    state: str = Field(default=NovelState.UPDATING.value, description="状态: updating, completed")
+    
+    create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
+    update_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
+
+    # Relationships
+    plugin_mappings: List["WorkPluginMappingSQLEntity"] = Relationship(back_populates="work")
+    nodes: List["NodeSQLEntity"] = Relationship(back_populates="work")
+
+
+class WorkPluginMappingSQLEntity(SQLModel, table=True):
+    """作品-插件关联表: 记录某个作品启用了哪些插件，以及特定的配置。
+    """
+    __tablename__ = "work_plugin_mapping"
+
+    id: str = Field(default_factory=create_uuid, primary_key=True)
+    
+    work_id: str = Field(foreign_key="work.id", index=True)
+    plugin_id: str = Field(foreign_key="plugin.id", index=True)
+    
+    # 该作品下是否启用
+    enabled: bool = Field(default=True)
+    
+    # 实例配置: 覆盖 Plugin 的 default_config
+    config: Dict = Field(default={}, sa_column=Column(JSON), description="作品级配置覆盖")
+    
+    # Relationships
+    work: WorkSQLEntity = Relationship(back_populates="plugin_mappings")
+    plugin: PluginSQLEntity = Relationship(back_populates="work_mappings")
+
+
+# --- 7.2 Agent管理 ---
+
+class AgentsManagerSQLEntity(SQLModel, table=True):
+    """agent的管理模块
+    """
+    __tablename__ = "agents_manager"   
+
+    id: str = Field(default_factory=create_uuid, primary_key=True, description="agent的id")
+    name: str = Field(description="agent的名称")
+    description: str | None = Field(default=None, description="agent的描述")
+    agent_type: str = Field(description="Agent类型")
+    enabled: bool = Field(default=True)
+    broadcast: bool = Field(default=False)
+    histories: List[str] = Field(default=[], sa_column=Column(JSON), description="历史会话ID列表")
+    config: Dict = Field(default={}, sa_column=Column(JSON), description="agent的配置")
+
+# --- 7.3 内容与结构 (Content & Graph) ---
+
+class NodeSQLEntity(SQLModel, table=True):
+    """节点表: 构成作品内容的原子单位（文档、文件夹、白板等）。
+    """
+    __tablename__ = "node"
+
+    id: str = Field(default_factory=create_uuid, primary_key=True, description="节点ID")
+    work_id: str = Field(foreign_key="work.id", index=True)
+    
+    name: str = Field(default="未命名节点")
+    description: Optional[str] = Field(default=None, description="节点描述")
+    node_type: str = Field(description="类型: document, folder, whiteboard...")
+    
+    create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
+    update_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
+
+    # Relationships
+    work: WorkSQLEntity = Relationship(back_populates="nodes")
+    # versions: List["DocumentVersionSQLEntity"] = Relationship(back_populates="node") # Circular dependency issue if not careful, omitted for brevity
+
+
+class NodeRelationshipSQLEntity(SQLModel, table=True):
+    """节点关系表: 定义节点之间的关系（层级关系、引用、链接）。
+    """
+    __tablename__ = "node_relationship"
+
+    id: str = Field(default_factory=create_uuid, primary_key=True)
+    work_id: str = Field(foreign_key="work.id", index=True)
+    
+    from_node_id: str = Field(foreign_key="node.id", index=True)
+    to_node_id: str = Field(foreign_key="node.id", index=True)
+    
+    relation_type: str = Field(default="link", description="关系类型: parent(父子), link(链接), reference(引用)")
 
 
 class DocumentVersionSQLEntity(SQLModel, table=True):
-    """
-        文档版本.
+    """文档版本表: 存储 Node (类型为 document) 的实际内容历史。
     """
     __tablename__ = "document_version"
 
-    document_version_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="版本ID")
-    document_id: str = Field(description="文档ID", index=True)
-    document_parent_version_id: str|None = Field(default=None,description="文档父版本ID")
-    document_body_text: str = Field(default="",description="文档正文")
-    document_create_time: datetime = Field(default_factory=lambda: get_now_time(),sa_type=TIMESTAMP(timezone=True),description="创建时间")
+    id: str = Field(default_factory=create_uuid, primary_key=True)
+    node_id: str = Field(foreign_key="node.id", index=True)
+    
+    content: str = Field(default="", description="文档内容 (HTML/JSON/Markdown)")
+    word_count: int = Field(default=0)
+    
+    create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
 
-    document_word_count: int = Field(default=0,description="字数")
 
-class NovelSQLEntity(SQLModel, table=True):
+# --- 7.4 知识库(Knowledge)(插件) ---
+
+class KnowledgeBaseSQLEntity(SQLModel, table=True):
+    """知识库元数据表
     """
-        小说.
+    __tablename__ = "knowledge_base"
+    
+    id: str = Field(default_factory=create_uuid, primary_key=True)
+    work_id: str | None = Field(default=None, index=True, description="关联作品ID，空则为全局")
+    name: str
+    description: str | None = None
+    
+    create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
+
+
+class KnowledgeChunkSQLEntity(SQLModel, table=True):
+    __tablename__ = "knowledge_chunk"
+    
+    id: str = Field(default_factory=create_uuid, primary_key=True)
+    kb_id: str = Field(foreign_key="knowledge_base.id", index=True)
+    
+    content: str = Field(description="文本内容")
+
+
+# --- 7.5 记忆库(Memory)(插件) ---
+
+class MemorySQLEntity(SQLModel, table=True):
+    """记忆表
     """
-    __tablename__ = "novel"
-
-    novel_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="小说ID")
-    user_id: str = Field(description="用户ID", index=True)
-    novel_name: str = Field(default="未命名小说",description="小说名称")
-    novel_cover_image_url: str = Field(default="",description="小说封面URL")
-    novel_summary: str = Field(default="",description="小说描述")
-    novel_state: str = Field(default="UPDATING",description="小说状态")
-    novel_create_time: datetime = Field(default_factory=lambda: get_now_time(),sa_type=TIMESTAMP(timezone=True),description="创建时间")
-    novel_update_time: datetime = Field(default_factory=lambda: get_now_time(),sa_type=TIMESTAMP(timezone=True),description="更新时间")
-    novel_is_remove: bool = Field(default=False,description="是否删除")
-
-class NovelKDMappingSQLEntity(SQLModel,table=True):
-    """
-        小说和知识库的映射表.
-    """
-    __tablename__ = "novel_kd_mapping"
-
-    novel_id: str = Field(primary_key=True,description="小说ID")
-    kd_id:str = Field(primary_key=True,description="知识库ID")
-
-class KDSQLEntity(SQLModel,table=True):
-    """
-        知识库映射: 仅人类阅读和Agent兜底使用
-    """
-    __tablename__ = "kd"
-
-    kd_id:str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="小说ID")
-
-class FolderSQLEntity(SQLModel, table=True):
-    """
-        文件夹.
-    """
-    __tablename__ = "folder"
-
-    folder_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="文件夹ID")
-    novel_id: str = Field(description="小说ID", index=True)
-    folder_name: str = Field(default="未命名文件夹",description="文件夹名称")
-    folder_create_time: datetime = Field(default_factory=lambda: get_now_time(),sa_type=TIMESTAMP(timezone=True),description="创建时间")
-
-class TreeSortSQLEntity(SQLModel, table=True):
-    """
-        文件夹/文档排序.
-    """
-    __tablename__ = "tree_sort"
-
-    tree_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="树ID")
-    novel_id: str = Field(description="小说ID", index=True)
-    parent_id: str|None = Field(default=None,description="父节点ID", index=True)
-    node_type: str = Field(description="节点类型")
-    node_id: str = Field(description="节点ID", index=True)
-    # 排序,越小越靠前,由应用层维护顺序
-    node_sort_order: int = Field(default=0,description="排序,越小越靠前") 
-
-
-
-
-class UserSQLEntity(SQLModel, table=True):
-    """
-        用户.
-    """
-    __tablename__ = "user"
-
-    user_id: str = Field(default_factory=lambda: create_uuid(), primary_key=True,description="用户ID")
-    user_name: str = Field(default="未命名用户",description="用户名称", index=True)
-    user_password: str = Field(description="密码")
+    __tablename__ = "memory" # Fixed table name from knowledge_base copy-paste error in doc
+    
+    id: str = Field(default_factory=create_uuid, primary_key=True)
+    work_id: str | None = Field(default=None, index=True, description="关联作品ID，空则为全局")
+    name: str
+    description: str | None = None
+    memory_type: str
+    context: str
+    create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))

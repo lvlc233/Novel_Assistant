@@ -1,6 +1,8 @@
 import os
 import shutil
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+
 from common.utils import create_uuid
 
 router = APIRouter(tags=["file"])
@@ -14,8 +16,7 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
 
 @router.post("/files/upload", summary="上传文件")
 async def upload_file(request: Request, file: UploadFile = File(...)):
-    """
-    上传文件到服务器本地存储
+    """上传文件到服务器本地存储
     """
     # Create directory if not exists
     if not os.path.exists(UPLOAD_DIR):

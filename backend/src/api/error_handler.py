@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-
-
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
 
 from api.base import Response
 from common.errors import BaseError
-
 
 # ------------------------
 # 异常处理器（全局）

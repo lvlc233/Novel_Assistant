@@ -1,5 +1,7 @@
+from typing import Generic, TypeVar
+
 from pydantic import BaseModel, Field
-from typing import Generic, TypeVar, Optional
+
 
 class BaseRequest(BaseModel):
     """统一的 API 请求基类。"""
