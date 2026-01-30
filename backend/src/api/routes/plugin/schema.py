@@ -10,9 +10,6 @@ class PluginMetaResponse(BaseModel):
     id: UUID
     name: str
     enabled: bool
-    description: str | None = None
-    from_type: PluginFromType
-    scope_type: PluginScopeType
 
 class PluginResponse(BaseModel):
     id: UUID

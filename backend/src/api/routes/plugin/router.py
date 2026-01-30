@@ -44,13 +44,3 @@ async def update_plugin(
     """更新插件配置."""
     await service.update_plugin(plugin_id, request)
     return Response.ok()
-
-# TODO: 暂时不需要卸载的接口,如果要卸载也是自定义的或以后的事情了
-# @router.delete("/{plugin_id}", response_model=Response[None])
-# async def uninstall_plugin(
-#     plugin_id: UUID,
-#     service: PluginService = Depends(get_plugin_service)
-# ) -> Response[None]:
-#     """卸载插件"""
-#     await service.delete_plugin(plugin_id)
-#     return Response.ok()
