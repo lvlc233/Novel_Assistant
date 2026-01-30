@@ -4,71 +4,68 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from common.enums import NodeType, NovelStateCN, PluginFromType, PluginScopeType
+from common.enums import NodeTypeEnum, WorkStateCNEnum, PluginFromTypeEnum, PluginScopeTypeEnum,WorkTypeEnum
 
 
 # DTOs
 class WorkMetaDTO(BaseModel):
-    work_id: str
-    work_cover_image_url: str | None = None
-    work_name: str | None = None
-    work_summary: str | None = None
-    work_state: NovelStateCN = NovelStateCN.UPDATING 
-    work_type: str
-    created_time: datetime
-    updated_time: datetime
+    id: UUID
+    cover_image_url: str | None = None
+    name: str | None = None
+    summary: str | None = None
+    state: WorkStateCNEnum = WorkStateCNEnum.UPDATING 
+    type: WorkTypeEnum
+    create_at: datetime
+    update_at: datetime
 
 class NodeDTO(BaseModel):
-    node_id: str
-    node_name: str
+    id: UUID
+    name: str
     description: str | None = None
-    node_type: NodeType
-    parent_id: str | None = None
-    sort_order: int = 0
+    type: NodeTypeEnum
 
 class EdgeDTO(BaseModel):
-    from_nodes: List[str]
-    to_nodes: List[str]
+    from_node_id: UUID
+    to_node_ids: List[UUID]
 
 # Requests & Responses
 class CreateWorkRequest(BaseModel):
-    works_cover_image_url: str | None = None
-    works_name: str | None = None
-    works_summary: str | None = None
-    works_type: str = "novel"
+    cover_image_url: str | None = None
+    name: str | None = None
+    summary: str | None = None
+    type: WorkTypeEnum = WorkTypeEnum.NOVEL # WorkTypeEnum in spec, essentially string or enum
     enabled_plugin_id_list: List[UUID] = []
 
 class WorkMetaResponse(BaseModel):
-    work_meta: WorkMetaDTO
+    meta: WorkMetaDTO
 
 class WorkMetaUpdateRequest(BaseModel):
-    works_cover_image_url: str | None = None
-    works_name: str | None = None
-    works_summary: str | None = None
-    works_state: NovelStateCN = NovelStateCN.UPDATING
+    cover_image_url: str | None = None
+    name: str | None = None
+    summary: str | None = None
+    state: WorkStateCNEnum = WorkStateCNEnum.UPDATING
 
 class WorkDetailResponse(BaseModel):
-    works_meta: WorkMetaDTO
-    works_document: List[NodeDTO] = []
-    works_documents_relationship: List[EdgeDTO] = []
+    meta: WorkMetaDTO
+    document: List[NodeDTO] = []
+    relationship: List[EdgeDTO] = []
 
 class WorkPluginMetaResponse(BaseModel):
-    plugin_id: UUID
+    id: UUID
     name: str
     enabled: bool
     description: str | None = None
 
 class WorkPluginDetailResponse(BaseModel):
-    plugin_id: UUID
+    id: UUID
     name: str
     description: str | None = None
     enabled: bool
     config: Dict
-    from_type: PluginFromType
-    scope_type: PluginScopeType
+    from_type: PluginFromTypeEnum
+    scope_type: PluginScopeTypeEnum
     tags: List[str]
 
 class UpdateWorkPluginRequest(BaseModel):
-    plugin_id: UUID
     enabled: bool
-    config: Dict
+    config: Dict | None = None

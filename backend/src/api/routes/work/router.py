@@ -39,14 +39,6 @@ async def get_work_list(
     data = await service.get_work_list()
     return Response.ok(data=data)
 
-@router.get("/{work_id}", response_model=Response[WorkDetailResponse])
-async def get_work_detail(
-    work_id: str,
-    service: WorkService = Depends(get_work_service)
-) -> Response[WorkDetailResponse]:
-    """获取作品详情."""
-    data = await service.get_work_detail(work_id)
-    return Response.ok(data=data)
 
 @router.patch("/{work_id}", response_model=Response[None])
 async def update_work_meta(
@@ -58,7 +50,25 @@ async def update_work_meta(
     await service.update_work_meta(work_id, request)
     return Response.ok()
 
-@router.get("/{work_id}/plugins", response_model=Response[List[WorkPluginMetaResponse]])
+@router.delete("/{work_id}", response_model=Response[None])
+async def delete_work(
+    work_id: str,
+    service: WorkService = Depends(get_work_service)
+) -> Response[None]:
+    """删除作品."""
+    await service.delete_work(work_id)
+    return Response.ok()
+
+@router.get("/{work_id}", response_model=Response[WorkDetailResponse])
+async def get_work_detail(
+    work_id: str,
+    service: WorkService = Depends(get_work_service)
+) -> Response[WorkDetailResponse]:
+    """获取作品详情."""
+    data = await service.get_work_detail(work_id)
+    return Response.ok(data=data)
+    
+@router.get("/{work_id}/plugin", response_model=Response[List[WorkPluginMetaResponse]])
 async def list_work_plugins(
     work_id: str,
     service: WorkService = Depends(get_work_service)
@@ -67,7 +77,7 @@ async def list_work_plugins(
     data = await service.list_work_plugins(work_id)
     return Response.ok(data=data)
 
-@router.get("/{work_id}/plugins/{plugin_id}", response_model=Response[WorkPluginDetailResponse])
+@router.get("/{work_id}/plugin/{plugin_id}", response_model=Response[WorkPluginDetailResponse])
 async def get_work_plugin_detail(
     work_id: str,
     plugin_id: UUID,
@@ -77,7 +87,7 @@ async def get_work_plugin_detail(
     data = await service.get_work_plugin_detail(work_id, plugin_id)
     return Response.ok(data=data)
 
-@router.put("/{work_id}/plugins/{plugin_id}", response_model=Response[None])
+@router.patch("/{work_id}/plugin/{plugin_id}", response_model=Response[None])
 async def update_work_plugin(
     work_id: str,
     plugin_id: UUID,
@@ -90,11 +100,17 @@ async def update_work_plugin(
     await service.update_work_plugin(work_id, request)
     return Response.ok()
 
-@router.delete("/{work_id}", response_model=Response[None])
-async def delete_work(
+@router.patch("/{work_id}/plugin/{plugin_id}/enabled", response_model=Response[None])
+async def update_work_plugin_enabled(
     work_id: str,
+    plugin_id: UUID,
+    enabled: bool,
     service: WorkService = Depends(get_work_service)
 ) -> Response[None]:
-    """删除作品."""
-    await service.delete_work(work_id)
+    """更新作品插件启动状态."""
+    request = UpdateWorkPluginRequest(enabled=enabled, config=None)
+    request.plugin_id = plugin_id
+    await service.update_work_plugin(work_id, request)
     return Response.ok()
+
+

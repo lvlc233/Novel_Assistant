@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from common.enums import PluginFromType, PluginScopeType
+from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum
 
 
 class PluginMetaResponse(BaseModel):
@@ -17,8 +17,8 @@ class PluginResponse(BaseModel):
     description: str | None = None
     enabled: bool
     config: Dict = Field(default_factory=dict)
-    from_type: PluginFromType  # 插件来源类型
-    scope_type: PluginScopeType  # 插件作用域类型
+    from_type: PluginFromTypeEnum  # 插件来源类型
+    scope_type: PluginScopeTypeEnum  # 插件作用域类型
     tags: List[str] = Field(default_factory=list)
 
 class PluginUpdateRequest(BaseModel):
