@@ -4,7 +4,7 @@ from typing import Dict, List
 from sqlalchemy import JSON, TIMESTAMP, Column
 from sqlmodel import Field, Relationship, SQLModel
 
-from common.enums import NovelState, PluginFromType, PluginScopeType
+from common.enums import NovelStateEnum, PluginFromTypeEnum, PluginScopeTypeEnum,NodeTypeEnum
 from common.utils import create_uuid, get_now_time
 
 # --- 7.1 Core & Plugin ---
@@ -18,8 +18,8 @@ class PluginSQLEntity(SQLModel, table=True):
     description: str | None = Field(default=None, description="插件描述")
     
     # 插件类型与作用域
-    from_type: str = Field(default=PluginFromType.SYSTEM.value, description="来源: system(系统内置), custom(用户自定义)")
-    scope_type: str = Field(default=PluginScopeType.WORK.value, description="作用域: global(全局), work(作品级), document(文档级)")
+    from_type: PluginFromTypeEnum = Field(default=PluginFromTypeEnum.SYSTEM, description="来源: system(系统内置), custom(用户自定义)")
+    scope_type: PluginScopeTypeEnum = Field(default=PluginScopeTypeEnum.WORK, description="作用域: global(全局), work(作品级), document(文档级)")
     
     # 全局开关
     enabled: bool = Field(default=True, description="全局启用状态")
@@ -48,7 +48,7 @@ class WorkSQLEntity(SQLModel, table=True):
     # 作品类型，对应某种 WorkType 插件的标识
     work_type: str = Field(default="novel", description="作品类型标识")
     
-    state: str = Field(default=NovelState.UPDATING.value, description="状态: updating, completed")
+    state: NovelStateEnum = Field(default=NovelStateEnum.UPDATING, description="状态: updating, completed")
     
     create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
     update_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
@@ -92,6 +92,23 @@ class AgentsManagerSQLEntity(SQLModel, table=True):
     broadcast: bool = Field(default=False)
     histories: List[str] = Field(default=[], sa_column=Column(JSON), description="历史会话ID列表")
     config: Dict = Field(default={}, sa_column=Column(JSON), description="agent的配置")
+    
+    create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
+
+
+class WorkTypeSQLEntity(SQLModel, table=True):
+    """作品类型表."""
+    __tablename__ = "work_type"
+
+    id: str = Field(default_factory=create_uuid, primary_key=True)
+    name: str = Field(unique=True, index=True)
+    enabled: bool = Field(default=True)
+    
+    tags: List[str] = Field(default=[], sa_column=Column(JSON))
+    relationship: List[str] = Field(default=[], sa_column=Column(JSON))
+    configurable: bool = Field(default=False)
+    
+    create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
 
 # --- 7.3 内容与结构 (Content & Graph) ---
 
@@ -104,7 +121,7 @@ class NodeSQLEntity(SQLModel, table=True):
     
     name: str = Field(default="未命名节点")
     description: str | None = Field(default=None, description="节点描述")
-    node_type: str = Field(description="类型: document, folder, whiteboard...")
+    node_type: NodeTypeEnum = Field(description="类型: document, folder, whiteboard...")
     
     create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
     update_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
