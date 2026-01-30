@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class WorkTypeEnum(str, Enum):
     """作品类型."""
     NOVEL = "novel"  # 小说

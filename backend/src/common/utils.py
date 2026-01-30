@@ -340,13 +340,13 @@ def _safe_to_dict(obj: Any) -> dict:
     if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
         try:
             return obj.model_dump()
-        except Exception:
+        except Exception: # nosec
             pass
     # Pydantic v1
     if hasattr(obj, "dict") and callable(getattr(obj, "dict")):
         try:
             return obj.dict()
-        except Exception:
+        except Exception: # nosec
             pass
     # 映射
     if isinstance(obj, Mapping):

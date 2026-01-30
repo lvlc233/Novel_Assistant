@@ -1,4 +1,20 @@
-时间: 2026-01-30 09:31
-目标: 输出后端待解决文档并标记事项状态
-变更范围: PROJECT\DOCUMENTS\后端待解决文档.md
-验证方式与结果: 未执行代码验证，仅新增待办文档
+# Agent Backend Update Log 2026-01-30
+
+## Completed Tasks
+- [x] Implemented Agent Management Module (L394-448) in architecture doc.
+- [x] Implemented Work Type Management Module (L449-468) in architecture doc.
+- [x] Added `create_time` to `AgentsManagerSQLEntity`.
+- [x] Added `WorkTypeSQLEntity`.
+- [x] Added `MessagesTypeEnum`.
+- [x] Implemented SSE streaming for Agent `send_message` endpoint.
+- [x] Fixed invalid imports in `app.py`.
+- [x] Fixed `ruff` linter errors (docstrings, unused imports).
+- [x] Fixed `mypy` type check errors (module structure).
+
+## Pending Tasks
+- [ ] Verify Work Type module DB table creation (need migration?).
+- [ ] Add message persistence to `AgentMessagesResponse` (currently mock/SSE).
+
+## Notes
+- `app.py` was importing non-existent `document_helper_router` and `project_helper_router` modules. Fixed to point to `router.py` inside packages.
+- Added docstrings to infrastructure and service modules to pass linter.
