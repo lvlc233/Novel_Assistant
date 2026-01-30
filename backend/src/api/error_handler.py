@@ -19,9 +19,9 @@ async def base_error_handler(_: Request, exc: BaseError) -> JSONResponse:
     status_code = 500
     
     # 根据错误码映射 HTTP 状态码
-    if exc.code == "40400" or exc.code.startswith("520"): # 520x are not found errors in common/errors.py
+    if exc.code == 40400 or str(exc.code).startswith("520"): # 520x are not found errors in common/errors.py
         status_code = 404
-    elif exc.code.startswith("4"): # Assuming 4xxxx codes are client errors
+    elif str(exc.code).startswith("4"): # Assuming 4xxxx codes are client errors
         status_code = 400
         
     resp = Response[dict].fail(code=exc.code, data=exc.data, message=exc.message)
@@ -39,7 +39,7 @@ async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse
 
 async def generic_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     """兜底处理未捕获的异常，输出通用失败响应。."""
-    resp = Response.fail(message=str(exc) or "Internal Server Error", code="500")
+    resp = Response.fail(message=str(exc) or "Internal Server Error", code=500)
     # 兜底使用 500，前端据此判定为未预期错误
     content = jsonable_encoder(resp.model_dump(by_alias=True))
     return JSONResponse(status_code=500, content=content)

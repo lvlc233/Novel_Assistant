@@ -7,11 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from api.error_handler import register_exception_handlers
+from api.routes.agent.document_helper_router import router as document_helper_router
+from api.routes.agent.project_helper_router import router as project_helper_router
 from api.routes.agent.router import router as agent_router
 from api.routes.file.router import router as file_router
-from api.routes.knowledge_base.router import router as knowledge_base_router
+from api.routes.kd.router import router as kd_router
 from api.routes.memory.router import router as memory_router
 from api.routes.node.router import router as node_router
+from api.routes.work_type.router import router as work_type_router
 
 # Old Routers (Legacy) - Commented out due to model refactoring
 # from api.routes.novel.router import router as novel_router
@@ -70,9 +73,12 @@ def create_app() -> FastAPI:
     app.include_router(work_router, prefix=settings.API_V1_STR)
     app.include_router(node_router, prefix=settings.API_V1_STR)
     app.include_router(agent_router, prefix=settings.API_V1_STR)
-    app.include_router(knowledge_base_router, prefix=settings.API_V1_STR)
+    app.include_router(document_helper_router, prefix=settings.API_V1_STR)
+    app.include_router(project_helper_router, prefix=settings.API_V1_STR)
+    app.include_router(kd_router, prefix=settings.API_V1_STR)
     app.include_router(memory_router, prefix=settings.API_V1_STR)
     app.include_router(file_router, prefix=settings.API_V1_STR)
+    app.include_router(work_type_router, prefix=settings.API_V1_STR)
 
     # Mount static files
     # Resolve absolute path to static directory: src/static

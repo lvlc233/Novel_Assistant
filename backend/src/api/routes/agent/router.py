@@ -1,15 +1,17 @@
 from typing import List
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.base import Response
 from api.routes.agent.schema import (
-    AgentResponse,
+    AgentDetailResponse,
+    AgentMessagesResponse,
+    AgentMetaResponse,
+    AgentUpdateRequest,
     CreateAgentRequest,
-    InvokeAgentRequest,
-    InvokeAgentResponse,
-    UpdateAgentRequest,
+    MessagesSendRequest,
 )
 from infrastructure.pg.pg_client import get_session
 from services.agent.service import AgentService
@@ -19,57 +21,55 @@ router = APIRouter(prefix="/plugin/agent/manager", tags=["agents"])
 def get_agent_service(session: AsyncSession = Depends(get_session)) -> AgentService:
     return AgentService(session)
 
-@router.post("", response_model=Response[AgentResponse])
-async def create_agent(
-    request: CreateAgentRequest,
-    service: AgentService = Depends(get_agent_service)
-) -> Response[AgentResponse]:
-    """创建Agent."""
-    data = await service.create_agent(request)
-    return Response.ok(data=data)
+# --- Spec Endpoints ---
 
-@router.get("", response_model=Response[List[AgentResponse]])
+@router.get("", response_model=Response[List[AgentMetaResponse]])
 async def get_agent_list(
     service: AgentService = Depends(get_agent_service)
-) -> Response[List[AgentResponse]]:
+) -> Response[List[AgentMetaResponse]]:
     """获取Agent列表."""
     data = await service.get_agent_list()
     return Response.ok(data=data)
 
-@router.get("/{agent_id}", response_model=Response[AgentResponse])
+@router.get("/{agent_id}", response_model=Response[AgentDetailResponse])
 async def get_agent_detail(
     agent_id: str,
     service: AgentService = Depends(get_agent_service)
-) -> Response[AgentResponse]:
+) -> Response[AgentDetailResponse]:
     """获取Agent详情."""
     data = await service.get_agent_detail(agent_id)
     return Response.ok(data=data)
 
-@router.patch("/{agent_id}", response_model=Response[AgentResponse])
-async def update_agent(
+@router.post("/{agent_id}/history/{session_id}", response_model=Response[AgentMessagesResponse])
+async def create_session(
     agent_id: str,
-    request: UpdateAgentRequest,
+    session_id: str,
     service: AgentService = Depends(get_agent_service)
-) -> Response[AgentResponse]:
-    """更新Agent."""
-    data = await service.update_agent(agent_id, request)
+) -> Response[AgentMessagesResponse]:
+    """会话创建."""
+    data = await service.create_session(agent_id, session_id)
     return Response.ok(data=data)
 
-@router.post("/{agent_id}/invoke", response_model=Response[InvokeAgentResponse])
-async def invoke_agent(
+@router.post("/{agent_id}/history/{session_id}/messages")
+async def send_message(
     agent_id: str,
-    request: InvokeAgentRequest,
+    session_id: str,
+    request: MessagesSendRequest,
     service: AgentService = Depends(get_agent_service)
-) -> Response[InvokeAgentResponse]:
-    """调用Agent (带记忆)."""
-    data = await service.invoke_agent(agent_id, request.input, request.thread_id)
-    return Response.ok(data=InvokeAgentResponse(output=data))
+) -> StreamingResponse:
+    """Agent发送消息 (SSE)."""
+    return StreamingResponse(
+        service.send_message(agent_id, session_id, request),
+        media_type="text/event-stream"
+    )
 
-@router.delete("/{agent_id}", response_model=Response[None])
-async def delete_agent(
+@router.patch("/{agent_id}", response_model=Response[None])
+async def update_agent(
     agent_id: str,
+    request: AgentUpdateRequest,
     service: AgentService = Depends(get_agent_service)
 ) -> Response[None]:
-    """删除Agent."""
-    await service.delete_agent(agent_id)
+    """Agent修改."""
+    await service.update_agent(agent_id, request)
     return Response.ok()
+

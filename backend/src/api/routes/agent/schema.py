@@ -1,35 +1,42 @@
-from typing import Any, Dict
+from datetime import datetime
+from typing import Any, Dict, List
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from common.enums import MessagesTypeEnum
 
-class CreateAgentRequest(BaseModel):
-    name: str
-    description: str | None = None
-    agent_type: str
-    config: Dict = {}
-    broadcast: bool = False
 
-class UpdateAgentRequest(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    config: Dict | None = None
-    enabled: bool | None = None
-    broadcast: bool | None = None
 
-class AgentResponse(BaseModel):
-    id: str
-    name: str
-    description: str | None
-    agent_type: str
+
+# --- Spec Models ---
+
+class AgentMetaResponse(BaseModel):
+    id: UUID
     enabled: bool
+    name: str
     broadcast: bool
-    config: Dict
+    description: str | None = None
+    create_at: datetime
 
-class InvokeAgentRequest(BaseModel):
-    input: Dict[str, Any]
-    thread_id: str = Field(..., description="Thread ID for conversation memory")
+class AgentDetailResponse(BaseModel):
+    id: UUID
+    enabled: bool
+    name: str
+    broadcast: bool
+    context_size: int = Field(..., description="上下文大小,-1不限制,0无历史")
+    is_summary: bool
+    description: str | None = None
+    create_at: datetime
+    sessions: List[str]
 
-class InvokeAgentResponse(BaseModel):
-    output: Dict[str, Any]
+class AgentMessagesResponse(BaseModel):
+    session_id: UUID
+    messages: List[Dict]
 
+class MessagesSendRequest(BaseModel):
+    messages_type: MessagesTypeEnum
+    context: Any
+
+class AgentUpdateRequest(BaseModel):
+    broadcast: bool
