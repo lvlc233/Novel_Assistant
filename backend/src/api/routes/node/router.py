@@ -14,7 +14,7 @@ from api.routes.node.schema import (
     RelationshipResponse,
     UpdateNodeDTO,
 )
-from common.enums import NodeType
+from common.enums import NodeTypeEnum
 from infrastructure.pg.pg_client import get_session
 from services.node.service import NodeService
 from services.work.service import WorkService
@@ -29,7 +29,7 @@ def get_work_service(session: AsyncSession = Depends(get_session)) -> WorkServic
 
 # --- Documents ---
 
-@router.post("/work/{work_id}/documents", response_model=Response[DocumentResponse])
+@router.post("/work/{work_id}/document", response_model=Response[DocumentResponse])
 async def create_document(
     work_id: str,
     request: DocumentCreateRequest,
@@ -37,21 +37,21 @@ async def create_document(
 ) -> Response[DocumentResponse]:
     """创建文档."""
     req = CreateNodeDTO(
-        node_name=request.title,
+        name=request.title,
         description=request.description,
-        node_type=NodeType.DOCUMENT,
-        fater_node_id=request.fater_node_id
+        type=NodeTypeEnum.DOCUMENT,
+        parent_node_id=request.from_node_id
     )
     data = await service.create_node(work_id, req)
     
     return Response.ok(data=DocumentResponse(
-        document_id=data.node_id,
-        title=data.node_name,
+        id=data.id,
+        title=data.name,
         description=data.description,
-        fater_node_id=data.fater_node_id
+        from_node_id=data.parent_node_id
     ))
 
-@router.delete("/work/{work_id}/documents/{document_id}", response_model=Response[None])
+@router.delete("/work/{work_id}/document/{document_id}", response_model=Response[None])
 async def delete_document(
     work_id: str,
     document_id: str,
@@ -61,7 +61,7 @@ async def delete_document(
     await service.delete_node(document_id)
     return Response.ok()
 
-@router.patch("/work/{work_id}/documents/{document_id}", response_model=Response[None])
+@router.patch("/work/{work_id}/document/{document_id}", response_model=Response[None])
 async def update_document(
     work_id: str,
     document_id: str,
@@ -70,15 +70,15 @@ async def update_document(
 ) -> Response[None]:
     """更新文档."""
     req = UpdateNodeDTO(
-        node_name=request.title,
+        name=request.title,
         description=request.description,
-        fater_node_id=request.fater_node_id,
+        parent_node_id=request.from_node_id,
         content=request.full_text
     )
     await service.update_node(document_id, req)
     return Response.ok()
 
-@router.get("/work/{work_id}/documents/{document_id}", response_model=Response[DocumentDetailResponse])
+@router.get("/work/{work_id}/document/{document_id}", response_model=Response[DocumentDetailResponse])
 async def get_document_detail(
     work_id: str,
     document_id: str,
@@ -87,15 +87,15 @@ async def get_document_detail(
     """获取文档详情."""
     data = await service.get_node_detail(document_id)
     return Response.ok(data=DocumentDetailResponse(
-        title=data.node_name,
+        title=data.name,
         description=data.description,
-        fater_node_id=data.fater_node_id,
+        from_node_id=data.parent_node_id,
         full_text=data.content
     ))
 
 # --- Nodes (Folders) ---
 
-@router.post("/work/{work_id}/nodes", response_model=Response[NodeResponse])
+@router.post("/work/{work_id}/node", response_model=Response[NodeResponse])
 async def create_node(
     work_id: str,
     request: NodeCreateRequest,
@@ -103,21 +103,21 @@ async def create_node(
 ) -> Response[NodeResponse]:
     """创建节点(文件夹)."""
     req = CreateNodeDTO(
-        node_name=request.node_name,
+        name=request.name,
         description=request.description,
-        node_type=NodeType.FOLDER,
-        fater_node_id=request.fater_node_id
+        type=NodeTypeEnum.FOLDER,
+        parent_node_id=request.from_node_id
     )
     data = await service.create_node(work_id, req)
     return Response.ok(data=NodeResponse(
-        node_id=data.node_id,
-        node_name=data.node_name,
+        id=data.id,
+        name=data.name,
         description=data.description,
-        node_type="folder",
-        fater_node_id=data.fater_node_id
+        type=NodeTypeEnum.FOLDER,
+        from_node_id=data.parent_node_id
     ))
 
-@router.delete("/work/{work_id}/nodes/{node_id}", response_model=Response[None])
+@router.delete("/work/{work_id}/node/{node_id}", response_model=Response[None])
 async def delete_node(
     work_id: str,
     node_id: str,
@@ -127,7 +127,7 @@ async def delete_node(
     await service.delete_node(node_id)
     return Response.ok()
 
-@router.patch("/work/{work_id}/nodes/{node_id}", response_model=Response[None])
+@router.patch("/work/{work_id}/node/{node_id}", response_model=Response[None])
 async def update_node(
     work_id: str,
     node_id: str,
@@ -136,16 +136,16 @@ async def update_node(
 ) -> Response[None]:
     """更新节点."""
     req = UpdateNodeDTO(
-        node_name=request.node_name,
+        name=request.name,
         description=request.description,
-        fater_node_id=request.fater_node_id
+        parent_node_id=request.from_node_id
     )
     await service.update_node(node_id, req)
     return Response.ok()
 
 # --- Relationships ---
 
-@router.get("/work/{work_id}/documents", response_model=Response[RelationshipResponse])
+@router.get("/work/{work_id}/document", response_model=Response[RelationshipResponse])
 async def get_work_relationships(
     work_id: str,
     service: WorkService = Depends(get_work_service)
@@ -153,18 +153,18 @@ async def get_work_relationships(
     """获取依赖关系."""
     data = await service.get_work_detail(work_id)
     return Response.ok(data=RelationshipResponse(
-        works_document=data.works_document,
-        works_documents_relationship=data.works_documents_relationship
+        document=data.document,
+        relationship=data.relationship
     ))
 
-@router.patch("/work/{work_id}/nodes/{node_id}/to/{target_node_id}", response_model=Response[None])
+@router.patch("/work/{work_id}/node/{node_id}/parent/{parent_node_id}", response_model=Response[None])
 async def move_node(
     work_id: str,
     node_id: str,
-    target_node_id: str,
+    parent_node_id: str,
     service: NodeService = Depends(get_node_service)
 ) -> Response[None]:
     """迁移节点(改变节点之间的关系)."""
-    req = UpdateNodeDTO(fater_node_id=target_node_id)
+    req = UpdateNodeDTO(parent_node_id=parent_node_id)
     await service.update_node(node_id, req)
     return Response.ok()
