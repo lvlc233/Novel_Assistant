@@ -2,32 +2,33 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel
+from common.enums import MemoryTypeEnum
 
 
 class MemoryMetaResponse(BaseModel):
-    memory_id: UUID
-    enable: bool
-    memory_name: str
-    memory_description: str | None = None
+    id: UUID
+    enabled: bool
+    name: str
+    description: str | None = None
     create_at: datetime
 
 class MemoryDetailResponse(BaseModel):
-    memory_id: UUID
-    enable: bool
-    memory_name: str
-    memory_type: str
-    memory_description: str | None = None
+    id: UUID
+    enabled: bool
+    name: str
+    type: MemoryTypeEnum
+    description: str | None = None
     create_at: datetime
-    memory_content: str | None = None
+    context: str | None = None
 
 class MemoryCreateRequest(BaseModel):
-    memory_name: str
-    memory_type: str
-    memory_description: str | None = None
-    memory_context: str | None = None
+    name: str
+    type: MemoryTypeEnum
+    description: str | None = None
+    context: str | None = None
 
 class MemoryUpdateRequest(BaseModel):
-    enable: bool | None = None
-    memory_name: str | None = None
-    memory_description: str | None = None
-    memory_context: str | None = None
+    enabled: bool | None = None
+    name: str | None = None
+    description: str | None = None
+    context: str | None = None
