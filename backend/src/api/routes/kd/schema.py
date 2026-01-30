@@ -2,13 +2,13 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class KDMetaResponse(BaseModel):
     id: UUID
     enabled: bool
-    titel: str
+    title: str
     description: str | None = None
     create_at: datetime
 

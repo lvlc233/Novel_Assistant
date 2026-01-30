@@ -10,7 +10,6 @@ from api.routes.agent.schema import (
     AgentMessagesResponse,
     AgentMetaResponse,
     AgentUpdateRequest,
-    CreateAgentRequest,
     MessagesSendRequest,
 )
 from infrastructure.pg.pg_client import get_session

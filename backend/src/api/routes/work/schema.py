@@ -4,7 +4,13 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from common.enums import NodeTypeEnum, WorkStateCNEnum, PluginFromTypeEnum, PluginScopeTypeEnum,WorkTypeEnum
+from common.enums import (
+    NodeTypeEnum,
+    PluginFromTypeEnum,
+    PluginScopeTypeEnum,
+    WorkStateCNEnum,
+    WorkTypeEnum,
+)
 
 
 # DTOs

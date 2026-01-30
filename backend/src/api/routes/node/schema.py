@@ -1,10 +1,11 @@
-from typing import List, Literal
+from typing import List
 from uuid import UUID
 
 from pydantic import BaseModel
 
 from api.routes.work.schema import EdgeDTO, NodeDTO
 from common.enums import NodeTypeEnum
+
 # --- Document Schemas ---
 
 class DocumentCreateRequest(BaseModel):

@@ -1,13 +1,8 @@
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Dict, List
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
-from common.enums import MessagesTypeEnum
-
-
-
 
 # --- Spec Models ---
 

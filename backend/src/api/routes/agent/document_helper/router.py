@@ -1,4 +1,3 @@
-from typing import List
 
 from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse

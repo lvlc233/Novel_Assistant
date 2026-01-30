@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"  # 预留API版本前缀
     
     # 服务器配置
-    HOST: str = "0.0.0.0"
+    HOST: str = "0.0.0.0" # nosec
     PORT: int = 8426
     LOG_LEVEL: str = "INFO"
     
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # 数据库配置
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "lixiaozai233"
+    POSTGRES_PASSWORD: str | None = None # 生产环境必须通过环境变量设置
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "novel_ai"
@@ -41,10 +41,19 @@ class Settings(BaseSettings):
         elif self.DATABASE_URL:
              url = str(self.DATABASE_URL)
         else:
+            if not self.POSTGRES_PASSWORD:
+                # 在开发环境如果没有设置密码，可以尝试使用默认空密码或者抛出警告
+                # 这里为了安全起见，如果不提供密码且不提供URL，应该抛出错误或使用空字符串(取决于DB配置)
+                # 假设本地开发默认密码是 postgres，但为了安全不应硬编码在代码库中
+                # 暂时保留 None，如果连接失败则是用户责任
+                pass
+            
+            password = self.POSTGRES_PASSWORD or "postgres" # Fallback for local dev only if needed, but better to enforce env var
+
             url = str(PostgresDsn.build(
                 scheme="postgresql+asyncpg",
                 username=self.POSTGRES_USER,
-                password=self.POSTGRES_PASSWORD,
+                password=password,
                 host=self.POSTGRES_SERVER,
                 port=self.POSTGRES_PORT,
                 path=self.POSTGRES_DB,

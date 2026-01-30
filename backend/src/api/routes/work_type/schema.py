@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from common.enums import WorkTypeEnum,NodeTypeEnum
+from common.enums import NodeTypeEnum, WorkTypeEnum
 
 
 class WorkTypeResponse(BaseModel):
