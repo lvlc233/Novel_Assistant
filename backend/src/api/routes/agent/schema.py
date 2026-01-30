@@ -35,8 +35,11 @@ class AgentMessagesResponse(BaseModel):
     messages: List[Dict]
 
 class MessagesSendRequest(BaseModel):
-    messages_type: MessagesTypeEnum
-    context: Any
+    context: str # 上下文
 
 class AgentUpdateRequest(BaseModel):
     broadcast: bool
+
+
+
+
