@@ -68,11 +68,12 @@ function mapNodesToVolumesAndChapters(nodes: NodeDTO[]): { volumes: Volume[], or
 
   // 3. Assign Chapters to Volumes or Orphan
   documents.sort((a, b) => a.sort_order - b.sort_order).forEach(doc => {
+      const parentId = doc.parent_id || doc.fater_node_id;
       const chapter: Chapter = {
           id: doc.node_id,
           title: doc.node_name,
           order: doc.sort_order,
-          volumeId: doc.parent_id || undefined,
+          volumeId: parentId || undefined,
           currentVersionId: 'v1', // TODO: Fetch version info
           versions: [
              {
@@ -84,8 +85,8 @@ function mapNodesToVolumesAndChapters(nodes: NodeDTO[]): { volumes: Volume[], or
           ]
       };
 
-      if (doc.parent_id && volumeIdToVolumeMap.has(doc.parent_id)) {
-          volumeIdToVolumeMap.get(doc.parent_id)!.chapters.push(chapter);
+      if (parentId && volumeIdToVolumeMap.has(parentId)) {
+          volumeIdToVolumeMap.get(parentId)!.chapters.push(chapter);
       } else {
           orphanChapters.push(chapter);
       }

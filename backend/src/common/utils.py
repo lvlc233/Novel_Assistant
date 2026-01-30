@@ -1,13 +1,77 @@
 """Utility & helper functions."""
+import os
 import uuid
 from datetime import datetime
 from typing import Union
 
-
 from langchain.chat_models import init_chat_model
+
+# from langchain_community.chat_models import FakeListChatModel
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-import os
+
+from common.config import settings
+
+# Try to import FakeListChatModel, define a fallback if missing
+try:
+    from langchain_community.chat_models import FakeListChatModel
+except ImportError:
+    from typing import Any, List
+
+    from langchain_core.outputs import ChatGeneration, ChatResult
+    
+    class FakeListChatModel(BaseChatModel):
+        responses: List[str]
+        i: int = 0
+        
+        def _generate(
+            self,
+            messages: List[BaseMessage],
+            stop: List[str] | None = None,
+            run_manager: Any = None,
+            **kwargs: Any,
+        ) -> ChatResult:
+            response = self.responses[self.i]
+            self.i = (self.i + 1) % len(self.responses)
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content=response))])
+            
+        @property
+        def _llm_type(self) -> str:
+            return "fake-list"
+
+class CustomFakeChatModel(FakeListChatModel):
+    """Extended FakeListChatModel with structured output support."""
+    
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+    def with_structured_output(self, schema, **kwargs):
+        from langchain_core.output_parsers import PydanticOutputParser
+        from langchain_core.runnables import RunnableLambda
+        
+        # Create a parser for the schema
+        parser = PydanticOutputParser(pydantic_object=schema)
+        
+        def parse_output(message):
+            content = message.content
+            # Simple JSON parsing logic
+            try:
+                clean_content = content.strip()
+                if clean_content.startswith("```json"):
+                    clean_content = clean_content[7:]
+                    if clean_content.endswith("```"):
+                        clean_content = clean_content[:-3]
+                elif clean_content.startswith("```"):
+                    clean_content = clean_content[3:]
+                    if clean_content.endswith("```"):
+                        clean_content = clean_content[:-3]
+                
+                clean_content = clean_content.strip()
+                return parser.parse(clean_content)
+            except Exception as e:
+                raise e
+
+        return self | RunnableLambda(parse_output)
 
 # TODO:  这里的工具可以整理一番
 # -----------------------------------------------------------------------------
@@ -18,10 +82,10 @@ import os
     包含: UUID生成, 密码哈希, 时间处理, 区域标准化, 消息处理, 文本统计, 模型加载等
 """
 def create_uuid() -> str:
-    """创建一个 UUID 字符串。"""
+    """创建一个 UUID 字符串。."""
     return uuid.uuid4().hex
 def passwd_hash(password: str) -> str:
-    """密码哈希"""
+    """密码哈希."""
     import hashlib
     import secrets
 
@@ -32,7 +96,7 @@ def passwd_hash(password: str) -> str:
     # 返回盐和哈希值的组合
     return f"{salt}${pwd_hash}"
 def passwd_verify(password: str, hashed_password: str) -> bool:
-    """验证密码
+    """验证密码.
 
     Args:
         password: 明文密码
@@ -55,14 +119,13 @@ def passwd_verify(password: str, hashed_password: str) -> bool:
         return False 
 
 def get_now_time(timezone: str = "Asia/Shanghai") -> datetime:
-    """获取当前时间:含时区"""
-    from datetime import timezone as tz
+    """获取当前时间:含时区."""
     import pytz
     tzinfo = pytz.timezone(timezone)
     return datetime.now(tzinfo)
 
 def format_time(time: datetime) -> str:
-    """格式化时间"""
+    """格式化时间."""
     return time.strftime("%Y-%m-%d %H:%M:%S")
 """"""
 def normalize_region(region: str) -> str | None:
@@ -115,12 +178,12 @@ def get_message_text(msg: BaseMessage) -> str:
 
 import re
 
+
 def count_words(text: str) -> int:
-    """
-    后端标准字数统计：
+    """后端标准字数统计：
     1. 中文字符（含标点）计为 1。
     2. 英文单词（以空白分隔）计为 1。
-    3. 剔除空白字符。
+    3. 剔除空白字符。.
     """
     if not text:
         return 0
@@ -147,6 +210,7 @@ def load_chat_model(
 ) -> Union[BaseChatModel]:
     """加载一个聊天模型.
     默认使用 gpt-3.5-turbo (或通过环境变量指定)
+    如果未配置 OPENAI_API_KEY，则返回 Mock 模型。.
 
     Args:
         node_name: 模型节点名称, 暂保留作为区分不同用途的标识.
@@ -154,6 +218,41 @@ def load_chat_model(
     Returns:
         BaseChatModel: 加载的聊天模型.
     """
+    from common.log.log import logger
+    api_key = settings.OPENAI_API_KEY or os.environ.get("OPENAI_API_KEY")
+    
+    if not api_key:
+        logger.warning(f"OPENAI_API_KEY not found. Using FakeListChatModel for {node_name or 'default'}.")
+        
+        responses = [
+            "Mock Response: I can help you with your novel outline. First, let's define the genre and main characters.",
+            "Mock Response: You just asked me to help with the outline of your novel."
+        ]
+        
+        # KD Agent Mocks
+        if node_name == "attention_node":
+            responses = [
+                '{"impression": ["important sentence 1", "key concept"], "reason": "contains core definition"}'
+            ]
+        elif node_name == "atom_entity_node":
+            responses = [
+                '{"entities": ["Entity1", "Entity2"]}'
+            ]
+        elif node_name == "dependence_entity_node":
+            responses = [
+                '{"entities": ["DepEntity1"]}'
+            ]
+        elif node_name == "complete_node":
+            responses = [
+                '{"full_node": {"Entity1": {"type": "concept"}}, "relations": [["Entity1", "related_to", "Entity2"]]}'
+            ]
+        elif node_name == "cypher_node":
+            responses = [
+                '{"cypher": ["CREATE (n:Entity1)"]}'
+            ]
+
+        return CustomFakeChatModel(responses=responses)
+
     model_name = "gpt-3.5-turbo"
     if node_name in ["composition_agent", "master_agent", "atom_entity_node", "dependence_entity_node", "complete_node", "cypher_node"]:
         model_name = "gpt-4"
@@ -230,8 +329,9 @@ def get_run_id_for_node(kwargs: dict):
         parent_run_id = "None"
     return current_run_id, parent_run_id
 
+from dataclasses import asdict, is_dataclass
 from typing import Any, Mapping
-from dataclasses import is_dataclass, asdict
+
 
 def _safe_to_dict(obj: Any) -> dict:
     if obj is None:
@@ -264,18 +364,17 @@ def _safe_to_dict(obj: Any) -> dict:
 支持按章节格式切割文档，并保留章节信息和行号
 """
 
-import re
-from typing import List, Dict
+from typing import Dict, List
+
 from langchain_core.documents import Document
 
 
 class DocumentTextSplitter:
-    """按文档切割文档的文本分割器"""
+    """按文档切割文档的文本分割器."""
     
     def __init__(self, 
                  document_pattern: str = r'^第\d+章\s+.+$'):
-        """
-        初始化文档文本分割器
+        """初始化文档文本分割器.
         
         Args:
             document_pattern: 文档标题的正则表达式模式
@@ -283,10 +382,9 @@ class DocumentTextSplitter:
         self.document_pattern = document_pattern
      # 查找所有文档(行号标记)
     def _find_documents(self, text: str) -> List[Dict]:
-        """
-        查找文档中的所有文档
+        """查找文档中的所有文档
         Args:
-            text: 文档文本内容
+            text: 文档文本内容.
             
         Returns:
             章节信息列表，包含章节标题、起始行号、结束行号等
@@ -314,8 +412,7 @@ class DocumentTextSplitter:
     
     # 内容提取
     def _extract_document_content(self, text: str, document_info: Dict) -> str:
-        """
-        提取指定文档的内容
+        """提取指定文档的内容.
         
         Args:
             text: 完整文档文本
@@ -332,8 +429,7 @@ class DocumentTextSplitter:
         return '\n'.join(document_lines)
     
     def split_by_documents(self, file_path: str) -> List[Dict]:
-        """
-        按文档切割文档
+        """按文档切割文档.
         
         Args:
             file_path: 文档文件路径
@@ -342,7 +438,7 @@ class DocumentTextSplitter:
             切割后的文档块列表，每个块包含内容、元数据等信息
         """
         # 读取文档内容
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             text = f.read()
         
         # 查找所有文档
@@ -372,8 +468,7 @@ class DocumentTextSplitter:
         return all_chunks
 
     def to_docment(self, chunks: List[Dict]) -> List[Document]:
-        """
-        将切割后的块转换为 Document 类型
+        """将切割后的块转换为 Document 类型.
         
         Args:
             chunks: 切割后的文档块列表，每个块包含内容和元数据

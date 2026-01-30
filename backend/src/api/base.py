@@ -4,12 +4,12 @@ from pydantic import BaseModel, Field
 
 
 class BaseRequest(BaseModel):
-    """统一的 API 请求基类。"""
+    """统一的 API 请求基类。."""
     pass
 
 T = TypeVar("T")
 class Response(BaseModel, Generic[T]):
-    """统一响应模型（支持泛型），可用作 Response[InitSessionData] 等"""
+    """统一响应模型（支持泛型），可用作 Response[InitSessionData] 等."""
 
     code: str = Field(..., description="状态码")
     data: T | None = Field(default=None, description="响应数据")

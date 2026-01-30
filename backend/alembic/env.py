@@ -30,7 +30,7 @@ target_metadata = SQLModel.metadata
 # ---------------- 离线模式 ----------------
 def run_migrations_offline() -> None:
     """离线运行迁移：只根据 URL 生成 SQL 文本，不真正连库执行。
-    适合 DBA 审核 SQL 或 CI 中生成脚本。
+    适合 DBA 审核 SQL 或 CI 中生成脚本。.
     """
     # 优先用环境变量 DATABASE_URL，否则读 alembic.ini 的 sqlalchemy.url
     url = settings.SQLALCHEMY_DATABASE_URI
@@ -51,8 +51,7 @@ def run_migrations_offline() -> None:
 
 # ---------------- 在线模式 ----------------
 def do_run_migrations(connection: Connection) -> None:
-    """真正连接数据库的同步迁移函数，会被异步引擎回调。
-    """
+    """真正连接数据库的同步迁移函数，会被异步引擎回调。."""
     # 把连接和模型元数据传给 Alembic
     context.configure(connection=connection, target_metadata=target_metadata)
 
@@ -60,8 +59,7 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 async def run_async_migrations() -> None:
-    """在线异步方式：创建 asyncpg 引擎 -> 取连接 -> 跑迁移 -> 关闭。
-    """
+    """在线异步方式：创建 asyncpg 引擎 -> 取连接 -> 跑迁移 -> 关闭。."""
     # 读取 alembic.ini 的 [alembic] 段，并强制把 url 换成环境变量 DATABASE_URL
 
     db_url = settings.SQLALCHEMY_DATABASE_URI
@@ -82,8 +80,7 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """在线模式入口：用 asyncio 启动异步迁移协程。
-    """
+    """在线模式入口：用 asyncio 启动异步迁移协程。."""
     import asyncio
     asyncio.run(run_async_migrations())
 

@@ -1,14 +1,19 @@
 from typing import List
 from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.base import Response
-from api.routes.plugin.schema import PluginMetaResponse, PluginResponse, PluginUpdateRequest
-from services.plugin.service import PluginService
+from api.routes.plugin.schema import (
+    PluginMetaResponse,
+    PluginResponse,
+    PluginUpdateRequest,
+)
 from infrastructure.pg.pg_client import get_session
+from services.plugin.service import PluginService
 
-router = APIRouter(prefix="/plugins", tags=["plugins"])
+router = APIRouter(prefix="/plugin", tags=["plugins"])
 
 def get_plugin_service(session: AsyncSession = Depends(get_session)) -> PluginService:
     return PluginService(session)
@@ -17,7 +22,7 @@ def get_plugin_service(session: AsyncSession = Depends(get_session)) -> PluginSe
 async def get_plugin_list(
     service: PluginService = Depends(get_plugin_service)
 ) -> Response[List[PluginMetaResponse]]:
-    """获取所有插件列表"""
+    """获取所有插件列表."""
     data = await service.get_plugin_list()
     return Response.ok(data=data)
 
@@ -26,7 +31,7 @@ async def get_plugin_detail(
     plugin_id: UUID,
     service: PluginService = Depends(get_plugin_service)
 ) -> Response[PluginResponse]:
-    """获取插件详情"""
+    """获取插件详情."""
     data = await service.get_plugin_detail(plugin_id)
     return Response.ok(data=data)
 
@@ -36,7 +41,7 @@ async def update_plugin(
     request: PluginUpdateRequest,
     service: PluginService = Depends(get_plugin_service)
 ) -> Response[None]:
-    """更新插件配置"""
+    """更新插件配置."""
     await service.update_plugin(plugin_id, request)
     return Response.ok()
 

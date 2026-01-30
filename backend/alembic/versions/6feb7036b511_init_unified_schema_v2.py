@@ -1,4 +1,4 @@
-"""init_unified_schema_v2
+"""init_unified_schema_v2.
 
 Revision ID: 6feb7036b511
 Revises: 
@@ -7,10 +7,10 @@ Create Date: 2026-01-28 19:22:46.359545
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes  # noqa: F401
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '6feb7036b511'

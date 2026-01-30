@@ -1,6 +1,8 @@
-from typing import TypedDict, List, Dict, Any, Annotated
-from langgraph.graph import add_messages
+from typing import Annotated, Any, Dict, List, TypedDict
+
 from langchain_core.messages import BaseMessage, HumanMessage
+from langgraph.graph import add_messages
+
 
 class CompositionState(TypedDict):
     # Base

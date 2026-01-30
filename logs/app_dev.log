@@ -1,0 +1,13 @@
+2026-01-29 14:25:30.208 | INFO     | src.api.app:lifespan:37 - LangGraph Checkpointer tables initialized
+2026-01-29 14:25:30.213 | INFO     | src.api.app:lifespan:40 - 数据库初始化完成
+2026-01-29 14:27:06.027 | INFO     | src.api.app:lifespan:43 - 数据库连接关闭
+2026-01-29 14:27:08.582 | INFO     | src.api.app:lifespan:37 - LangGraph Checkpointer tables initialized
+2026-01-29 14:27:08.584 | INFO     | src.api.app:lifespan:40 - 数据库初始化完成
+2026-01-29 14:27:58.209 | INFO     | src.api.app:lifespan:43 - 数据库连接关闭
+2026-01-29 14:28:00.609 | INFO     | src.api.app:lifespan:37 - LangGraph Checkpointer tables initialized
+2026-01-29 14:28:00.611 | INFO     | src.api.app:lifespan:40 - 数据库初始化完成
+2026-01-29 14:28:32.617 | INFO     | src.api.app:lifespan:37 - LangGraph Checkpointer tables initialized
+2026-01-29 14:28:32.618 | INFO     | src.api.app:lifespan:40 - 数据库初始化完成
+2026-01-29 14:30:51.105 | INFO     | src.api.app:lifespan:43 - 数据库连接关闭
+2026-01-29 14:30:54.765 | INFO     | src.api.app:lifespan:37 - LangGraph Checkpointer tables initialized
+2026-01-29 14:30:54.772 | INFO     | src.api.app:lifespan:40 - 数据库初始化完成

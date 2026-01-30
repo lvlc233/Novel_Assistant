@@ -1,11 +1,16 @@
-from typing import TypedDict, List, Dict, Any, Tuple, Annotated
-from langgraph.graph import add_messages
+import operator
+from typing import Annotated, Any, Dict, List, Tuple, TypedDict
+
 from langchain_core.messages import BaseMessage
+from langgraph.graph import add_messages
+
 
 class Allocation(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
     context: Dict[str, Any]
     documents: List[str]
+    # Collect all cyphers from parallel executions
+    cypher: Annotated[List[str], operator.add]
 
 class KDBuildState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
@@ -25,4 +30,4 @@ class KDBuildState(TypedDict):
     relation: List[Tuple[str, str, str]]
 
     # Cypher
-    cypher: List[str]
+    cypher: Annotated[List[str], operator.add]

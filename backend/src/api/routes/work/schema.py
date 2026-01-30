@@ -1,15 +1,19 @@
-from typing import List, Literal, Optional, Dict
-from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field
+from typing import Dict, List
+from uuid import UUID
+
+from pydantic import BaseModel
+
+from common.enums import NodeType, NovelStateCN, PluginFromType, PluginScopeType
+
 
 # DTOs
 class WorkMetaDTO(BaseModel):
     work_id: str
-    work_cover_image_url: Optional[str] = None
-    work_name: Optional[str] = None
-    work_summary: Optional[str] = None
-    work_state: Literal["完成", "进行中"] = "进行中" 
+    work_cover_image_url: str | None = None
+    work_name: str | None = None
+    work_summary: str | None = None
+    work_state: NovelStateCN = NovelStateCN.UPDATING 
     work_type: str
     created_time: datetime
     updated_time: datetime
@@ -17,9 +21,9 @@ class WorkMetaDTO(BaseModel):
 class NodeDTO(BaseModel):
     node_id: str
     node_name: str
-    description: Optional[str] = None
-    node_type: Literal["document", "folder"]
-    parent_id: Optional[str] = None
+    description: str | None = None
+    node_type: NodeType
+    parent_id: str | None = None
     sort_order: int = 0
 
 class EdgeDTO(BaseModel):
@@ -28,9 +32,9 @@ class EdgeDTO(BaseModel):
 
 # Requests & Responses
 class CreateWorkRequest(BaseModel):
-    works_cover_image_url: Optional[str] = None
-    works_name: Optional[str] = None
-    works_summary: Optional[str] = None
+    works_cover_image_url: str | None = None
+    works_name: str | None = None
+    works_summary: str | None = None
     works_type: str = "novel"
     enabled_plugin_id_list: List[UUID] = []
 
@@ -38,10 +42,10 @@ class WorkMetaResponse(BaseModel):
     work_meta: WorkMetaDTO
 
 class WorkMetaUpdateRequest(BaseModel):
-    works_cover_image_url: Optional[str] = None
-    works_name: Optional[str] = None
-    works_summary: Optional[str] = None
-    works_state: Literal["完成", "进行中"] = "进行中"
+    works_cover_image_url: str | None = None
+    works_name: str | None = None
+    works_summary: str | None = None
+    works_state: NovelStateCN = NovelStateCN.UPDATING
 
 class WorkDetailResponse(BaseModel):
     works_meta: WorkMetaDTO
@@ -52,16 +56,16 @@ class WorkPluginMetaResponse(BaseModel):
     plugin_id: UUID
     name: str
     enabled: bool
-    description: Optional[str] = None
+    description: str | None = None
 
 class WorkPluginDetailResponse(BaseModel):
     plugin_id: UUID
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool
     config: Dict
-    from_type: Literal["system", "custom"]
-    scope_type: Literal["global", "work", "document"]
+    from_type: PluginFromType
+    scope_type: PluginScopeType
     tags: List[str]
 
 class UpdateWorkPluginRequest(BaseModel):

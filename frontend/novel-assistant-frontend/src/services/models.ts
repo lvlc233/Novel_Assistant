@@ -21,7 +21,64 @@ export interface NodeDTO {
   description?: string;
   node_type: "document" | "folder";
   parent_id?: string | null;
+  fater_node_id?: string | null; // Alias for parent_id, backend might return this
   sort_order: number;
+}
+
+export interface DocumentCreateRequest {
+  title: string;
+  description?: string;
+  fater_node_id?: string | null; // Alias for parent_id
+}
+
+export interface DocumentResponse {
+  document_id: string;
+  title: string;
+  description?: string;
+  fater_node_id?: string | null;
+}
+
+export interface DocumentUploadRequest {
+  title?: string;
+  description?: string;
+  fater_node_id?: string | null;
+  full_text?: string;
+}
+
+export interface DocumentUpdateRequest {
+  title?: string;
+  description?: string;
+  fater_node_id?: string | null;
+  full_text?: string;
+}
+
+export interface DocumentDetailResponse {
+  title: string;
+  description?: string;
+  fater_node_id?: string | null;
+  full_text?: string;
+}
+
+export interface NodeCreateRequest {
+  node_name: string;
+  description?: string;
+  node_type: "folder";
+  fater_node_id?: string | null;
+}
+
+export interface NodeResponse {
+  node_id: string;
+  node_name: string;
+  description?: string;
+  node_type: "folder";
+  fater_node_id?: string | null;
+}
+
+export interface NodeUpdateRequest {
+  node_name?: string;
+  description?: string;
+  node_type?: "folder";
+  fater_node_id?: string | null;
 }
 
 export interface EdgeDTO {

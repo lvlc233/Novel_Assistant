@@ -1,18 +1,20 @@
-from typing import Any, List, Tuple, Dict, cast
+from typing import Any, Dict, List, cast
+
 from langchain_core.messages import SystemMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from pydantic import BaseModel, Field
 from langgraph.types import Send
+from pydantic import BaseModel, Field
 
-from core.agents.kd_builder.state import KDBuildState, Allocation
+from common.utils import load_chat_model
 from core.agents.kd_builder.prompts import (
-    ATTENTION_READ_PROMPT,
     ATOM_SUBMIT_PROMPT,
-    DEPENDENCE_SUBMIT_PROMPT,
+    ATTENTION_READ_PROMPT,
     COMPLETE_KD_PROMPT,
     CYPHER_BUILD_PROMPT,
+    DEPENDENCE_SUBMIT_PROMPT,
 )
-from common.utils import load_chat_model
+from core.agents.kd_builder.state import Allocation, KDBuildState
+
 
 # ========== 结构化输出模型 ==========
 # 注意力
@@ -57,7 +59,6 @@ def loop_attention_router(state: KDBuildState) -> str | List[str]:
     # Ensure chunks exist
     chunks = state.get("chunks", [])
     now_index = state.get("now_chunk_index", 0)
-    print(f"now_chunk_index: {now_index}, len(chunks): {len(chunks)}")
     
     if now_index < len(chunks):
         return "attention_node"
@@ -65,9 +66,7 @@ def loop_attention_router(state: KDBuildState) -> str | List[str]:
 
 # ========== 文档 → 切块 ==========
 async def chunk_node(state: KDBuildState) -> Dict[str, Any]:
-    """
-    把 KDBuildState.document 做简单固定长度切块
-    """
+    """把 KDBuildState.document 做简单固定长度切块."""
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,      # 每块 ≤ 500 字符
         chunk_overlap=20,    # 重复 20 字符

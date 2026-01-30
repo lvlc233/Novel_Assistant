@@ -1,13 +1,14 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, PostgresDsn, computed_field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from dotenv import load_dotenv
+from pydantic import PostgresDsn, computed_field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 显式加载 .env 到 os.environ，确保 LangChain 等库能自动读取 KEY
 load_dotenv(override=True)
 
 class Settings(BaseSettings):
-    """全局配置类，自动加载环境变量(.env)"""
+    """全局配置类，自动加载环境变量(.env)."""
     
     # 基础配置
     PROJECT_NAME: str = "Novel Assistant API"

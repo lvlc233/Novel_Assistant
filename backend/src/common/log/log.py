@@ -1,4 +1,4 @@
-"""日志配置模块。
+"""日志配置模块。.
 
 本模块使用 loguru 实现结构化日志，支持按环境区分配置、文件轮转。
 简化配置：统一输出到控制台和文件，移除复杂的采样和分层。
@@ -6,6 +6,7 @@
 
 import os
 import sys
+
 from loguru import logger
 
 APP_ENV = os.getenv("APP_ENV", "dev").lower()

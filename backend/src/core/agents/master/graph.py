@@ -1,9 +1,12 @@
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from core.agents.master.state import MasterState
-from core.agents.master.prompts import MASTER_AGENT_SYSTEM_PROMPT
-from common.utils import load_chat_model
 from langchain_core.messages import SystemMessage
+from langgraph.graph import END, START, StateGraph
+
+from common.config import settings
+from common.utils import load_chat_model
+from core.agents.master.prompts import MASTER_AGENT_SYSTEM_PROMPT
+from core.agents.master.state import MasterState
+from infrastructure.langgraph.checkpointer import PostgresCheckpointer
+
 
 async def master_node(state: MasterState):
     model = load_chat_model("master_agent")
@@ -21,6 +24,12 @@ class MasterGraph:
         graph.add_edge(START, "master")
         graph.add_edge("master", END)
         
-        return graph.compile(checkpointer=MemorySaver())
+        # Use PostgresCheckpointer
+        conn_string = settings.SQLALCHEMY_DATABASE_URI
+        if "postgresql+asyncpg://" in conn_string:
+            conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+        
+        checkpointer = PostgresCheckpointer(conn_string)
+        return graph.compile(checkpointer=checkpointer)
 
 master_agent = MasterGraph().build()

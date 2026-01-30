@@ -1,33 +1,41 @@
-from typing import List, Sequence, Optional, Tuple
+from typing import List, Sequence, Tuple
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_
+
+from sqlalchemy import and_, delete, select
 from sqlalchemy.engine import Result, Row
-from infrastructure.pg.pg_models import (
-    WorkSQLEntity, 
-    WorkPluginMappingSQLEntity, 
-    PluginSQLEntity,
-    NodeSQLEntity,
-    NodeRelationshipSQLEntity,
-    DocumentVersionSQLEntity,
-    KnowledgeBaseSQLEntity,
-    KnowledgeChunkSQLEntity
-)
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from api.routes.work.schema import (
-    CreateWorkRequest, WorkMetaResponse, WorkMetaDTO, 
-    WorkDetailResponse, NodeDTO, EdgeDTO,
-    WorkMetaUpdateRequest, WorkPluginMetaResponse,
-    WorkPluginDetailResponse, UpdateWorkPluginRequest
+    CreateWorkRequest,
+    EdgeDTO,
+    NodeDTO,
+    UpdateWorkPluginRequest,
+    WorkDetailResponse,
+    WorkMetaDTO,
+    WorkMetaResponse,
+    WorkMetaUpdateRequest,
+    WorkPluginDetailResponse,
+    WorkPluginMetaResponse,
 )
-from common.errors import ResourceNotFoundError, PluginNotFoundError
+from common.enums import NovelState, NovelStateCN, PluginScopeType
+from common.errors import PluginNotFoundError, ResourceNotFoundError
 from common.utils import get_now_time
+from infrastructure.pg.pg_models import (
+    DocumentVersionSQLEntity,
+    NodeRelationshipSQLEntity,
+    NodeSQLEntity,
+    PluginSQLEntity,
+    WorkPluginMappingSQLEntity,
+    WorkSQLEntity,
+)
+
 
 class WorkService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def create_work(self, request: CreateWorkRequest) -> WorkMetaResponse:
-        """创建作品"""
+        """创建作品."""
         # 1. 创建 Work 实体
         new_work = WorkSQLEntity(
             name=request.works_name or "未命名作品",
@@ -69,7 +77,7 @@ class WorkService:
                 work_cover_image_url=new_work.cover_image_url,
                 work_name=new_work.name,
                 work_summary=new_work.summary,
-                work_state="完成" if new_work.state == "completed" else "进行中",# TODO: 后续打算把散落的状态封装为枚举,现在放着吧
+                work_state=NovelStateCN.COMPLETED if new_work.state == NovelState.COMPLETED.value else NovelStateCN.UPDATING,
                 work_type=new_work.work_type,
                 created_time=new_work.create_time,
                 updated_time=new_work.update_time
@@ -77,7 +85,7 @@ class WorkService:
         )
 
     async def delete_work(self, work_id: str) -> None:
-        """删除作品"""
+        """删除作品."""
         stmt = select(WorkSQLEntity).where(WorkSQLEntity.id == work_id)
         result = await self.session.execute(stmt)
         work = result.scalar_one_or_none()
@@ -112,14 +120,14 @@ class WorkService:
         await self.session.commit()
 
     async def get_work_list(self) -> List[WorkMetaResponse]:
-        """获取作品列表"""
+        """获取作品列表."""
         stmt = select(WorkSQLEntity).order_by(WorkSQLEntity.update_time.desc())
         result = await self.session.execute(stmt)
         works = result.scalars().all()
         return [WorkMetaResponse(work_meta=self._to_meta_dto(w)) for w in works]
 
     async def get_work_detail(self, work_id: str) -> WorkDetailResponse:
-        """获取作品详情（含目录树和关系）"""
+        """获取作品详情（含目录树和关系）."""
         stmt = select(WorkSQLEntity).where(WorkSQLEntity.id == work_id)
         result = await self.session.execute(stmt)
         work = result.scalar_one_or_none()
@@ -137,6 +145,12 @@ class WorkService:
         result_edges = await self.session.execute(stmt_edges)
         edges = result_edges.scalars().all()
 
+        # Build Parent Map from Edges for Nodes DTO
+        parent_map = {}
+        for e in edges:
+            if e.relation_type == "parent":
+                parent_map[e.to_node_id] = e.from_node_id
+
         return WorkDetailResponse(
             works_meta=self._to_meta_dto(work),
             works_document=[
@@ -144,9 +158,9 @@ class WorkService:
                     node_id=n.id,
                     node_name=n.name,
                     node_type=n.node_type, # type: ignore
-                    description=None,
-                    parent_id=n.parent_id,
-                    sort_order=n.sort_order
+                    description=n.description,
+                    parent_id=parent_map.get(n.id),
+                    sort_order=0 # n.sort_order removed from DB
                 ) for n in nodes
             ],
             works_documents_relationship=[
@@ -158,7 +172,7 @@ class WorkService:
         )
     
     async def update_work_meta(self, work_id: str, request: WorkMetaUpdateRequest) -> None:
-        """更新作品元数据"""
+        """更新作品元数据."""
         stmt = select(WorkSQLEntity).where(WorkSQLEntity.id == work_id)
         result = await self.session.execute(stmt)
         work = result.scalar_one_or_none()
@@ -173,7 +187,7 @@ class WorkService:
         if request.works_summary is not None:
             work.summary = request.works_summary
         if request.works_state is not None:
-            work.state = "completed" if request.works_state == "完成" else "updating"
+            work.state = NovelState.COMPLETED.value if request.works_state == NovelStateCN.COMPLETED else NovelState.UPDATING.value
             
         work.update_time = get_now_time()
         await self.session.commit()
@@ -184,14 +198,14 @@ class WorkService:
             work_cover_image_url=work.cover_image_url,
             work_name=work.name,
             work_summary=work.summary,
-            work_state="完成" if work.state == "completed" else "进行中",
+            work_state=NovelStateCN.COMPLETED if work.state == NovelState.COMPLETED.value else NovelStateCN.UPDATING,
             work_type=work.work_type,
             created_time=work.create_time,
             updated_time=work.update_time
         )
 
     async def list_work_plugins(self, work_id: str) -> List[WorkPluginMetaResponse]:
-        """获取作品插件列表(包含所有可用插件(作品级和文档级别的插件)，标明启用状态)"""
+        """获取作品插件列表(包含所有可用插件(作品级和文档级别的插件)，标明启用状态)."""
         stmt = select(PluginSQLEntity, WorkPluginMappingSQLEntity)\
             .outerjoin(
                 WorkPluginMappingSQLEntity, 
@@ -200,10 +214,10 @@ class WorkService:
                     WorkPluginMappingSQLEntity.work_id == work_id
                 )
             )\
-            .where(PluginSQLEntity.scope_type.in_(["work", "document"]))
+            .where(PluginSQLEntity.scope_type.in_([PluginScopeType.WORK.value, PluginScopeType.DOCUMENT.value]))
         
-        result: Result[Tuple[PluginSQLEntity, Optional[WorkPluginMappingSQLEntity]]] = await self.session.execute(stmt)
-        rows: Sequence[Row[Tuple[PluginSQLEntity, Optional[WorkPluginMappingSQLEntity]]]] = result.all()
+        result: Result[Tuple[PluginSQLEntity, WorkPluginMappingSQLEntity | None]] = await self.session.execute(stmt)
+        rows: Sequence[Row[Tuple[PluginSQLEntity, WorkPluginMappingSQLEntity | None]]] = result.all()
         
         return [
             WorkPluginMetaResponse(
@@ -215,15 +229,15 @@ class WorkService:
         ]
 
     async def get_work_plugin_detail(self, work_id: str, plugin_id: UUID) -> WorkPluginDetailResponse:
-        """获取作品插件详情(包含所有可用插件(作品级和文档级别的插件)，标明启用状态)"""
+        """获取作品插件详情(包含所有可用插件(作品级和文档级别的插件)，标明启用状态)."""
         stmt = select(WorkPluginMappingSQLEntity, PluginSQLEntity)\
             .join(PluginSQLEntity, WorkPluginMappingSQLEntity.plugin_id == PluginSQLEntity.id)\
             .where(WorkPluginMappingSQLEntity.work_id == work_id)\
             .where(WorkPluginMappingSQLEntity.plugin_id == str(plugin_id))\
-            .where(PluginSQLEntity.scope_type.in_(["work", "document"]))
+            .where(PluginSQLEntity.scope_type.in_([PluginScopeType.WORK.value, PluginScopeType.DOCUMENT.value]))
             
         result: Result[Tuple[WorkPluginMappingSQLEntity, PluginSQLEntity]] = await self.session.execute(stmt)
-        row: Optional[Row[Tuple[WorkPluginMappingSQLEntity, PluginSQLEntity]]] = result.first()
+        row: Row[Tuple[WorkPluginMappingSQLEntity, PluginSQLEntity]] | None = result.first()
         
         if not row:
             # 检查插件是否存在，如果存在但未关联，可能需要处理（当前假设必须先关联）
@@ -256,7 +270,7 @@ class WorkService:
         )
 
     async def update_work_plugin(self, work_id: str, request: UpdateWorkPluginRequest) -> None:
-        """更新作品插件状态/配置"""
+        """更新作品插件状态/配置."""
         # Check existence
         plugin_id_str = request.plugin_id.hex
         stmt = select(WorkPluginMappingSQLEntity).where(

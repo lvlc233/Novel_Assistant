@@ -3,8 +3,8 @@
 本模块提供用于记录LangGraph节点执行和LLM调用的日志处理器。
 """
 
-import json
 import copy
+import json
 from typing import cast
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -12,7 +12,12 @@ from langchain_core.load import dumpd
 from langchain_core.messages import AIMessage
 
 from common.log.log import logger
-from common.utils import get_run_id_for_node, pick_msg_fields, value_colour_for_dict,_safe_to_dict
+from common.utils import (
+    _safe_to_dict,
+    get_run_id_for_node,
+    pick_msg_fields,
+    value_colour_for_dict,
+)
 
 
 class NodeLogHandler(BaseCallbackHandler):

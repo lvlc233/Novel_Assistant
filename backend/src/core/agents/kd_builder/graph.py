@@ -1,15 +1,17 @@
-from langgraph.graph import StateGraph, START, END
-from core.agents.kd_builder.state import KDBuildState, Allocation
+from langgraph.graph import END, START, StateGraph
+
 from core.agents.kd_builder.nodes import (
-    chunk_node,
-    attention_node,
-    atom_entity_node,
-    dependence_entity_node,
-    complete_node,
     allocation_router,
+    atom_entity_node,
+    attention_node,
+    chunk_node,
+    complete_node,
     cypher_node,
+    dependence_entity_node,
     loop_attention_router,
 )
+from core.agents.kd_builder.state import Allocation, KDBuildState
+
 
 class KDBuildGraph:
 

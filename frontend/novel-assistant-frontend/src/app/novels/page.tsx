@@ -125,8 +125,7 @@ export default function DocumentsPage() {
           user_id: userId,
           novel_name: data.title,
           novel_summary: data.synopsis,
-          // TODO: 处理封面图片上传，目前仅透传 null 或 URL
-          // novel_cover_image_url: data.cover ? URL.createObjectURL(data.cover) : undefined,
+          novel_cover_image_url: data.cover || undefined,
           kd_id_list: data.selectedKbIds,
           novel_type: data.type,
           novel_genre: data.genre,

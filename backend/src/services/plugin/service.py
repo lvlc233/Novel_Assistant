@@ -1,17 +1,24 @@
-from typing import List, Optional
+from typing import List
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import select
-from infrastructure.pg.pg_models import PluginSQLEntity
-from api.routes.plugin.schema import PluginMetaResponse, PluginResponse, PluginUpdateRequest
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.routes.plugin.schema import (
+    PluginMetaResponse,
+    PluginResponse,
+    PluginUpdateRequest,
+)
 from common.errors import ResourceNotFoundError
+from infrastructure.pg.pg_models import PluginSQLEntity
+
 
 class PluginService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def get_plugin_list(self) -> List[PluginMetaResponse]:
-        """获取所有插件列表"""
+        """获取所有插件列表."""
         stmt = select(PluginSQLEntity)
         result = await self.session.execute(stmt)
         plugins = result.scalars().all()
@@ -28,7 +35,7 @@ class PluginService:
         ]
 
     async def get_plugin_detail(self, plugin_id: UUID) -> PluginResponse:
-        """获取插件详情"""
+        """获取插件详情."""
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == str(plugin_id))
         result = await self.session.execute(stmt)
         plugin = result.scalar_one_or_none()
@@ -48,7 +55,7 @@ class PluginService:
         )
 
     async def update_plugin(self, plugin_id: UUID, request: PluginUpdateRequest) -> None:
-        """更新插件配置(全局设置)"""
+        """更新插件配置(全局设置)."""
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == str(plugin_id))
         result = await self.session.execute(stmt)
         plugin = result.scalar_one_or_none()

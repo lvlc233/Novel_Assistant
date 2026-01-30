@@ -190,10 +190,11 @@ export default function DocumentEditor({ isChatExpanded, novelId, initialChapter
   };
 
   useEffect(() => {
-    if (currentChapterId) {
+    if (currentChapterId && novelId) {
        getDocumentDetail({
          document_id: currentChapterId,
-         user_id: userId
+         user_id: userId,
+         novel_id: novelId
        }).then(detail => {
            setContent(detail.document_body_text || '');
            setTitle(detail.document_title || '未命名文档');
@@ -201,7 +202,7 @@ export default function DocumentEditor({ isChatExpanded, novelId, initialChapter
            setIsSaved(true);
        }).catch(err => logger.error("Fetch document failed", err));
     }
-  }, [currentChapterId]);
+  }, [currentChapterId, novelId]);
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
@@ -277,7 +278,11 @@ export default function DocumentEditor({ isChatExpanded, novelId, initialChapter
                 volumes={volumes} 
                 orphanChapters={orphanChapters} 
                 selectedChapterId={currentChapterId || undefined}
-                onSelectChapter={(chapter) => setCurrentChapterId(chapter.id)}
+                onSelectChapter={(chapter) => {
+                    setCurrentChapterId(chapter.id);
+                    setContent('');
+                    setTitle(chapter.title);
+                }}
                 onCreateVolume={handleCreateVolume}
                 onCreateChapter={handleCreateChapter}
                 onUpdateVolume={handleUpdateVolume}
@@ -343,6 +348,7 @@ export default function DocumentEditor({ isChatExpanded, novelId, initialChapter
                 />
                 
                 <TiptapEditor 
+                    key={currentChapterId}
                     content={content} 
                     onChange={handleContentChange} 
                     editable={!!currentChapterId}

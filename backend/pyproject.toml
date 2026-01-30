@@ -29,7 +29,6 @@ dependencies = [
     "pydantic-settings>=2.12.0",
 ]
 
-
 [project.optional-dependencies]
 dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
 
@@ -40,6 +39,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src","alembic"]              
 include = ["*"]    
+
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 
@@ -62,8 +62,10 @@ lint.ignore = [
     "D417",
     "E501",
 ]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D", "UP"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
@@ -74,4 +76,104 @@ dev = [
     "mypy>=1.13.0",
     "pytest>=8.3.5",
     "ruff>=0.8.2",
+    "bandit[toml]>=1.7.10",
 ]
+
+# ==================== MyPy 严格类型检查配置 ====================
+[tool.mypy]
+# Python 版本约束
+python_version = "3.11"
+
+# 严格模式（生产级 Agent 项目建议开启）
+strict = true
+
+# 路径配置
+files = ["src", "tests"]
+exclude = [
+    "alembic",           # 迁移文件通常类型较乱
+    "tests/fixtures",    # 如有复杂测试夹具可排除
+    "venv",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+# 关键插件（对 Pydantic v2 和 SQLModel 必需）
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+# 类型检查严格度（配合 strict = true 的微调）
+warn_return_any = true              # 返回 Any 时警告
+warn_unused_ignores = true          # 清理过时的 type: ignore
+warn_unreachable = true             # 警告不可达代码
+warn_redundant_casts = true         # 警告冗余的类型转换
+warn_unused_configs = true          # 警告未使用的配置
+disallow_untyped_calls = false      # 允许调用无类型第三方库（LangGraph 生态部分无类型）
+disallow_untyped_defs = true        # 要求函数必须有类型定义（核心严格项）
+disallow_incomplete_defs = true     # 禁止部分类型定义
+check_untyped_defs = true           # 检查未类型定义的内部
+ignore_missing_imports = true       # 忽略缺失导入（某些第三方库无 stubs）
+
+# 错误显示优化
+show_error_codes = true             # 显示错误代码便于 # type: ignore[xxx]
+show_column_numbers = true          # 显示列号
+show_error_context = true           # 显示错误上下文
+pretty = true                       # 美化错误输出
+error_summary = true                # 最后显示统计
+
+# 性能优化（大型 Agent 项目）
+incremental = true
+cache_dir = ".mypy_cache"
+sqlite_cache = true                 # 使用 SQLite 缓存提升性能
+
+# 命名空间包（src layout 必需）
+namespace_packages = true
+explicit_package_bases = true
+
+# ==================== Pydantic V2 特定配置 ====================
+[tool.pydantic-mypy]
+init_forbid_extra = true            # 禁止 Extra.forbid 时的额外字段
+init_typed = true                   # __init__ 方法类型检查
+warn_required_dynamic_aliases = true  # 警告必需的动态别名
+warn_untyped_fields = true          # 警告无类型字段
+
+# ==================== Bandit 安全扫描配置 ====================
+[tool.bandit]
+# 扫描目标路径
+targets = ["src"]
+
+# 排除路径（测试文件、迁移、虚拟环境等）
+exclude_dirs = [
+    "tests",
+    "alembic",
+    "**/__pycache__",
+    "**/.venv",
+    "venv",
+    ".git",
+    "build",
+    "dist",
+    "*.egg-info",
+    ".pytest_cache",
+    ".mypy_cache",
+]
+
+# 跳过的规则（针对 FastAPI/SQLModel/LangGraph 的合理豁免）
+# B608: Hardcoded SQL（SQLModel 使用参数化查询，但硬编码 SQL 字符串会被误报）
+# B104: Hardcoded bind all interfaces（FastAPI 默认 0.0.0.0 是合理的）
+skips = ["B608", "B104"]
+
+# 严重程度阈值（low/medium/high）
+severity = "low"
+confidence = "medium"
+
+# 递归扫描
+recursive = true
+
+# 格式化输出（screen, json, xml, html, txt）
+format = "screen"
+
+# 断言检查（允许在特定场景使用 assert）
+assert_used = { skips = [] }
+
+# 额外插件（如有需要）
+# plugins = []

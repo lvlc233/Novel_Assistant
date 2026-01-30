@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from sqlalchemy import JSON, TIMESTAMP, Column
 from sqlmodel import Field, Relationship, SQLModel
@@ -10,8 +10,7 @@ from common.utils import create_uuid, get_now_time
 # --- 7.1 Core & Plugin ---
 
 class PluginSQLEntity(SQLModel, table=True):
-    """插件注册表: 定义系统中所有可用的插件（能力）。
-    """
+    """插件注册表: 定义系统中所有可用的插件（能力）。."""
     __tablename__ = "plugin"
 
     id: str = Field(default_factory=create_uuid, primary_key=True, description="插件ID")
@@ -36,8 +35,7 @@ class PluginSQLEntity(SQLModel, table=True):
 
 
 class WorkSQLEntity(SQLModel, table=True):
-    """作品表: 项目的核心实体（如一本小说）。
-    """
+    """作品表: 项目的核心实体（如一本小说）。."""
     __tablename__ = "work"
 
     id: str = Field(default_factory=create_uuid, primary_key=True, description="作品ID")
@@ -61,8 +59,7 @@ class WorkSQLEntity(SQLModel, table=True):
 
 
 class WorkPluginMappingSQLEntity(SQLModel, table=True):
-    """作品-插件关联表: 记录某个作品启用了哪些插件，以及特定的配置。
-    """
+    """作品-插件关联表: 记录某个作品启用了哪些插件，以及特定的配置。."""
     __tablename__ = "work_plugin_mapping"
 
     id: str = Field(default_factory=create_uuid, primary_key=True)
@@ -84,8 +81,7 @@ class WorkPluginMappingSQLEntity(SQLModel, table=True):
 # --- 7.2 Agent管理 ---
 
 class AgentsManagerSQLEntity(SQLModel, table=True):
-    """agent的管理模块
-    """
+    """agent的管理模块."""
     __tablename__ = "agents_manager"   
 
     id: str = Field(default_factory=create_uuid, primary_key=True, description="agent的id")
@@ -100,15 +96,14 @@ class AgentsManagerSQLEntity(SQLModel, table=True):
 # --- 7.3 内容与结构 (Content & Graph) ---
 
 class NodeSQLEntity(SQLModel, table=True):
-    """节点表: 构成作品内容的原子单位（文档、文件夹、白板等）。
-    """
+    """节点表: 构成作品内容的原子单位（文档、文件夹、白板等）。."""
     __tablename__ = "node"
 
     id: str = Field(default_factory=create_uuid, primary_key=True, description="节点ID")
     work_id: str = Field(foreign_key="work.id", index=True)
     
     name: str = Field(default="未命名节点")
-    description: Optional[str] = Field(default=None, description="节点描述")
+    description: str | None = Field(default=None, description="节点描述")
     node_type: str = Field(description="类型: document, folder, whiteboard...")
     
     create_time: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
@@ -120,8 +115,7 @@ class NodeSQLEntity(SQLModel, table=True):
 
 
 class NodeRelationshipSQLEntity(SQLModel, table=True):
-    """节点关系表: 定义节点之间的关系（层级关系、引用、链接）。
-    """
+    """节点关系表: 定义节点之间的关系（层级关系、引用、链接）。."""
     __tablename__ = "node_relationship"
 
     id: str = Field(default_factory=create_uuid, primary_key=True)
@@ -134,13 +128,14 @@ class NodeRelationshipSQLEntity(SQLModel, table=True):
 
 
 class DocumentVersionSQLEntity(SQLModel, table=True):
-    """文档版本表: 存储 Node (类型为 document) 的实际内容历史。
-    """
+    """文档版本表: 存储 Node (类型为 document) 的实际内容历史。."""
     __tablename__ = "document_version"
 
     id: str = Field(default_factory=create_uuid, primary_key=True)
     node_id: str = Field(foreign_key="node.id", index=True)
     
+    version_number: int = Field(default=1, description="版本号")
+
     content: str = Field(default="", description="文档内容 (HTML/JSON/Markdown)")
     word_count: int = Field(default=0)
     
@@ -150,8 +145,7 @@ class DocumentVersionSQLEntity(SQLModel, table=True):
 # --- 7.4 知识库(Knowledge)(插件) ---
 
 class KnowledgeBaseSQLEntity(SQLModel, table=True):
-    """知识库元数据表
-    """
+    """知识库元数据表."""
     __tablename__ = "knowledge_base"
     
     id: str = Field(default_factory=create_uuid, primary_key=True)
@@ -174,8 +168,7 @@ class KnowledgeChunkSQLEntity(SQLModel, table=True):
 # --- 7.5 记忆库(Memory)(插件) ---
 
 class MemorySQLEntity(SQLModel, table=True):
-    """记忆表
-    """
+    """记忆表."""
     __tablename__ = "memory" # Fixed table name from knowledge_base copy-paste error in doc
     
     id: str = Field(default_factory=create_uuid, primary_key=True)

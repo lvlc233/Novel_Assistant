@@ -1,7 +1,10 @@
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from core.agents.composition.state import CompositionState
+from langgraph.graph import END, START, StateGraph
+
+from common.config import settings
 from common.utils import load_chat_model
+from core.agents.composition.state import CompositionState
+from infrastructure.langgraph.checkpointer import PostgresCheckpointer
+
 
 async def model_node(state: CompositionState):
     model = load_chat_model("composition_agent")
@@ -17,6 +20,12 @@ class CompositionGraph:
         graph.add_edge(START, "agent")
         graph.add_edge("agent", END)
         
-        return graph.compile(checkpointer=MemorySaver())
+        # Use PostgresCheckpointer
+        conn_string = settings.SQLALCHEMY_DATABASE_URI
+        if "postgresql+asyncpg://" in conn_string:
+            conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+        
+        checkpointer = PostgresCheckpointer(conn_string)
+        return graph.compile(checkpointer=checkpointer)
 
 composition_agent = CompositionGraph().build()

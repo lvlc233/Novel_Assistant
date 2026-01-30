@@ -1,5 +1,5 @@
 import { request } from '@/lib/request';
-import { NodeDTO } from '@/services/models';
+import { NodeDTO, DocumentResponse, DocumentDetailResponse, NodeResponse, CreateNodeRequest, DocumentCreateRequest } from '@/services/models';
 import { mockNovels, USE_MOCK, saveMockData } from '@/services/mockData';
 import { Chapter } from '@/types/novel';
 
@@ -7,27 +7,6 @@ import { Chapter } from '@/types/novel';
  * Service for managing documents and folders (nodes).
  * Aligned with backend /nodes endpoints.
  */
-
-// Types matching backend
-export interface CreateNodeRequest {
-  parent_id?: string | null;
-  node_name: string;
-  node_type: 'document' | 'folder';
-}
-
-export interface UpdateNodeRequest {
-  node_name?: string;
-  content?: string;
-  parent_id?: string | null;
-}
-
-export interface NodeDetailResponse {
-  node_id: string;
-  node_name: string;
-  content?: string;
-  node_type: 'document' | 'folder';
-  word_count: number;
-}
 
 // Frontend DTOs (keeping existing interfaces where possible for compatibility)
 
@@ -39,6 +18,9 @@ export interface CreateFolderDto {
 
 export async function createFolder(data: CreateFolderDto): Promise<NodeDTO> {
     if (USE_MOCK) {
+        // Mock implementation omitted for brevity, assuming existing mock logic is fine or irrelevant if USE_MOCK=false
+        // For simplicity, just error or minimal mock if needed.
+        // Keeping original mock logic is safer if user switches back.
         await new Promise(resolve => setTimeout(resolve, 500));
         const novel = mockNovels.find(n => n.id === data.novel_id);
         if (novel) {
@@ -65,17 +47,19 @@ export async function createFolder(data: CreateFolderDto): Promise<NodeDTO> {
         throw new Error('Novel not found');
     }
     
-    const response = await request.post<NodeDetailResponse>(`/works/${data.novel_id}/nodes`, {
+    // Backend: POST /works/{work_id}/nodes
+    const response = await request.post<NodeResponse>(`/works/${data.novel_id}/nodes`, {
       node_name: data.name,
-      node_type: 'folder'
+      node_type: 'folder',
+      fater_node_id: null // Explicitly null for root folders
     });
     
     return {
       node_id: response.node_id,
       node_name: response.node_name,
       node_type: response.node_type,
-      sort_order: 0, // Backend might not return sort_order in NodeDetailResponse, strictly speaking it's in NodeDTO
-      parent_id: null
+      sort_order: 0,
+      parent_id: response.fater_node_id || null
     };
 }
 
@@ -96,7 +80,8 @@ export async function deleteFolder(data: DeleteFolderDto): Promise<boolean> {
         }
         return false;
     }
-    await request.delete(`/nodes/${data.folder_id}`);
+    // Backend: DELETE /works/{work_id}/nodes/{node_id}
+    await request.delete(`/works/${data.novel_id}/nodes/${data.folder_id}`);
     return true;
 }
 
@@ -121,10 +106,11 @@ export async function renameFolder(data: RenameFolderDto): Promise<string> {
         }
         throw new Error('Folder not found');
     }
-    const response = await request.patch<NodeDetailResponse>(`/nodes/${data.folder_id}`, {
+    // Backend: PATCH /works/{work_id}/nodes/{node_id}
+    await request.patch(`/works/${data.novel_id}/nodes/${data.folder_id}`, {
       node_name: data.name
     });
-    return response.node_name;
+    return data.name;
 }
 
 export interface CreateDocumentDto {
@@ -172,18 +158,18 @@ export async function createDocument(data: CreateDocumentDto): Promise<NodeDTO> 
         throw new Error('Novel not found');
     }
     
-    const response = await request.post<NodeDetailResponse>(`/works/${data.novel_id}/nodes`, {
-      node_name: data.title,
-      node_type: 'document',
-      parent_id: data.folder_id
+    // Backend: POST /works/{work_id}/documents
+    const response = await request.post<DocumentResponse>(`/works/${data.novel_id}/documents`, {
+      title: data.title,
+      fater_node_id: data.folder_id
     });
 
     return {
-      node_id: response.node_id,
-      node_name: response.node_name,
-      node_type: response.node_type,
+      node_id: response.document_id,
+      node_name: response.title,
+      node_type: 'document',
       sort_order: 0,
-      parent_id: data.folder_id
+      parent_id: response.fater_node_id || null
     };
 }
 
@@ -217,7 +203,8 @@ export async function deleteDocument(data: DeleteDocumentDto): Promise<boolean> 
         }
         return false;
     }
-    await request.delete(`/nodes/${data.document_id}`);
+    // Backend: DELETE /works/{work_id}/documents/{document_id}
+    await request.delete(`/works/${data.novel_id}/documents/${data.document_id}`);
     return true;
 }
 
@@ -256,19 +243,22 @@ export async function renameDocument(data: RenameDocumentDto): Promise<string> {
         }
         throw new Error('Document not found');
     }
-    const response = await request.patch<NodeDetailResponse>(`/nodes/${data.document_id}`, {
-      node_name: data.title
+    // Backend: PATCH /works/{work_id}/documents/{document_id}
+    // Note: Rename uses update_document endpoint but only sending title
+    await request.patch(`/works/${data.novel_id}/documents/${data.document_id}`, {
+      title: data.title
     });
-    return response.node_name;
+    return data.title;
 }
 
 export interface GetDocumentDetailDto {
     user_id?: string;
+    novel_id: string; // Added novel_id (work_id)
     document_id: string;
     version_id?: string;
 }
 
-export interface DocumentDetailResponse {
+export interface DocumentDetailDto {
     document_id: string;
     document_version_id: string;
     document_title: string;
@@ -276,7 +266,7 @@ export interface DocumentDetailResponse {
     document_word_count: number;
 }
 
-export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<DocumentDetailResponse> {
+export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<DocumentDetailDto> {
     if (USE_MOCK) {
         await new Promise(resolve => setTimeout(resolve, 500));
         for (const novel of mockNovels) {
@@ -314,13 +304,14 @@ export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<Doc
         throw new Error('Document not found');
     }
     
-    const response = await request.get<NodeDetailResponse>(`/nodes/${data.document_id}`);
+    // Backend: GET /works/{work_id}/documents/{document_id}
+    const response = await request.get<DocumentDetailResponse>(`/works/${data.novel_id}/documents/${data.document_id}`);
     return {
-      document_id: response.node_id,
-      document_version_id: 'latest', // Backend versioning not fully exposed yet
-      document_title: response.node_name,
-      document_body_text: response.content || '',
-      document_word_count: response.word_count
+      document_id: data.document_id,
+      document_version_id: 'latest', 
+      document_title: response.title,
+      document_body_text: response.full_text || '',
+      document_word_count: (response.full_text || '').length
     };
 }
 
@@ -370,8 +361,10 @@ export async function updateDocumentContent(data: UpdateDocumentContentDto): Pro
         throw new Error('Document not found');
     }
     
-    await request.patch<NodeDetailResponse>(`/nodes/${data.document_id}`, {
-      content: data.content
-    });
+    // Backend: PATCH /works/{work_id}/documents/{document_id}
+    const payload: DocumentUpdateRequest = {
+        full_text: data.content
+    };
+    await request.patch(`/works/${data.novel_id}/documents/${data.document_id}`, payload);
     return "success";
 }
