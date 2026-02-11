@@ -1,259 +1,121 @@
 import { request } from '@/lib/request';
-import { NodeDTO, DocumentResponse, DocumentDetailResponse, NodeResponse, CreateNodeRequest, DocumentCreateRequest } from '@/services/models';
-import { mockNovels, USE_MOCK, saveMockData } from '@/services/mockData';
-import { Chapter } from '@/types/novel';
+import { NodeDTO, DocumentResponse, DocumentDetailResponse, NodeResponse, NodeCreateRequest, DocumentCreateRequest, DocumentUploadRequest, DocumentVersionUploadRequest, NodeUpdateRequest, DocumentVersionResponse, DocumentVersionCreateRequest, DocumentVersionItem } from '@/services/models';
+import { Chapter, Volume } from '@/types/work';
 
 /**
  * Service for managing documents and folders (nodes).
- * Aligned with backend /nodes endpoints.
+ * Aligned with backend /work endpoints.
  */
 
 // Frontend DTOs (keeping existing interfaces where possible for compatibility)
 
 export interface CreateFolderDto {
   user_id?: string; // Ignored by backend
-  novel_id: string;
+  work_id: string;
   name: string;
 }
 
-export async function createFolder(data: CreateFolderDto): Promise<NodeDTO> {
-    if (USE_MOCK) {
-        // Mock implementation omitted for brevity, assuming existing mock logic is fine or irrelevant if USE_MOCK=false
-        // For simplicity, just error or minimal mock if needed.
-        // Keeping original mock logic is safer if user switches back.
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const novel = mockNovels.find(n => n.id === data.novel_id);
-        if (novel) {
-            const newVolume = {
-                id: `mock-vol-${crypto.randomUUID()}`,
-                title: data.name,
-                order: (novel.volumes?.length || 0) + 1,
-                isExpanded: true,
-                chapters: []
-            };
-            novel.volumes = novel.volumes || [];
-            if (!novel.volumes.find(v => v.id === newVolume.id)) {
-                novel.volumes.push(newVolume);
-            }
-            saveMockData();
-            return {
-                node_id: newVolume.id,
-                node_name: newVolume.title,
-                node_type: 'folder',
-                sort_order: newVolume.order,
-                parent_id: null
-            };
-        }
-        throw new Error('Novel not found');
-    }
+export async function createFolder(data: CreateFolderDto): Promise<NodeDTO> {    
+    // Backend: POST /work/{work_id}/node
+    const payload: NodeCreateRequest = {
+        name: data.name,
+        type: 'folder',
+        from_node_id: null // Explicitly null for root folders
+    };
     
-    // Backend: POST /works/{work_id}/nodes
-    const response = await request.post<NodeResponse>(`/works/${data.novel_id}/nodes`, {
-      node_name: data.name,
-      node_type: 'folder',
-      fater_node_id: null // Explicitly null for root folders
-    });
+    const response = await request.post<NodeResponse>(`/work/${data.work_id}/node`, payload);
     
     return {
-      node_id: response.node_id,
-      node_name: response.node_name,
-      node_type: response.node_type,
-      sort_order: 0,
-      parent_id: response.fater_node_id || null
+      id: response.id,
+      name: response.name,
+      type: response.type, // should be 'folder'
+      from_node_id: response.from_node_id || null
     };
 }
 
 export interface DeleteFolderDto {
   user_id?: string;
-  novel_id: string;
+  work_id: string;
   folder_id: string;
 }
 
 export async function deleteFolder(data: DeleteFolderDto): Promise<boolean> {
-    if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const novel = mockNovels.find(n => n.id === data.novel_id);
-        if (novel && novel.volumes) {
-            novel.volumes = novel.volumes.filter(v => v.id !== data.folder_id);
-            saveMockData();
-            return true;
-        }
-        return false;
-    }
-    // Backend: DELETE /works/{work_id}/nodes/{node_id}
-    await request.delete(`/works/${data.novel_id}/nodes/${data.folder_id}`);
+    await request.delete(`/work/${data.work_id}/node/${data.folder_id}`);
     return true;
 }
 
 export interface RenameFolderDto {
     user_id?: string;
-    novel_id: string;
+    work_id: string;
     folder_id: string;
     name: string;
 }
 
 export async function renameFolder(data: RenameFolderDto): Promise<string> {
-    if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const novel = mockNovels.find(n => n.id === data.novel_id);
-        if (novel && novel.volumes) {
-            const vol = novel.volumes.find(v => v.id === data.folder_id);
-            if (vol) {
-                vol.title = data.name;
-                saveMockData();
-                return data.name;
-            }
-        }
-        throw new Error('Folder not found');
-    }
-    // Backend: PATCH /works/{work_id}/nodes/{node_id}
-    await request.patch(`/works/${data.novel_id}/nodes/${data.folder_id}`, {
-      node_name: data.name
-    });
+    const payload: NodeUpdateRequest = {
+        name: data.name
+    };
+    await request.patch(`/work/${data.work_id}/node/${data.folder_id}`, payload);
     return data.name;
 }
 
 export interface CreateDocumentDto {
     user_id?: string;
-    novel_id: string;
+    work_id: string;
     title: string;
     folder_id?: string | null;
 }
 
-export async function createDocument(data: CreateDocumentDto): Promise<NodeDTO> {
-    if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const novel = mockNovels.find(n => n.id === data.novel_id);
-        if (novel) {
-            const newChapter = {
-                id: `mock-chap-${crypto.randomUUID()}`,
-                title: data.title,
-                order: 1,
-                currentVersionId: 'v1',
-                versions: [{ id: 'v1', versionNumber: 1, content: '', updatedAt: new Date().toISOString() }]
-            };
-
-            if (data.folder_id) {
-                const vol = novel.volumes?.find(v => v.id === data.folder_id);
-                if (vol) {
-                    newChapter.order = (vol.chapters?.length || 0) + 1;
-                    vol.chapters.push(newChapter);
-                } else {
-                    throw new Error('Folder not found');
-                }
-            } else {
-                 newChapter.order = (novel.orphanChapters?.length || 0) + 1;
-                 novel.orphanChapters = novel.orphanChapters || [];
-                 novel.orphanChapters.push(newChapter);
-            }
-             saveMockData();
-             return {
-                node_id: newChapter.id,
-                node_name: newChapter.title,
-                node_type: 'document',
-                sort_order: newChapter.order,
-                parent_id: data.folder_id
-            };
-        }
-        throw new Error('Novel not found');
-    }
+export async function createDocument(data: CreateDocumentDto): Promise<NodeDTO> {    
+    // Backend: POST /work/{work_id}/document
+    const payload: DocumentCreateRequest = {
+        title: data.title,
+        from_node_id: data.folder_id
+    };
     
-    // Backend: POST /works/{work_id}/documents
-    const response = await request.post<DocumentResponse>(`/works/${data.novel_id}/documents`, {
-      title: data.title,
-      fater_node_id: data.folder_id
-    });
+    const response = await request.post<DocumentResponse>(`/work/${data.work_id}/document`, payload);
 
     return {
-      node_id: response.document_id,
-      node_name: response.title,
-      node_type: 'document',
-      sort_order: 0,
-      parent_id: response.fater_node_id || null
+      id: response.id,
+      name: response.title,
+      type: 'document',
+      from_node_id: response.from_node_id || null,
+      now_version: response.now_version,
+      current_version_id: response.current_version_id
     };
 }
 
 export interface DeleteDocumentDto {
     user_id?: string;
-    novel_id: string;
+    work_id: string;
     document_id: string;
 }
 
 export async function deleteDocument(data: DeleteDocumentDto): Promise<boolean> {
-    if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const novel = mockNovels.find(n => n.id === data.novel_id);
-        if (novel) {
-            // Check volumes
-            if (novel.volumes) {
-                for (const vol of novel.volumes) {
-                     if (vol.chapters.some(c => c.id === data.document_id)) {
-                         vol.chapters = vol.chapters.filter(c => c.id !== data.document_id);
-                         return true;
-                     }
-                }
-            }
-            // Check orphan chapters
-            if (novel.orphanChapters) {
-                 if (novel.orphanChapters.some(c => c.id === data.document_id)) {
-                     novel.orphanChapters = novel.orphanChapters.filter(c => c.id !== data.document_id);
-                     return true;
-                 }
-            }
-        }
-        return false;
-    }
-    // Backend: DELETE /works/{work_id}/documents/{document_id}
-    await request.delete(`/works/${data.novel_id}/documents/${data.document_id}`);
+    // Backend: DELETE /work/{work_id}/document/{document_id}
+    await request.delete(`/work/${data.work_id}/document/${data.document_id}`);
     return true;
 }
 
 export interface RenameDocumentDto {
     user_id?: string;
-    novel_id: string;
+    work_id: string;
     document_id: string;
     title: string;
 }
 
 export async function renameDocument(data: RenameDocumentDto): Promise<string> {
-    if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const novel = mockNovels.find(n => n.id === data.novel_id);
-        if (novel) {
-            // Check volumes
-            if (novel.volumes) {
-                for (const vol of novel.volumes) {
-                     const chap = vol.chapters.find(c => c.id === data.document_id);
-                     if (chap) {
-                         chap.title = data.title;
-                         saveMockData();
-                         return data.title;
-                     }
-                }
-            }
-             // Check orphan chapters
-            if (novel.orphanChapters) {
-                 const chap = novel.orphanChapters.find(c => c.id === data.document_id);
-                 if (chap) {
-                     chap.title = data.title;
-                     saveMockData();
-                     return data.title;
-                 }
-            }
-        }
-        throw new Error('Document not found');
-    }
-    // Backend: PATCH /works/{work_id}/documents/{document_id}
-    // Note: Rename uses update_document endpoint but only sending title
-    await request.patch(`/works/${data.novel_id}/documents/${data.document_id}`, {
-      title: data.title
-    });
+
+    const payload: DocumentUploadRequest = {
+        title: data.title
+    };
+    await request.patch(`/work/${data.work_id}/document/${data.document_id}`, payload);
     return data.title;
 }
 
 export interface GetDocumentDetailDto {
     user_id?: string;
-    novel_id: string; // Added novel_id (work_id)
+    work_id?: string; // Added work_id, optional if fetching by document_id only
     document_id: string;
     version_id?: string;
 }
@@ -264,107 +126,70 @@ export interface DocumentDetailDto {
     document_title: string;
     document_body_text: string | null;
     document_word_count: number;
+    work_id?: string; // Add work_id to return
+    current_version_name?: string | null;
 }
 
-export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<DocumentDetailDto> {
-    if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        for (const novel of mockNovels) {
-            // Check volumes
-            if (novel.volumes) {
-                for (const vol of novel.volumes) {
-                    const chap = vol.chapters.find(c => c.id === data.document_id);
-                    if (chap) {
-                        const version = chap.versions.find(v => v.id === (data.version_id || chap.currentVersionId));
-                        return {
-                            document_id: chap.id,
-                            document_version_id: version?.id || 'v1',
-                            document_title: chap.title,
-                            document_body_text: version?.content || '',
-                            document_word_count: (version?.content || '').length
-                        };
-                    }
-                }
-            }
-             // Check orphan chapters
-            if (novel.orphanChapters) {
-                 const chap = novel.orphanChapters.find(c => c.id === data.document_id);
-                 if (chap) {
-                    const version = chap.versions.find(v => v.id === (data.version_id || chap.currentVersionId));
-                    return {
-                        document_id: chap.id,
-                        document_version_id: version?.id || 'v1',
-                        document_title: chap.title,
-                        document_body_text: version?.content || '',
-                        document_word_count: (version?.content || '').length
-                    };
-                 }
-            }
+export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<DocumentDetailDto> {    
+    // Backend: GET /work/{work_id}/document/{document_id} or .../version/{version_id}
+    let response: DocumentDetailResponse;
+    if (data.work_id) {
+        if (data.version_id) {
+             const encodedVersion = encodeURIComponent(data.version_id);
+             console.log(`[documentService] Fetching version: ${data.version_id} (encoded: ${encodedVersion})`);
+             response = await request.get<DocumentDetailResponse>(`/work/${data.work_id}/document/${data.document_id}/version/${encodedVersion}`);
+        } else {
+             response = await request.get<DocumentDetailResponse>(`/work/${data.work_id}/document/${data.document_id}`);
         }
-        throw new Error('Document not found');
+    } else {
+        // Strict Mode: work_id is required per architecture
+        throw new Error('work_id is required to fetch document detail');
     }
-    
-    // Backend: GET /works/{work_id}/documents/{document_id}
-    const response = await request.get<DocumentDetailResponse>(`/works/${data.novel_id}/documents/${data.document_id}`);
+
     return {
-      document_id: data.document_id,
-      document_version_id: 'latest', 
+      document_id: response.id || data.document_id,
+      document_version_id: response.now_version || 'latest', 
       document_title: response.title,
       document_body_text: response.full_text || '',
-      document_word_count: (response.full_text || '').length
+      document_word_count: (response.full_text || '').length,
+      work_id: response.work_id || data.work_id,
+      current_version_name: response.now_version
     };
+}
+
+export async function getDocumentVersions(work_id: string, document_id: string): Promise<DocumentVersionItem[]> {
+    const res = await request.get<DocumentVersionResponse>(`/work/${work_id}/document/${document_id}/version`);
+    return res.versions;
+}
+
+export interface CreateDocumentVersionDto {
+    user_id?: string;
+    work_id: string;
+    document_id: string;
+    version_name?: string;
+}
+
+export async function createDocumentVersion(data: CreateDocumentVersionDto): Promise<void> {
+    const payload: DocumentVersionCreateRequest = { version_name: data.version_name };
+    await request.post(`/work/${data.work_id}/document/${data.document_id}/version`, payload);
+}
+
+export async function deleteDocumentVersion(work_id: string, document_id: string, version_id: string): Promise<void> {
+    await request.delete(`/work/${work_id}/document/${document_id}/version/${version_id}`);
 }
 
 export interface UpdateDocumentContentDto {
     user_id?: string;
-    novel_id: string;
+    work_id: string;
     document_id: string;
+    version_id: string;
     content: string;
 }
 
-export async function updateDocumentContent(data: UpdateDocumentContentDto): Promise<string> {
-    if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const novel = mockNovels.find(n => n.id === data.novel_id);
-        if (novel) {
-             let chap: Chapter | undefined = undefined;
-             // Check volumes
-            if (novel.volumes) {
-                for (const vol of novel.volumes) {
-                    chap = vol.chapters.find(c => c.id === data.document_id);
-                    if (chap) break;
-                }
-            }
-            if (!chap && novel.orphanChapters) {
-                chap = novel.orphanChapters.find(c => c.id === data.document_id);
-            }
-            
-            if (chap) {
-                // Update content
-                const currentVersion = chap.versions.find((v) => v.id === chap!.currentVersionId);
-                if (currentVersion) {
-                    currentVersion.content = data.content;
-                    currentVersion.updatedAt = new Date().toISOString();
-                } else {
-                     chap.versions.push({
-                         id: 'v1',
-                         versionNumber: 1,
-                         content: data.content,
-                         updatedAt: new Date().toISOString()
-                     });
-                     chap.currentVersionId = 'v1';
-                }
-                saveMockData();
-                return "success";
-            }
-        }
-        throw new Error('Document not found');
-    }
-    
-    // Backend: PATCH /works/{work_id}/documents/{document_id}
-    const payload: DocumentUpdateRequest = {
+export async function updateDocumentContent(data: UpdateDocumentContentDto): Promise<DocumentDetailResponse> {
+    // Backend: PATCH /work/{work_id}/document/{document_id}/version/{version_id}
+    const payload: DocumentVersionUploadRequest = {
         full_text: data.content
     };
-    await request.patch(`/works/${data.novel_id}/documents/${data.document_id}`, payload);
-    return "success";
+    return await request.patch<DocumentDetailResponse>(`/work/${data.work_id}/document/${data.document_id}/version/${data.version_id}`, payload);
 }

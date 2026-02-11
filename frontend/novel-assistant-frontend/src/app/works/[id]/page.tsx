@@ -6,7 +6,7 @@ import { SlotInjector } from '@/components/common/SlotInjector';
 import WorkPluginSettingsModal from '@/components/work-detail/WorkPluginSettingsModal';
 import WorkSettingsModal from '@/components/work-detail/WorkSettingsModal';
 
-import { Work, Volume, Chapter } from '@/types/work';
+import { Work, Novel, Volume, Chapter } from '@/types/work';
 import WorkHeader from '@/components/work-detail/WorkHeader';
 import WorkDirectory from '@/components/work-detail/WorkDirectory';
 import ChapterPreview from '@/components/work-detail/ChapterPreview';
@@ -33,10 +33,11 @@ import {
 
 /**
  * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260131-01
+ * 当前版本: FE-REF-20260131-02
  * 创建时间: 2026-01-20 21:40
- * 更新时间: 2026-01-31 14:30
+ * 更新时间: 2026-01-31 14:40
  * 更新记录:
+ * - [2026-01-31 14:40:FE-REF-20260131-02: 使用通用 Work 类型，支持泛型扩展，实现统一操作。]
  * - [2026-01-31 14:30:FE-REF-20260131-01: 优化作品详情页布局，缩小头部区域，增加内容区域占比，统一卡片风格。]
  * - [2026-01-31 10:00:FE-REF-20260126-03: 重构为 Work 术语，移除 mock 依赖]
  */

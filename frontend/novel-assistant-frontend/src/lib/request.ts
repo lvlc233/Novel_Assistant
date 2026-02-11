@@ -47,7 +47,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   }
 }
 
-// TODO: 当后端完全迁移到 /api/v1 时，将其设置为 "/api/v1"
+// 当后端完全迁移到 /api/v1 时，将其设置为 "/api/v1"
 const API_PREFIX = "/api/v1"; 
 
 /**
@@ -64,7 +64,7 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
   } = options;
 
   // Build URL
-  const baseUrl = config.novel.apiBaseUrl;
+  const baseUrl = config.work.apiBaseUrl;
   let fullUrl = url;
 
   if (url.startsWith("http")) {
