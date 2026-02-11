@@ -52,7 +52,7 @@ export const NotificationToast: React.FC = () => {
     <div 
       className={`
         fixed right-6 top-20 z-40
-        w-80 bg-white/90 backdrop-blur-md 
+        w-80 bg-white
         border border-gray-200 shadow-xl rounded-xl 
         overflow-hidden transition-all duration-500 ease-in-out
         ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'}

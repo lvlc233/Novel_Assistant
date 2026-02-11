@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { memoryService } from '@/services/memoryService';
 import { knowledgeBaseService } from '@/services/knowledgeBaseService';
 import { agentService } from '@/services/agentService';
+import { KnowledgeBaseManager } from '@/components/knowledge-base/KnowledgeBaseManager';
 
 export type PluginType = 'memory' | 'knowledge' | 'agent' | 'doc_agent' | 'project_agent';
 
@@ -34,7 +35,7 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
       title: '记忆管理',
       icon: <Brain className="w-6 h-6" />,
       color: 'text-accent-primary',
-      bgColor: 'bg-accent-primary/10',
+      bgColor: 'bg-gray-100',
       fetch: async () => {
         const data = await memoryService.getMemories();
         return data.map(m => ({
@@ -69,10 +70,10 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
         const data = await knowledgeBaseService.getKnowledgeBases();
         return data.map(k => ({
           id: k.id,
-          title: k.name,
+          title: k.title,
           description: k.description,
-          tags: k.tags,
-          meta: k.updated_at ? new Date(k.updated_at).toLocaleDateString() : ''
+          tags: [], // Tags removed from meta
+          meta: k.create_at ? new Date(k.create_at).toLocaleDateString() : ''
         }));
       },
       delete: knowledgeBaseService.deleteKnowledgeBase,
@@ -80,14 +81,13 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
           await knowledgeBaseService.createKnowledgeBase({
               name: data.title,
               description: data.description,
-              tags: data.tags ? data.tags.split(',').map((t: string) => t.trim()) : []
+              // tags removed
           });
       },
       route: '/knowledge-bases',
       formFields: [
           { name: 'title', label: '名称', type: 'text', required: true },
-          { name: 'description', label: '描述', type: 'textarea' },
-          { name: 'tags', label: '标签 (逗号分隔)', type: 'text' }
+          { name: 'description', label: '描述', type: 'textarea' }
       ]
     },
     agent: {
@@ -253,6 +253,26 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
       }
   };
 
+  // Special rendering for Knowledge Base using the new Manager
+  if (type === 'knowledge') {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div 
+                className="w-[90vw] max-w-6xl h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up border border-border-primary relative"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button 
+                    onClick={onClose}
+                    className="absolute top-3 right-3 z-50 p-2 bg-white hover:bg-surface-hover rounded-full transition-colors text-text-secondary hover:text-text-primary shadow-sm border border-border-primary"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+                <KnowledgeBaseManager />
+            </div>
+        </div>
+      );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div 
@@ -316,7 +336,7 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
                     <div 
                         key={item.id}
                         onClick={() => handleItemClick(item.id)}
-                        className="group relative p-6 bg-white hover:bg-white border border-border-primary hover:border-accent-primary/30 hover:shadow-lg rounded-xl cursor-pointer transition-all duration-300 flex flex-col h-[200px]"
+                        className="group relative p-6 bg-white hover:bg-white border border-border-primary hover:border-accent-primary hover:shadow-lg rounded-xl cursor-pointer transition-all duration-300 flex flex-col h-[200px]"
                     >
                         <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-3">

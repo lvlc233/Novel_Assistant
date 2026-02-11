@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
-import { Settings, X, ChevronDown, ChevronRight, RotateCcw, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, X, RotateCcw, Save, Loader2, Package, Tag, Globe, Server } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { getSystemPlugins, updatePlugin } from '@/services/pluginService';
+import { PluginInstance } from '@/types/plugin';
+import AgentConfigEditor from './AgentConfigEditor';
+import WorkTypeConfigEditor from './WorkTypeConfigEditor';
+import JsonConfigEditor from './JsonConfigEditor';
 
 /**
  * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260120-02
- * 创建时间: 2026-01-20 21:48
- * 更新时间: 2026-01-20 21:48
+ * 更新时间: 2026-01-30 16:50
  * 更新记录:
- * - [2026-01-20 21:48:FE-REF-20260120-02: 在何处使用: 系统设置弹窗；如何使用: 由父组件控制 isOpen/onClose；实现概述: 清理未使用 import，移除直接 console 输出，避免误用类 API Key 占位符。]
+ * - 重构为动态加载系统插件配置
+ * - 集成 AgentConfigEditor 和 WorkTypeConfigEditor
+ * - 对接后端 /plugin/system 接口
  */
 
 interface SettingsModalProps {
@@ -16,106 +21,106 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-type TabType = 'system' | 'agent' | 'future';
-
-interface AgentConfig {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  config: {
-    base_url: string;
-    model_name: string;
-    api_key: string;
-  };
-}
-
-const MOCK_AGENTS: AgentConfig[] = [
-  {
-    id: 'agent-1',
-    name: 'Novel Writer',
-    description: '负责小说正文生成的智能助手，擅长环境描写和对话构建。',
-    enabled: true,
-    config: {
-      base_url: 'https://api.openai.com/v1',
-      model_name: 'gpt-4',
-      api_key: ''
-    }
-  },
-  {
-    id: 'agent-2',
-    name: 'Plot Advisor',
-    description: '剧情规划顾问，帮助梳理故事大纲和情节发展。',
-    enabled: true,
-    config: {
-      base_url: 'https://api.anthropic.com',
-      model_name: 'claude-3-opus',
-      api_key: ''
-    }
-  },
-  {
-    id: 'agent-3',
-    name: 'Character Designer',
-    description: '角色设计专家，生成详细的人物小传和性格特征。',
-    enabled: false,
-    config: {
-      base_url: 'https://api.deepseek.com',
-      model_name: 'deepseek-chat',
-      api_key: ''
-    }
-  }
-];
-
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('system');
-  const [agents, setAgents] = useState<AgentConfig[]>(MOCK_AGENTS);
-  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
-  const [showToast, setShowToast] = useState(false);
+  const [plugins, setPlugins] = useState<PluginInstance[]>([]);
+  const [activePluginId, setActivePluginId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [unsavedConfigs, setUnsavedConfigs] = useState<Record<string, any>>({});
+  const [saving, setSaving] = useState(false);
+  const [showToast, setShowToast] = useState(false); // Local toast state
 
-  // Reset logic (deep copy mock data)
-  const handleReset = () => {
-    setAgents(JSON.parse(JSON.stringify(MOCK_AGENTS)));
-  };
+  // Load plugins when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadPlugins();
+    } else {
+        // Reset state on close
+        setUnsavedConfigs({});
+    }
+  }, [isOpen]);
 
-  // Save single config (mock)
-  const handleSave = (id: string) => {
-    // In real app, this would make an API call
-    logger.debug('Saving config for agent:', id);
-    // Show quick feedback?
-  };
-
-  // Global confirm
-  const handleConfirm = () => {
-    logger.debug('Global confirm:', agents);
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-      onClose();
-    }, 2000);
-  };
-
-  const updateAgentConfig = (id: string, field: keyof AgentConfig['config'], value: string) => {
-    setAgents(prev => prev.map(agent => {
-      if (agent.id === id) {
-        return {
-          ...agent,
-          config: {
-            ...agent.config,
-            [field]: value
-          }
-        };
+  const loadPlugins = async () => {
+    try {
+      setLoading(true);
+      const data = await getSystemPlugins();
+      setPlugins(data);
+      if (data.length > 0 && !activePluginId) {
+        setActivePluginId(data[0].id);
       }
-      return agent;
+    } catch (error) {
+      logger.error('Failed to load system plugins', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activePlugin = plugins.find(p => p.id === activePluginId);
+  const currentConfig = activePluginId && unsavedConfigs[activePluginId] 
+    ? unsavedConfigs[activePluginId] 
+    : activePlugin?.config || {};
+
+  const handleConfigChange = (newConfig: any) => {
+    if (!activePluginId) return;
+    setUnsavedConfigs(prev => ({
+      ...prev,
+      [activePluginId]: newConfig
     }));
   };
 
-  const toggleAgent = (id: string) => {
-    setAgents(prev => prev.map(agent => {
-        if (agent.id === id) {
-            return { ...agent, enabled: !agent.enabled };
+  const handleReset = () => {
+    if (!activePluginId) return;
+    const newConfigs = { ...unsavedConfigs };
+    delete newConfigs[activePluginId];
+    setUnsavedConfigs(newConfigs);
+    logger.debug('Reset config for:', activePluginId);
+  };
+
+  const handleSave = async () => {
+    if (!activePluginId) return;
+    
+    try {
+      setSaving(true);
+      await updatePlugin(activePluginId, { config: currentConfig });
+      
+      // Update local plugin state to reflect saved config
+      setPlugins(prev => prev.map(p => {
+        if (p.id === activePluginId) {
+            return { ...p, config: currentConfig };
         }
-        return agent;
-    }));
+        return p;
+      }));
+      
+      // Clear unsaved state
+      const newConfigs = { ...unsavedConfigs };
+      delete newConfigs[activePluginId];
+      setUnsavedConfigs(newConfigs);
+
+      // Show success feedback
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+      
+    } catch (error) {
+      logger.error('Failed to save config', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderEditor = () => {
+    if (!activePlugin) return null;
+
+    const name = activePlugin.manifest.name || '';
+    
+    // Select editor based on plugin name or id
+    if (name.includes('Agent管理') || activePlugin.id === 'agent_manager') {
+        return <AgentConfigEditor config={currentConfig} onChange={handleConfigChange} />;
+    }
+    
+    if (name.includes('作品类型') || activePlugin.id === 'work_type_manager') {
+        return <WorkTypeConfigEditor config={currentConfig} onChange={handleConfigChange} />;
+    }
+
+    return <JsonConfigEditor config={currentConfig} onChange={handleConfigChange} />;
   };
 
   if (!isOpen) return null;
@@ -123,40 +128,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-fade-in">
       {/* Modal Container */}
-      <div className="w-[900px] h-[600px] bg-surface-white rounded-2xl border border-gray-200 shadow-2xl flex overflow-hidden animate-scale-up relative mx-4">
+      <div className="w-[1000px] h-[700px] bg-surface-white rounded-2xl border border-gray-200 shadow-2xl flex overflow-hidden animate-scale-up relative mx-4">
         
         {/* Top Left Icon */}
         <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
             <Settings className="w-6 h-6" />
-            <span className="font-serif font-bold text-lg">Settings</span>
+            <span className="font-serif font-bold text-lg">System Settings</span>
         </div>
 
         {/* Left Sidebar */}
         <div className="w-64 border-r border-gray-200 pt-20 flex flex-col bg-gray-50/50">
-            <button 
-                onClick={() => setActiveTab('system')}
-                className={`w-full text-left px-8 py-4 font-serif text-sm font-bold transition-colors border-l-4 ${activeTab === 'system' ? 'border-black bg-white' : 'border-transparent hover:bg-gray-100 text-gray-500'}`}
-            >
-                System
-            </button>
-            <div className="w-48 mx-auto border-b border-gray-200/50 my-1"></div>
-            <button 
-                onClick={() => setActiveTab('agent')}
-                className={`w-full text-left px-8 py-4 font-serif text-sm font-bold transition-colors border-l-4 ${activeTab === 'agent' ? 'border-black bg-white' : 'border-transparent hover:bg-gray-100 text-gray-500'}`}
-            >
-                Agent
-            </button>
-            <div className="w-48 mx-auto border-b border-gray-200/50 my-1"></div>
-            <button 
-                onClick={() => setActiveTab('future')}
-                className={`w-full text-left px-8 py-4 font-serif text-sm font-bold transition-colors border-l-4 ${activeTab === 'future' ? 'border-black bg-white' : 'border-transparent hover:bg-gray-100 text-gray-400'}`}
-            >
-                敬请期待
-            </button>
+            {loading ? (
+                <div className="flex justify-center py-10">
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+            ) : (
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {plugins.map(plugin => (
+                        <button 
+                            key={plugin.id}
+                            onClick={() => setActivePluginId(plugin.id)}
+                            className={`w-full text-left px-6 py-4 font-serif text-sm font-bold transition-all border-l-4 group relative ${
+                                activePluginId === plugin.id 
+                                ? 'border-black bg-white shadow-[0_2px_8px_rgba(0,0,0,0.05)]' 
+                                : 'border-transparent hover:bg-gray-100 text-gray-500'
+                            }`}
+                        >
+                            <span className="line-clamp-1">{plugin.manifest.name}</span>
+                            {unsavedConfigs[plugin.id] && (
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500" title="Unsaved changes"></span>
+                            )}
+                        </button>
+                    ))}
+                    {plugins.length === 0 && (
+                        <div className="text-center text-gray-400 text-xs py-8 px-4">
+                            No system plugins found.
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
 
         {/* Right Content */}
-        <div className="flex-1 flex flex-col relative bg-white">
+        <div className="flex-1 flex flex-col relative bg-white min-w-0">
             {/* Close Button */}
             <button 
                 onClick={onClose}
@@ -165,156 +179,110 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 <X className="w-5 h-5 text-gray-500" />
             </button>
 
-            <div className="flex-1 overflow-y-auto p-12 pt-20">
-                {activeTab === 'system' && (
-                    <div className="space-y-8 animate-fade-in">
-                        <h2 className="text-2xl font-serif font-bold mb-8">System Config</h2>
+            {activePlugin ? (
+                <>
+                    {/* Plugin Header */}
+                    <div className="px-10 pt-20 pb-6 border-b border-gray-100">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl font-serif font-bold mb-2">{activePlugin.manifest.name}</h2>
+                                <p className="text-sm text-gray-500 font-serif leading-relaxed max-w-xl">
+                                    {activePlugin.manifest.description || 'No description provided.'}
+                                </p>
+                            </div>
+                            <div className={`px-3 py-1 rounded-full text-xs font-bold ${activePlugin.status === 'enabled' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {activePlugin.status === 'enabled' ? 'Enabled' : 'Disabled'}
+                            </div>
+                        </div>
                         
-                        <div className="bg-white border-2 border-black rounded-xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="font-bold text-lg mb-1">Theme</h3>
-                                    <p className="text-xs text-gray-500 font-serif">选择系统的外观主题</p>
+                        {/* Meta Tags */}
+                        <div className="flex flex-wrap gap-3 mt-4">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+                                <Globe size={12} />
+                                <span>{activePlugin.manifest.scope_type || 'global'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+                                <Server size={12} />
+                                <span>{activePlugin.manifest.from_type || 'system'}</span>
+                            </div>
+                            {activePlugin.manifest.tags?.map(tag => (
+                                <div key={tag} className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                                    <Tag size={12} />
+                                    <span>{tag}</span>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button className="px-4 py-2 bg-black text-white rounded-lg text-xs font-bold">Light</button>
-                                    <button className="px-4 py-2 bg-gray-100 text-gray-400 rounded-lg text-xs font-bold hover:bg-gray-200">Dark</button>
-                                </div>
+                            ))}
+                            <div className="flex items-center gap-1.5 text-xs text-gray-400 px-2.5 py-1">
+                                <Package size={12} />
+                                <span>v{activePlugin.manifest.version}</span>
                             </div>
                         </div>
                     </div>
-                )}
 
-                {activeTab === 'agent' && (
-                    <div className="space-y-6 animate-fade-in">
-                        <h2 className="text-2xl font-serif font-bold mb-2">Agent Config</h2>
-                        
-                        {agents.map(agent => (
-                            <div key={agent.id} className="border-b border-gray-100 pb-6 last:border-0">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <h3 className="font-bold text-lg">{agent.name}</h3>
-                                            <div 
-                                                className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${agent.enabled ? 'bg-black' : 'bg-gray-200'}`}
-                                                onClick={() => toggleAgent(agent.id)}
-                                            >
-                                                <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${agent.enabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-gray-500 font-serif leading-relaxed max-w-md">
-                                            {agent.description}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Expandable Config */}
-                                <div className="mt-2">
-                                    <button 
-                                        onClick={() => setExpandedAgentId(expandedAgentId === agent.id ? null : agent.id)}
-                                        className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-black transition-colors mb-4"
-                                    >
-                                        {expandedAgentId === agent.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                        配置项
-                                    </button>
-
-                                    {expandedAgentId === agent.id && (
-                                        <div className="bg-gray-50 rounded-xl p-6 border border-gray-100 space-y-4 animate-slide-down">
-                                            <div className="grid grid-cols-1 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold mb-1.5">Base URL</label>
-                                                    <input 
-                                                        type="text" 
-                                                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-serif outline-none focus:border-black transition-colors"
-                                                        value={agent.config.base_url}
-                                                        onChange={(e) => updateAgentConfig(agent.id, 'base_url', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="block text-xs font-bold mb-1.5">Model Name</label>
-                                                        <input 
-                                                            type="text" 
-                                                            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-serif outline-none focus:border-black transition-colors"
-                                                            value={agent.config.model_name}
-                                                            onChange={(e) => updateAgentConfig(agent.id, 'model_name', e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold mb-1.5">API Key</label>
-                                                        <input 
-                                                            type="password" 
-                                                            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-serif outline-none focus:border-black transition-colors"
-                                                            value={agent.config.api_key}
-                                                            onChange={(e) => updateAgentConfig(agent.id, 'api_key', e.target.value)}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-end pt-2">
-                                                <button 
-                                                    onClick={() => handleSave(agent.id)}
-                                                    className="text-xs font-bold text-black underline decoration-2 hover:text-gray-600"
-                                                >
-                                                    保存此配置
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                    {/* Config Editor Area */}
+                    <div className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-gray-50/30">
+                        {renderEditor()}
                     </div>
-                )}
 
-                {activeTab === 'future' && (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-300 animate-fade-in">
-                        <div className="text-4xl font-serif font-bold mb-4 opacity-20">COMING SOON</div>
-                        <p className="font-serif text-sm">更多功能敬请期待...</p>
+                    {/* Bottom Actions */}
+                    <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-white z-10">
+                        <button 
+                            onClick={handleReset}
+                            disabled={!unsavedConfigs[activePlugin.id] || saving}
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Reset Changes
+                        </button>
+                        <button 
+                            onClick={handleSave}
+                            disabled={!unsavedConfigs[activePlugin.id] || saving}
+                            className={`
+                                flex items-center gap-2 px-8 py-2.5 bg-black text-white rounded-xl text-xs font-bold 
+                                transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                                ${!unsavedConfigs[activePlugin.id] || saving ? '' : 'shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}
+                            `}
+                        >
+                            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            {saving ? 'Saving...' : 'Save Config'}
+                        </button>
                     </div>
-                )}
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/30">
-                <button 
-                    onClick={handleReset}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors"
-                >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Reset
-                </button>
-                <button 
-                    onClick={onClose}
-                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-black border-2 border-transparent hover:bg-gray-100 transition-colors"
-                >
-                    Cancel
-                </button>
-                <button 
-                    onClick={handleConfirm}
-                    className="
-                        flex items-center gap-2 px-8 py-2.5 bg-black text-white rounded-xl text-xs font-bold 
-                        shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] 
-                        hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] 
-                        active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all
-                    "
-                >
-                    <Check className="w-3.5 h-3.5" />
-                    Confirm
-                </button>
-            </div>
+                </>
+            ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-300">
+                    <Settings className="w-16 h-16 mb-4 opacity-10" />
+                    <p className="font-serif text-sm">Select a plugin to configure</p>
+                </div>
+            )}
         </div>
       </div>
 
       {/* Success Toast */}
       {showToast && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-slide-down z-[110]">
-            <Check className="w-4 h-4 text-green-400" />
-            <span className="text-xs font-bold">配置已生效</span>
+            <CheckIcon className="w-4 h-4 text-green-400" />
+            <span className="text-xs font-bold">配置已保存</span>
         </div>
       )}
     </div>
   );
 };
+
+// Simple Check Icon component since it was missing in imports
+const CheckIcon = ({ className }: { className?: string }) => (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="24" 
+        height="24" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        className={className}
+    >
+        <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+);
 
 export default SettingsModal;

@@ -60,7 +60,7 @@ export const memoryService = {
       }));
     }
     
-    const response = await request.get<BackendMemoryMeta[]>('/memories');
+    const response = await request.get<BackendMemoryMeta[]>('/plugin/memory');
     return response.map(m => ({
       memory_id: m.memory_id,
       enable: m.enable,
@@ -78,7 +78,7 @@ export const memoryService = {
       return { ...memory };
     }
     
-    const response = await request.get<BackendMemoryDetail>(`/memories/${id}`);
+    const response = await request.get<BackendMemoryDetail>(`/plugin/memory/${id}`);
     return {
       memory_id: response.memory_id,
       enable: response.enable,
@@ -107,7 +107,7 @@ export const memoryService = {
       return meta;
     }
     
-    const response = await request.post<BackendMemoryMeta>('/memories', data);
+    const response = await request.post<BackendMemoryMeta>('/plugin/memory', data);
     return {
       memory_id: response.memory_id,
       enable: response.enable,
@@ -126,7 +126,7 @@ export const memoryService = {
       return;
     }
     
-    await request.patch(`/memories/${id}`, data);
+    await request.patch(`/plugin/memory/${id}`, data);
   },
 
   deleteMemory: async (id: string): Promise<void> => {
@@ -137,6 +137,6 @@ export const memoryService = {
       return;
     }
     
-    await request.delete(`/memories/${id}`);
+    await request.delete(`/plugin/memory/${id}`);
   }
 };

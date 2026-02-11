@@ -238,7 +238,7 @@ export const MailboxDrawer: React.FC = () => {
         <div className="flex-1 flex flex-col h-full bg-surface-primary relative overflow-hidden">
           
           {/* Header */}
-          <div className="h-16 px-6 border-b border-border-primary flex items-center justify-between bg-surface-primary/80 backdrop-blur-md shrink-0 z-20">
+          <div className="h-16 px-6 border-b border-border-primary flex items-center justify-between bg-surface-primary shrink-0 z-20">
             <div>
               <h2 className="text-lg font-bold font-serif text-text-primary tracking-tight">
                 {currentFilter === 'all' ? '全部信件' : agents.find(a => a.id === currentFilter)?.name}
@@ -261,7 +261,7 @@ export const MailboxDrawer: React.FC = () => {
              {selectedMessage ? (
                // Detail View
                <div className="absolute inset-0 bg-surface-primary flex flex-col z-10 animate-fade-in">
-                  <div className="p-4 border-b border-border-primary flex items-center gap-2 bg-surface-primary/80 backdrop-blur-md">
+                  <div className="p-4 border-b border-border-primary flex items-center gap-2 bg-surface-primary">
                     <button 
                         onClick={() => setSelectedMessage(null)}
                         className="p-2 hover:bg-surface-hover rounded-full transition-colors text-text-secondary hover:text-text-primary"

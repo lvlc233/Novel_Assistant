@@ -10,7 +10,7 @@ export const MailButton: React.FC = () => {
   return (
     <button
       onClick={toggleMailbox}
-      className="relative p-3 bg-white/80 backdrop-blur-sm rounded-full shadow-sm hover:bg-white hover:scale-110 hover:shadow-md transition-all group z-50"
+      className="relative p-3 bg-white rounded-full shadow-sm hover:bg-white hover:scale-110 hover:shadow-md transition-all group z-50"
       aria-label="打开信箱"
     >
       <Mail className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" />

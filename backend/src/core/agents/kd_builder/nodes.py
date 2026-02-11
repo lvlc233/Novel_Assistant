@@ -5,7 +5,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.types import Send
 from pydantic import BaseModel, Field
 
-from common.utils import load_chat_model
+from common.utils import load_chat_model_with_env
 from core.agents.kd_builder.prompts import (
     ATOM_SUBMIT_PROMPT,
     ATTENTION_READ_PROMPT,
@@ -83,7 +83,7 @@ async def chunk_node(state: KDBuildState) -> Dict[str, Any]:
 # ========== 切块 → attention ==========
 async def attention_node(state: KDBuildState) -> Dict[str, Any]:
     # 获取配置中的模型
-    model = load_chat_model("attention_node")
+    model = load_chat_model_with_env("attention_node")
     
     chunks = state.get("chunks", [])
     now_index = state.get("now_chunk_index", 0)

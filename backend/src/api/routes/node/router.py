@@ -8,6 +8,9 @@ from api.routes.node.schema import (
     DocumentDetailResponse,
     DocumentResponse,
     DocumentUploadRequest,
+    DocumentVersionUploadRequest,
+    DocumentVersionCreateRequest,
+    DocumentVersionResponse,
     NodeCreateRequest,
     NodeResponse,
     NodeUpdateRequest,
@@ -28,6 +31,15 @@ def get_work_service(session: AsyncSession = Depends(get_session)) -> WorkServic
     return WorkService(session)
 
 # --- Documents ---
+
+@router.get("/document/{document_id}", response_model=Response[DocumentDetailResponse])
+async def get_document_detail_by_id(
+    document_id: str,
+    service: NodeService = Depends(get_node_service)
+) -> Response[DocumentDetailResponse]:
+    """根据ID直接获取文档详情 (用于编辑器等不依赖Work上下文的场景)."""
+    data = await service.get_document_detail_by_id(document_id)
+    return Response.ok(data=data)
 
 @router.post("/work/{work_id}/document", response_model=Response[DocumentResponse])
 async def create_document(
@@ -68,15 +80,69 @@ async def update_document(
     request: DocumentUploadRequest,
     service: NodeService = Depends(get_node_service)
 ) -> Response[None]:
-    """更新文档."""
+    """更新文档基础信息 (Title, Description, Parent)."""
     req = UpdateNodeDTO(
         name=request.title,
         description=request.description,
-        parent_node_id=request.from_node_id,
-        content=request.full_text
+        parent_node_id=request.from_node_id
     )
     await service.update_node(document_id, req)
     return Response.ok()
+
+@router.get("/work/{work_id}/document/{document_id}/version", response_model=Response[DocumentVersionResponse])
+async def get_document_versions(
+    work_id: str,
+    document_id: str,
+    service: NodeService = Depends(get_node_service)
+) -> Response[DocumentVersionResponse]:
+    """获取指定文档的所有版本."""
+    data = await service.get_document_versions(document_id)
+    return Response.ok(data=data)
+
+@router.get("/work/{work_id}/document/{document_id}/version/{version_id}", response_model=Response[DocumentDetailResponse])
+async def get_document_version_detail(
+    work_id: str,
+    document_id: str,
+    version_id: str,
+    service: NodeService = Depends(get_node_service)
+) -> Response[DocumentDetailResponse]:
+    """获取指定文档的指定版本的详情,并切换当前的版本为指定version的版本."""
+    data = await service.get_document_version_detail_and_switch(document_id, version_id)
+    return Response.ok(data=data)
+
+@router.post("/work/{work_id}/document/{document_id}/version", response_model=Response[None])
+async def create_document_version(
+    work_id: str,
+    document_id: str,
+    request: DocumentVersionCreateRequest,
+    service: NodeService = Depends(get_node_service)
+) -> Response[None]:
+    """创建文档的新版本,并将最新的版本指定为该版本,新版本继承自当前版本的内容."""
+    await service.create_document_version(document_id, request)
+    return Response.ok()
+
+@router.delete("/work/{work_id}/document/{document_id}/version/{version_id}", response_model=Response[None])
+async def delete_document_version(
+    work_id: str,
+    document_id: str,
+    version_id: str,
+    service: NodeService = Depends(get_node_service)
+) -> Response[None]:
+    """删除指定版本."""
+    await service.delete_document_version(document_id, version_id)
+    return Response.ok()
+
+@router.patch("/work/{work_id}/document/{document_id}/version/{version_id}", response_model=Response[DocumentDetailResponse])
+async def update_document_version_content(
+    work_id: str,
+    document_id: str,
+    version_id: str,
+    request: DocumentVersionUploadRequest,
+    service: NodeService = Depends(get_node_service)
+) -> Response[DocumentDetailResponse]:
+    """更新指定版本的内容."""
+    data = await service.update_document_version_content(document_id, version_id, request.full_text)
+    return Response.ok(data=data)
 
 @router.get("/work/{work_id}/document/{document_id}", response_model=Response[DocumentDetailResponse])
 async def get_document_detail(
@@ -87,10 +153,13 @@ async def get_document_detail(
     """获取文档详情."""
     data = await service.get_node_detail(document_id)
     return Response.ok(data=DocumentDetailResponse(
+        id=data.id,
+        work_id=data.work_id,
         title=data.name,
         description=data.description,
         from_node_id=data.parent_node_id,
-        full_text=data.content
+        full_text=data.content,
+        now_version=str(data.now_version) if data.now_version else None
     ))
 
 # --- Nodes (Folders) ---
@@ -101,11 +170,11 @@ async def create_node(
     request: NodeCreateRequest,
     service: NodeService = Depends(get_node_service)
 ) -> Response[NodeResponse]:
-    """创建节点(文件夹)."""
+    """创建节点"""
     req = CreateNodeDTO(
         name=request.name,
         description=request.description,
-        type=NodeTypeEnum.FOLDER,
+        type=request.type,
         parent_node_id=request.from_node_id
     )
     data = await service.create_node(work_id, req)
@@ -113,7 +182,7 @@ async def create_node(
         id=data.id,
         name=data.name,
         description=data.description,
-        type=NodeTypeEnum.FOLDER,
+        type=data.type,
         from_node_id=data.parent_node_id
     ))
 

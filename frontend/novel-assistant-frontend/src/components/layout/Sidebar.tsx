@@ -22,7 +22,7 @@ export function Sidebar() {
 
   const NAV_ITEMS = [
     { name: '主页', path: '/home', icon: LayoutDashboard },
-    { name: '文档', path: '/novels', icon: BookOpen },
+    { name: '文档', path: '/works', icon: BookOpen },
     { name: '插件管理', path: '/plugins', icon: Puzzle },
   ];
 

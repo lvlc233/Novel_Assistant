@@ -1,0 +1,1 @@
+"""Work Type Service package."""

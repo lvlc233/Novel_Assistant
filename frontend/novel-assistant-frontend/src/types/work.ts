@@ -86,17 +86,10 @@ export interface Volume {
 }
 
 /**
- * 小说 (Novel)
- * 这是一个视图模型 (View Model)，专用于小说类作品的展示。
- * 它将通用的 Work/Node/Document 数据结构映射为小说作者熟悉的
- * 卷 (Volume) 和 章节 (Chapter) 概念。
- * 
- * 对应关系:
- * - Work (作品) -> Novel (小说)
- * - Node (type=folder) -> Volume (卷)
- * - Node (type=document) -> Chapter (章节)
+ * 作品 (Work) 基础领域模型
+ * 包含所有作品类型共有的元数据字段
  */
-export interface Novel {
+export interface Work {
   /** 作品唯一标识符 */
   id: string;
   /** 作品标题 */
@@ -111,8 +104,35 @@ export interface Novel {
   createdAt: string;
   /** 最后更新时间 */
   updatedAt: string;
+  /** 作品类型 (如: novel, script, etc.) */
+  type?: string;
+  /** 作品题材/流派 */
+  genre?: string;
   /** 关联的知识库列表 */
   knowledgeBases?: KnowledgeBase[];
+  /** 
+   * 作品级插件配置
+   * 针对该作品启用的特定插件及其设置
+   */
+  plugins?: { 
+    id: string; 
+    enabled: boolean; 
+    config: Record<string, unknown> 
+  }[];
+}
+
+/**
+ * 小说 (Novel)
+ * 这是一个视图模型 (View Model)，专用于小说类作品的展示。
+ * 它将通用的 Work/Node/Document 数据结构映射为小说作者熟悉的
+ * 卷 (Volume) 和 章节 (Chapter) 概念。
+ * 
+ * 对应关系:
+ * - Work (作品) -> Novel (小说)
+ * - Node (type=folder) -> Volume (卷)
+ * - Node (type=document) -> Chapter (章节)
+ */
+export interface Novel extends Work {
   /** 
    * 卷列表 (结构化目录)
    * 包含分卷及其下属章节
@@ -123,17 +143,4 @@ export interface Novel {
    * 不属于任何分卷的独立章节
    */
   orphanChapters?: Chapter[];
-  /** 作品类型 (如: 玄幻, 都市) */
-  type?: string;
-  /** 作品题材/流派 */
-  genre?: string;
-  /** 
-   * 作品级插件配置
-   * 针对该作品启用的特定插件及其设置
-   */
-  plugins?: { 
-    id: string; 
-    enabled: boolean; 
-    config: Record<string, unknown> 
-  }[];
 }

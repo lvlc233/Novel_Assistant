@@ -22,6 +22,7 @@ class KDDescriptionResponse(BaseModel):
 
 class KDCreateRequest(BaseModel):
     name: str
+    work_id: UUID | None = None
     description: str | None = None
 
 class KDDescriptionCreateRequest(BaseModel):

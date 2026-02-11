@@ -25,7 +25,6 @@ export default function AIAssistant({ isExpanded, onToggle }: AIAssistantProps) 
     if (!input.trim()) return;
     setMessages([...messages, { id: Date.now().toString(), role: 'user', content: input }]);
     setInput('');
-    // Mock response
     setTimeout(() => {
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: '这是一个很好的切入点...' }]);
     }, 1000);

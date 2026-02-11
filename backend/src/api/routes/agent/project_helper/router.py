@@ -4,8 +4,10 @@ from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
 
 from api.base import Response
-from api.routes.agent.helper_schema import (
+from api.routes.agent.schema import (
     MessagesSendRequest,
+)
+from api.routes.agent.project_helper.schema import (
     ProjectHelperChatConfigRequest,
     ProjectHelperChatConfigResponse,
     ProjectHelperResourcesRequest,

@@ -204,8 +204,8 @@ def count_words(text: str) -> int:
     english_count = len(text_no_chinese.split())
     
     return chinese_count + english_count
-
-def load_chat_model(
+# 废弃
+def load_chat_model_with_env(
     node_name: str|None = None,
 ) -> Union[BaseChatModel]:
     """加载一个聊天模型.
@@ -261,6 +261,8 @@ def load_chat_model(
         model=model_name,
         model_provider="openai",
     )
+
+# async def load_model_with_base_config():
 
 
 def messages_to_plain(messages: list[BaseMessage]) -> SystemMessage:

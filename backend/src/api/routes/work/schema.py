@@ -29,6 +29,7 @@ class NodeDTO(BaseModel):
     name: str
     description: str | None = None
     type: NodeTypeEnum
+    now_version: str | None = None
 
 class EdgeDTO(BaseModel):
     from_node_id: UUID

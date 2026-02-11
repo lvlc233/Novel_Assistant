@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # 数据库配置
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str | None = None # 生产环境必须通过环境变量设置
+    POSTGRES_PASSWORD: str = "lixiaozai233"
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "novel_ai"

@@ -1,3 +1,4 @@
+"""Work Service Module."""
 from typing import List, Sequence, Tuple
 from uuid import UUID
 
@@ -17,7 +18,7 @@ from api.routes.work.schema import (
     WorkPluginDetailResponse,
     WorkPluginMetaResponse,
 )
-from common.enums import NovelState, NovelStateCN, PluginScopeType
+from common.enums import PluginScopeTypeEnum, WorkStateCNEnum, WorkStateEnum
 from common.errors import PluginNotFoundError, ResourceNotFoundError
 from common.utils import get_now_time
 from infrastructure.pg.pg_models import (
@@ -31,17 +32,19 @@ from infrastructure.pg.pg_models import (
 
 
 class WorkService:
+    """作品服务类."""
     def __init__(self, session: AsyncSession):
+        """Initialize WorkService."""
         self.session = session
 
     async def create_work(self, request: CreateWorkRequest) -> WorkMetaResponse:
         """创建作品."""
         # 1. 创建 Work 实体
         new_work = WorkSQLEntity(
-            name=request.works_name or "未命名作品",
-            cover_image_url=request.works_cover_image_url,
-            summary=request.works_summary,
-            work_type=request.works_type
+            name=request.name or "未命名作品",
+            cover_image_url=request.cover_image_url,
+            summary=request.summary,
+            work_type=request.type
         )
         self.session.add(new_work)
         await self.session.flush() # 获取 ID
@@ -49,20 +52,20 @@ class WorkService:
         # 2. 处理插件关联
         if request.enabled_plugin_id_list:
             # 验证插件是否存在
-            stmt = select(PluginSQLEntity).where(PluginSQLEntity.id.in_([str(pid) for pid in request.enabled_plugin_id_list]))
+            stmt = select(PluginSQLEntity).where(PluginSQLEntity.id.in_(request.enabled_plugin_id_list))
             result = await self.session.execute(stmt)
             plugins = result.scalars().all()
             found_ids = {p.id for p in plugins}
             # TODO: 插件有3个等级,全局状态不可以在作品中配置(启动或禁用,也无法配置),在创建的时候只能配置作品级/文档级的插件,不过这里就放着吧这里。
             for pid in request.enabled_plugin_id_list:
-                if str(pid) not in found_ids:
+                if pid not in found_ids:
                     # 可以在这里报错，或者忽略
                     # raise PluginNotFoundError(str(pid))
                     continue
                 
                 mapping = WorkPluginMappingSQLEntity(
                     work_id=new_work.id,
-                    plugin_id=str(pid),
+                    plugin_id=pid,
                     enabled=True,
                     config={} # 默认空配置，使用插件默认配置
                 )
@@ -72,15 +75,15 @@ class WorkService:
         await self.session.refresh(new_work)
 
         return WorkMetaResponse(
-            work_meta=WorkMetaDTO(
-                work_id=new_work.id,
-                work_cover_image_url=new_work.cover_image_url,
-                work_name=new_work.name,
-                work_summary=new_work.summary,
-                work_state=NovelStateCN.COMPLETED if new_work.state == NovelState.COMPLETED.value else NovelStateCN.UPDATING,
-                work_type=new_work.work_type,
-                created_time=new_work.create_time,
-                updated_time=new_work.update_time
+            meta=WorkMetaDTO(
+                id=new_work.id,
+                cover_image_url=new_work.cover_image_url,
+                name=new_work.name,
+                summary=new_work.summary,
+                state=WorkStateCNEnum.COMPLETED if new_work.state == WorkStateEnum.COMPLETED.value else WorkStateCNEnum.UPDATING,
+                type=new_work.work_type,
+                create_at=new_work.create_at,
+                update_at=new_work.update_at
             )
         )
 
@@ -121,10 +124,10 @@ class WorkService:
 
     async def get_work_list(self) -> List[WorkMetaResponse]:
         """获取作品列表."""
-        stmt = select(WorkSQLEntity).order_by(WorkSQLEntity.update_time.desc())
+        stmt = select(WorkSQLEntity).order_by(WorkSQLEntity.update_at.desc())
         result = await self.session.execute(stmt)
         works = result.scalars().all()
-        return [WorkMetaResponse(work_meta=self._to_meta_dto(w)) for w in works]
+        return [WorkMetaResponse(meta=self._to_meta_dto(w)) for w in works]
 
     async def get_work_detail(self, work_id: str) -> WorkDetailResponse:
         """获取作品详情（含目录树和关系）."""
@@ -145,29 +148,29 @@ class WorkService:
         result_edges = await self.session.execute(stmt_edges)
         edges = result_edges.scalars().all()
 
-        # Build Parent Map from Edges for Nodes DTO
-        parent_map = {}
+        # Aggregate edges by from_node_id
+        edge_map = {}
         for e in edges:
-            if e.relation_type == "parent":
-                parent_map[e.to_node_id] = e.from_node_id
+            if e.from_node_id not in edge_map:
+                edge_map[e.from_node_id] = []
+            edge_map[e.from_node_id].append(e.to_node_id)
 
         return WorkDetailResponse(
-            works_meta=self._to_meta_dto(work),
-            works_document=[
+            meta=self._to_meta_dto(work),
+            document=[
                 NodeDTO(
-                    node_id=n.id,
-                    node_name=n.name,
-                    node_type=n.node_type, # type: ignore
+                    id=n.id,
+                    name=n.name,
+                    type=n.node_type, # type: ignore
                     description=n.description,
-                    parent_id=parent_map.get(n.id),
-                    sort_order=0 # n.sort_order removed from DB
+                    now_version=n.now_version
                 ) for n in nodes
             ],
-            works_documents_relationship=[
+            relationship=[
                 EdgeDTO(
-                    from_nodes=[e.from_node_id],
-                    to_nodes=[e.to_node_id]
-                ) for e in edges
+                    from_node_id=from_id,
+                    to_node_ids=to_ids
+                ) for from_id, to_ids in edge_map.items()
             ]
         )
     
@@ -180,125 +183,128 @@ class WorkService:
         if not work:
             raise ResourceNotFoundError(f"Work not found: {work_id}")
             
-        if request.works_name is not None:
-            work.name = request.works_name
-        if request.works_cover_image_url is not None:
-            work.cover_image_url = request.works_cover_image_url
-        if request.works_summary is not None:
-            work.summary = request.works_summary
-        if request.works_state is not None:
-            work.state = NovelState.COMPLETED.value if request.works_state == NovelStateCN.COMPLETED else NovelState.UPDATING.value
+        if request.name is not None:
+            work.name = request.name
+        if request.cover_image_url is not None:
+            work.cover_image_url = request.cover_image_url
+        if request.summary is not None:
+            work.summary = request.summary
+        if request.state is not None:
+            work.state = WorkStateEnum.COMPLETED if request.state == WorkStateCNEnum.COMPLETED else WorkStateEnum.UPDATING
             
-        work.update_time = get_now_time()
+        work.update_at = get_now_time()
         await self.session.commit()
 
     def _to_meta_dto(self, work: WorkSQLEntity) -> WorkMetaDTO:
         return WorkMetaDTO(
-            work_id=work.id,
-            work_cover_image_url=work.cover_image_url,
-            work_name=work.name,
-            work_summary=work.summary,
-            work_state=NovelStateCN.COMPLETED if work.state == NovelState.COMPLETED.value else NovelStateCN.UPDATING,
-            work_type=work.work_type,
-            created_time=work.create_time,
-            updated_time=work.update_time
+            id=work.id,
+            cover_image_url=work.cover_image_url,
+            name=work.name,
+            summary=work.summary,
+            state=WorkStateCNEnum.COMPLETED if work.state == WorkStateEnum.COMPLETED.value else WorkStateCNEnum.UPDATING,           
+            type=work.work_type,
+            create_at=work.create_at,
+            update_at=work.update_at
         )
 
-    async def list_work_plugins(self, work_id: str) -> List[WorkPluginMetaResponse]:
-        """获取作品插件列表(包含所有可用插件(作品级和文档级别的插件)，标明启用状态)."""
-        stmt = select(PluginSQLEntity, WorkPluginMappingSQLEntity)\
-            .outerjoin(
-                WorkPluginMappingSQLEntity, 
-                and_(
-                    PluginSQLEntity.id == WorkPluginMappingSQLEntity.plugin_id, 
-                    WorkPluginMappingSQLEntity.work_id == work_id
-                )
-            )\
-            .where(PluginSQLEntity.scope_type.in_([PluginScopeType.WORK.value, PluginScopeType.DOCUMENT.value]))
+    async def get_work_plugins(self, work_id: str) -> List[WorkPluginMetaResponse]:
+        """获取作品启用的插件列表 (包含配置)."""
+        stmt = select(WorkPluginMappingSQLEntity).where(WorkPluginMappingSQLEntity.work_id == work_id)
+        result = await self.session.execute(stmt)
+        mappings = result.scalars().all()
         
-        result: Result[Tuple[PluginSQLEntity, WorkPluginMappingSQLEntity | None]] = await self.session.execute(stmt)
-        rows: Sequence[Row[Tuple[PluginSQLEntity, WorkPluginMappingSQLEntity | None]]] = result.all()
+        # 批量获取插件详情
+        plugin_ids = [m.plugin_id for m in mappings]
+        if not plugin_ids:
+            return []
+            
+        stmt_p = select(PluginSQLEntity).where(PluginSQLEntity.id.in_(plugin_ids))
+        result_p = await self.session.execute(stmt_p)
+        plugins = result_p.scalars().all()
+        plugins_map = {p.id: p for p in plugins}
         
-        return [
-            WorkPluginMetaResponse(
-                plugin_id=plugin.id,
-                name=plugin.name,
-                enabled=mapping.enabled if mapping else False,
-                description=plugin.description
-            ) for plugin, mapping in rows
-        ]
+        response = []
+        for m in mappings:
+            p = plugins_map.get(m.plugin_id)
+            if p:
+                response.append(WorkPluginMetaResponse(
+                    plugin_id=p.id,
+                    name=p.name,
+                    enabled=m.enabled,
+                    scope_type=p.scope_type,
+                    tags=p.tags
+                ))
+        return response
 
-    async def get_work_plugin_detail(self, work_id: str, plugin_id: UUID) -> WorkPluginDetailResponse:
-        """获取作品插件详情(包含所有可用插件(作品级和文档级别的插件)，标明启用状态)."""
-        stmt = select(WorkPluginMappingSQLEntity, PluginSQLEntity)\
-            .join(PluginSQLEntity, WorkPluginMappingSQLEntity.plugin_id == PluginSQLEntity.id)\
-            .where(WorkPluginMappingSQLEntity.work_id == work_id)\
-            .where(WorkPluginMappingSQLEntity.plugin_id == str(plugin_id))\
-            .where(PluginSQLEntity.scope_type.in_([PluginScopeType.WORK.value, PluginScopeType.DOCUMENT.value]))
-            
-        result: Result[Tuple[WorkPluginMappingSQLEntity, PluginSQLEntity]] = await self.session.execute(stmt)
-        row: Row[Tuple[WorkPluginMappingSQLEntity, PluginSQLEntity]] | None = result.first()
-        
-        if not row:
-            # 检查插件是否存在，如果存在但未关联，可能需要处理（当前假设必须先关联）
-            # 或者如果插件存在但没 mapping，是否返回默认？
-            # 架构文档 implying mapping creation on work creation. 
-            # If not mapped, treat as not enabled or not found?
-            # 简单起见，如果找不到mapping，尝试找plugin，如果plugin存在，则返回默认配置且enabled=False (virtual mapping)
-            # 但create_work只关联了enabled_plugin_id_list。
-            # 如果要支持后期启用插件，应该在这里支持 "lazy loading" 或者 list_work_plugins 应该返回所有可用插件？
-            # Doc says "get all plugins for a work".
-            # For now, raise Not Found if not mapped.
-            raise ResourceNotFoundError(f"Plugin {plugin_id} not enabled or found for work {work_id}")
-            
-        mapping, plugin = row
-        
-        # 合并配置：Default Config updated by Mapping Config
-        merged_config = plugin.default_config.copy()
-        if mapping.config:
-            merged_config.update(mapping.config)
-            
-        return WorkPluginDetailResponse(
-            plugin_id=plugin.id,
-            name=plugin.name,
-            description=plugin.description,
-            enabled=mapping.enabled,
-            config=merged_config,
-            from_type=plugin.from_type, # type: ignore
-            scope_type=plugin.scope_type, # type: ignore
-            tags=plugin.tags
-        )
-
-    async def update_work_plugin(self, work_id: str, request: UpdateWorkPluginRequest) -> None:
-        """更新作品插件状态/配置."""
-        # Check existence
-        plugin_id_str = request.plugin_id.hex
+    async def update_work_plugin_config(self, work_id: str, plugin_id: str, request: UpdateWorkPluginRequest) -> WorkPluginDetailResponse:
+        """更新作品的插件配置."""
         stmt = select(WorkPluginMappingSQLEntity).where(
-            WorkPluginMappingSQLEntity.work_id == work_id,
-            WorkPluginMappingSQLEntity.plugin_id == plugin_id_str
+            and_(
+                WorkPluginMappingSQLEntity.work_id == work_id,
+                WorkPluginMappingSQLEntity.plugin_id == plugin_id
+            )
         )
         result = await self.session.execute(stmt)
         mapping = result.scalar_one_or_none()
         
         if not mapping:
-             # 如果不存在映射，可能需要创建（如果插件存在）
-             # 检查插件是否存在
-            plugin_stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id_str)
-            plugin_res = await self.session.execute(plugin_stmt)
-            if not plugin_res.scalar_one_or_none():
-                 raise PluginNotFoundError(plugin_id_str)
-            
-            # 创建新映射
-            mapping = WorkPluginMappingSQLEntity(
-                work_id=work_id,
-                plugin_id=plugin_id_str,
-                enabled=request.enabled,
-                config=request.config
-            )
-            self.session.add(mapping)
-        else:
+             # 如果没有映射，可能是尚未启用，或者插件不存在
+             # 这里假设只能更新已关联的插件
+             # 若要支持"配置即启用"，需要先查询 Plugin 表
+             raise ResourceNotFoundError(f"Plugin mapping not found for work {work_id} and plugin {plugin_id}")
+
+        if request.enabled is not None:
             mapping.enabled = request.enabled
+            
+        if request.config is not None:
+            # Merge or Replace? Let's Replace for now
             mapping.config = request.config
             
         await self.session.commit()
+        await self.session.refresh(mapping)
+        
+        # Get Plugin Detail for response
+        stmt_p = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
+        result_p = await self.session.execute(stmt_p)
+        plugin = result_p.scalar_one_or_none()
+        
+        return WorkPluginDetailResponse(
+            plugin_id=plugin.id,
+            name=plugin.name,
+            enabled=mapping.enabled,
+            config=mapping.config,
+            default_config=plugin.default_config,
+            scope_type=plugin.scope_type,
+            config_schema=plugin.config_schema
+        )
+
+    async def get_work_plugin_detail(self, work_id: str, plugin_id: str) -> WorkPluginDetailResponse:
+        """获取作品插件详情."""
+        stmt = select(WorkPluginMappingSQLEntity).where(
+            and_(
+                WorkPluginMappingSQLEntity.work_id == work_id,
+                WorkPluginMappingSQLEntity.plugin_id == plugin_id
+            )
+        )
+        result = await self.session.execute(stmt)
+        mapping = result.scalar_one_or_none()
+        
+        if not mapping:
+            # 尝试查找是否是默认启用的全局插件? 暂不处理，假设只有显式关联
+             raise ResourceNotFoundError(f"Plugin mapping not found for work {work_id} and plugin {plugin_id}")
+        
+        stmt_p = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
+        result_p = await self.session.execute(stmt_p)
+        plugin = result_p.scalar_one_or_none()
+        
+        return WorkPluginDetailResponse(
+            plugin_id=plugin.id,
+            name=plugin.name,
+            enabled=mapping.enabled,
+            config=mapping.config,
+            default_config=plugin.default_config,
+            scope_type=plugin.scope_type,
+            config_schema=plugin.config_schema
+        )
+
 

@@ -139,6 +139,8 @@ class NodeSQLEntity(SQLModel, table=True):
     description: str | None = Field(default=None, description="节点描述")
     node_type: NodeTypeEnum = Field(description="类型: document, folder, whiteboard...")
     
+    now_version: str | None = Field(default=None, description="当前版本ID")
+
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
     update_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
 
@@ -168,7 +170,7 @@ class DocumentVersionSQLEntity(SQLModel, table=True):
     id: UUID = Field(default_factory=create_uuid, primary_key=True)
     node_id: UUID = Field(foreign_key="node.id", index=True)
     
-    version: int = Field(default=1, description="版本号")
+    version: str = Field(default=1, description="版本号")
 
     full_text: str = Field(default="", description="文档内容 (HTML/JSON/Markdown)")
     word_count: int = Field(default=0)

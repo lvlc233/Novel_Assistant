@@ -95,9 +95,7 @@ async def update_work_plugin(
     service: WorkService = Depends(get_work_service)
 ) -> Response[None]:
     """更新作品插件状态/配置."""
-    # Ensure path param matches body or override
-    request.plugin_id = plugin_id
-    await service.update_work_plugin(work_id, request)
+    await service.update_work_plugin(work_id, plugin_id, request)
     return Response.ok()
 
 @router.patch("/{work_id}/plugin/{plugin_id}/enabled", response_model=Response[None])

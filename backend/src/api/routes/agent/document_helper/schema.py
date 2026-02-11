@@ -1,3 +1,5 @@
+from pydantic import BaseModel
+
 class DocumentHelperChatConfigResponse(BaseModel):
     model_name: str # 模型名称
     base_url: str # 基础URL

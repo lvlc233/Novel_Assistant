@@ -9,64 +9,17 @@ interface PluginMetaResponse {
   id: string;
   name: string;
   enabled: boolean;
-  description?: string;
-  from_type: 'system' | 'custom';
-  scope_type: 'global' | 'work' | 'document';
+  // description, from_type, scope_type are NOT in the list response
 }
 
 interface PluginResponse extends PluginMetaResponse {
+  description?: string;
   config: Record<string, any>;
+  from_type: 'system' | 'custom';
+  scope_type: 'global' | 'work' | 'document';
   tags: string[];
 }
 
-// Mock Data
-const MOCK_PLUGINS: PluginInstance[] = [
-  {
-    id: 'writer-agent',
-    status: 'enabled',
-    config: {},
-    installedAt: '2026-01-20T10:00:00Z',
-    manifest: {
-      id: 'writer-agent',
-      name: 'Writer Agent',
-      version: '1.0.0',
-      description: 'AI 写作助手，提供续写、润色功能',
-      author: 'Official',
-      type: 'system',
-      capabilities: { editor: true, sidebar: true }
-    }
-  },
-  {
-    id: 'reviewer-agent',
-    status: 'disabled',
-    config: {},
-    installedAt: '2026-01-21T10:00:00Z',
-    manifest: {
-      id: 'reviewer-agent',
-      name: 'Reviewer Agent',
-      version: '0.9.0',
-      description: '审稿助手，检查逻辑漏洞和错别字',
-      author: 'Official',
-      type: 'system',
-      capabilities: { editor: true }
-    }
-  },
-  {
-    id: 'world-builder',
-    status: 'enabled',
-    config: {},
-    installedAt: '2026-01-22T10:00:00Z',
-    manifest: {
-      id: 'world-builder',
-      name: 'World Builder',
-      version: '1.2.0',
-      description: '世界观构建工具，管理角色和设定',
-      author: 'Community',
-      type: 'user',
-      capabilities: { sidebar: true }
-    }
-  }
-];
 
 // Mapper
 const mapMetaToInstance = (meta: PluginMetaResponse): PluginInstance => {
@@ -79,10 +32,32 @@ const mapMetaToInstance = (meta: PluginMetaResponse): PluginInstance => {
       id: meta.id,
       name: meta.name,
       version: '1.0.0', // Default
-      description: meta.description || '',
-      author: meta.from_type === 'system' ? 'System' : 'User',
-      type: meta.from_type === 'system' ? 'system' : 'user',
+      description: '', // Meta response doesn't include description
+      author: 'System', // Default to System as most plugins currently are system
+      type: 'system', // Default to system, or we could infer from name?
       capabilities: { // Default capabilities
+        sidebar: true,
+        editor: true,
+        header: false
+      }
+    }
+  };
+};
+
+const mapResponseToInstance = (data: PluginResponse): PluginInstance => {
+  return {
+    id: data.id,
+    status: data.enabled ? 'enabled' : 'disabled',
+    config: data.config,
+    installedAt: new Date().toISOString(),
+    manifest: {
+      id: data.id,
+      name: data.name,
+      version: '1.0.0',
+      description: data.description || '',
+      author: data.from_type === 'system' ? 'System' : 'Official',
+      type: 'system', // Map to frontend PluginType?
+      capabilities: {
         sidebar: true,
         editor: true,
         header: false
@@ -97,8 +72,16 @@ export async function getPlugins(): Promise<PluginInstance[]> {
       setTimeout(() => resolve([...MOCK_PLUGINS]), 500);
     });
   }
-  const response = await request.get<PluginMetaResponse[]>('/plugins');
+  const response = await request.get<PluginMetaResponse[]>('/plugin/expand');
   return response.map(mapMetaToInstance);
+}
+
+export async function getSystemPlugins(): Promise<PluginInstance[]> {
+  if (USE_MOCK) {
+    return []; 
+  }
+  const response = await request.get<PluginResponse[]>('/plugin/system');
+  return response.map(mapResponseToInstance);
 }
 
 export async function togglePluginStatus(id: string, enable: boolean): Promise<void> {
@@ -109,16 +92,28 @@ export async function togglePluginStatus(id: string, enable: boolean): Promise<v
     }
     return new Promise((resolve) => setTimeout(resolve, 300));
   }
-  await request.patch(`/plugins/${id}`, {
+  await request.patch(`/plugin/${id}`, {
     enabled: enable
   });
+}
+
+export async function updatePlugin(id: string, data: { enabled?: boolean; config?: Record<string, any> }): Promise<void> {
+  if (USE_MOCK) {
+    const plugin = MOCK_PLUGINS.find(p => p.id === id);
+    if (plugin) {
+        if (data.enabled !== undefined) plugin.status = data.enabled ? 'enabled' : 'disabled';
+        if (data.config) plugin.config = { ...plugin.config, ...data.config };
+    }
+    return new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  await request.patch(`/plugin/${id}`, data);
 }
 
 /**
  * 卸载插件
  * 注释者: FrontendAgent(react)
  * 时间: 2026-01-26 19:40:00
- * 说明: 卸载指定ID的插件。对接后端 DELETE /plugins/{plugin_id} 接口。
+ * 说明: 卸载指定ID的插件。对接后端 DELETE /plugin/{plugin_id} 接口。
  */
 export async function uninstallPlugin(pluginId: string): Promise<void> {
   if (USE_MOCK) {
@@ -128,6 +123,7 @@ export async function uninstallPlugin(pluginId: string): Promise<void> {
     }
     return new Promise((resolve) => setTimeout(resolve, 300));
   }
-  await request.delete(`/plugins/${pluginId}`);
+  // Warning: Backend might not support DELETE yet
+  await request.delete(`/plugin/${pluginId}`);
 }
 

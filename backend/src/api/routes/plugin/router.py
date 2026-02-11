@@ -26,6 +26,22 @@ async def get_plugin_list(
     data = await service.get_plugin_list()
     return Response.ok(data=data)
 
+@router.get("/system", response_model=Response[List[PluginResponse]])
+async def get_system_plugins(
+    service: PluginService = Depends(get_plugin_service)
+) -> Response[List[PluginResponse]]:
+    """获取系统插件列表 (SYSTEM)."""
+    data = await service.get_system_plugins()
+    return Response.ok(data=data)
+
+@router.get("/expand", response_model=Response[List[PluginMetaResponse]])
+async def get_expand_plugins(
+    service: PluginService = Depends(get_plugin_service)
+) -> Response[List[PluginMetaResponse]]:
+    """获取扩展插件列表 (OFFICIAL, CUSTOM)."""
+    data = await service.get_expand_plugins()
+    return Response.ok(data=data)
+
 @router.get("/{plugin_id}", response_model=Response[PluginResponse])
 async def get_plugin_detail(
     plugin_id: UUID,

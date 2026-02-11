@@ -69,14 +69,17 @@ def create_app() -> FastAPI:
     # app.include_router(novel_router) # Legacy
     # app.include_router(document_router) # Legacy
     
+    # Specific plugin routers must be registered BEFORE the generic plugin router
+    app.include_router(kd_router, prefix=settings.API_V1_STR)
+    app.include_router(agent_router, prefix=settings.API_V1_STR)
+    app.include_router(memory_router, prefix=settings.API_V1_STR)
+    # Generic plugin router (catch-all for /plugin/{id})
     app.include_router(plugin_router, prefix=settings.API_V1_STR)
+    
     app.include_router(work_router, prefix=settings.API_V1_STR)
     app.include_router(node_router, prefix=settings.API_V1_STR)
-    app.include_router(agent_router, prefix=settings.API_V1_STR)
     app.include_router(document_helper_router, prefix=settings.API_V1_STR)
     app.include_router(project_helper_router, prefix=settings.API_V1_STR)
-    app.include_router(kd_router, prefix=settings.API_V1_STR)
-    app.include_router(memory_router, prefix=settings.API_V1_STR)
     app.include_router(file_router, prefix=settings.API_V1_STR)
     app.include_router(work_type_router, prefix=settings.API_V1_STR)
 

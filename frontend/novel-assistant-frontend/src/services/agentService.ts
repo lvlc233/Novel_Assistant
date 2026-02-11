@@ -1,4 +1,5 @@
 import { request } from '@/lib/request';
+import { config } from '@/config';
 import { 
   AgentMeta, 
   AgentDetail, 
@@ -32,10 +33,10 @@ const mockAgents: AgentDetail[] = [
   {
     agent_id: '1',
     enable: true,
-    agent_name: 'Novel Writer',
+    agent_name: 'Work Writer',
     broadcast: false,
     agent_type: 'writer',
-    agent_description: 'Specializes in writing novel chapters based on outlines.',
+    agent_description: 'Specializes in writing work chapters based on outlines.',
     create_at: new Date().toISOString(),
     history_meta: {}
   },
@@ -88,7 +89,7 @@ export const agentService = {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return mockAgents.map(({ history_meta, ...meta }) => meta);
     }
-    const response = await request.get<AgentResponse[]>('/agents');
+    const response = await request.get<AgentResponse[]>('/plugin/agent/manager');
     return response.map(mapAgentResponseToMeta);
   },
 
@@ -99,11 +100,14 @@ export const agentService = {
       if (!agent) throw new Error('Agent not found');
       return { ...agent };
     }
-    const response = await request.get<AgentResponse>(`/agents/${id}`);
+    const response = await request.get<AgentResponse>(`/plugin/agent/manager/${id}`);
     return mapAgentResponseToDetail(response);
   },
 
   createAgent: async (data: AgentCreateRequest): Promise<AgentMeta> => {
+    // Note: The backend documentation does not explicitly list a create agent endpoint under /plugin/agent/manager.
+    // This might be handled via a different mechanism or manually.
+    // Keeping this for now but it might fail.
     if (USE_MOCK) {
       await delay(500);
       const newAgent: AgentDetail = {
@@ -121,7 +125,9 @@ export const agentService = {
       const { history_meta, ...meta } = newAgent;
       return meta;
     }
-    const response = await request.post<AgentResponse>('/agents', {
+    // Assuming a create endpoint exists or fallback to error
+    console.warn("Create Agent API not explicitly defined in doc. Trying /plugin/agent/manager");
+    const response = await request.post<AgentResponse>('/plugin/agent/manager', {
       name: data.agent_name,
       agent_type: data.agent_type,
       description: data.agent_description,
@@ -139,10 +145,8 @@ export const agentService = {
       mockAgents[index] = { ...mockAgents[index], ...data };
       return;
     }
-    await request.patch<AgentResponse>(`/agents/${id}`, {
+    await request.patch<AgentResponse>(`/plugin/agent/manager/${id}`, {
       broadcast: data.broadcast
-      // Note: Backend supports more fields, but frontend interface currently only exposes broadcast for update?
-      // If needed, expand AgentUpdateRequest to include other fields.
     });
   },
 
@@ -184,41 +188,79 @@ export const agentService = {
       return () => {}; // Cleanup function
     }
 
-    // Real backend implementation
+    // Real backend implementation with SSE
     const controller = new AbortController();
+    const url = `${config.work.apiBaseUrl}/plugin/agent/manager/${agentId}/history/${sessionId}/messages`;
     
     (async () => {
       try {
-        // Construct input for LangGraph
-        // Assuming the graph expects "messages" list
-        const inputData = {
-          messages: [
-            {
-              role: "user",
-              content: payload.context
-            }
-          ]
-        };
-
-        const response = await request.post<InvokeAgentResponse>(`/agents/${agentId}/invoke`, {
-          input: inputData,
-          thread_id: sessionId
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
         });
 
-        // Extract response from LangGraph state
-        // Assuming output.messages is a list and we want the last one
-        const messages = response.output.messages || [];
-        const lastMessage = messages[messages.length - 1];
-        const responseText = lastMessage?.content || "No response content";
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-        // Since backend is not streaming yet, we emit the whole text
-        // We could simulate streaming here for better UI experience if needed
-        onMessage(responseText);
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('Response body is null');
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep the last incomplete line
+
+          for (const line of lines) {
+             if (line.startsWith('data: ')) {
+                 const dataStr = line.slice(6);
+                 try {
+                     // Check if it is the end of stream or valid JSON
+                     if (dataStr === '[DONE]') {
+                         onFinish();
+                         return;
+                     }
+                     const data = JSON.parse(dataStr);
+                     // Expected data structure from doc: { message_chunk: str|dict }
+                     if (data.message_chunk) {
+                         const content = typeof data.message_chunk === 'string' ? data.message_chunk : JSON.stringify(data.message_chunk);
+                         onMessage(content);
+                     }
+                 } catch (e) {
+                     console.error('Failed to parse SSE data', e);
+                 }
+             } else if (line.startsWith('event: ')) {
+                 const eventType = line.slice(7);
+                 if (eventType === 'chat/end' || eventType === 'tool/chat/end') {
+                     // Maybe handle end event explicitly if data doesn't come with it?
+                 }
+             }
+          }
+        }
+        
         onFinish();
 
       } catch (err) {
-        console.error("Agent invoke error:", err);
-        onError(err);
+        if (err instanceof Error && err.name === 'AbortError') {
+            console.log('Stream aborted');
+        } else {
+            console.error("Agent invoke error:", err);
+            onError(err);
+        }
       }
     })();
 
@@ -240,8 +282,17 @@ export const agentService = {
   
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   createSession: async (agentId: string): Promise<string> => {
-    // Generate a random session ID (thread_id)
-    return `thread-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    if (USE_MOCK) {
+        return `thread-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    }
+    // Create Session via POST /plugin/agent/manager/{agent_id}/history/{session_id}
+    // We generate a session ID first or let backend handle it? 
+    // Doc says: POST /plugin/agent/manager/{agent_id}/history/{session_id}
+    // So we need to generate session_id client side? Or maybe backend expects it.
+    // Let's generate one client side.
+    const sessionId = crypto.randomUUID();
+    await request.post(`/plugin/agent/manager/${agentId}/history/${sessionId}`, {});
+    return sessionId;
   },
 
   /**
@@ -259,6 +310,8 @@ export const agentService = {
       }
       return;
     }
-    await request.delete(`/agents/${id}`);
+    // Backend Doc does not explicitly list DELETE for agent manager.
+    console.warn("Delete Agent API not explicitly defined in doc. Trying DELETE /plugin/agent/manager/{id}");
+    await request.delete(`/plugin/agent/manager/${id}`);
   }
 };

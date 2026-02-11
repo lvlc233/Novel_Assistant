@@ -14,7 +14,7 @@ const getEnvVar = (key: string, defaultValue: string) => {
 const API_BASE_URL = getEnvVar("NEXT_PUBLIC_API_URL", "http://localhost:8426");
 
 export const config = {
-  novel: {
+  work: {
     baseUrl: API_BASE_URL,
     apiBaseUrl: `${API_BASE_URL}`,
   },

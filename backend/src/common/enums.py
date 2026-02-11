@@ -25,6 +25,7 @@ class PluginFromTypeEnum(str, Enum):
     """插件来源类型."""
     SYSTEM = "system"
     CUSTOM = "custom"
+    OFFICIAL = "official"
 
 class PluginScopeTypeEnum(str, Enum):
     """插件作用域类型."""

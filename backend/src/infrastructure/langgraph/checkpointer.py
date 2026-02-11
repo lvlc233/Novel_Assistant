@@ -62,6 +62,7 @@ class PostgresCheckpointer(BaseCheckpointSaver):
 
     @asynccontextmanager
     async def connect(self):
+        """Connect to the database."""
         if self.pool is None:
             async with self._lock:
                 if self.pool is None:
@@ -71,12 +72,13 @@ class PostgresCheckpointer(BaseCheckpointSaver):
             yield conn
             
     async def close(self):
+        """Close the connection."""
         if self.pool:
             await self.pool.close()
             self.pool = None
 
     async def aget_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
-
+        """Get a checkpoint tuple."""
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"].get("checkpoint_id")
@@ -144,6 +146,7 @@ class PostgresCheckpointer(BaseCheckpointSaver):
         before: RunnableConfig | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[CheckpointTuple]:
+        """List checkpoints."""
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         
@@ -253,6 +256,7 @@ class PostgresCheckpointer(BaseCheckpointSaver):
         writes: Sequence[Tuple[str, Any]],
         task_id: str,
     ) -> None:
+        """Put writes."""
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"]["checkpoint_id"]
