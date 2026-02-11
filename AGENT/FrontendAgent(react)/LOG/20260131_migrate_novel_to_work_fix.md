@@ -1,0 +1,24 @@
+# 前端术语迁移修复日志：Novel -> Work
+
+- **时间**: 2026年01月31日 17:59
+- **目标**: 修复 `KnowledgeBaseForm` 中的 `workService` 引用错误，并进行全量类型检查，确保 "novel" -> "work" 迁移无遗留问题。
+- **变更范围**:
+    - **修复**: `src/components/knowledge-base/KnowledgeBaseForm.tsx`
+        - 修正导入：`import { workService }` -> `import { getWorkList }`。
+        - 修正调用：`workService.getWorkList()` -> `getWorkList(userId)`。
+        - 修正类型：`WorkMetaResponse[]` -> `Work[]`，并使用 `work.title` 替代 `work.meta.name`。
+    - **验证范围**:
+        - `src/components/work-manager/WorkPluginConfigModal.tsx`
+        - `src/components/work-manager/CreateWorkCard.tsx`
+        - `src/components/work-manager/EditWorkModal.tsx`
+        - `src/components/work-manager/KnowledgeBaseModal.tsx`
+        - `src/components/work-detail/WorkPluginSettingsModal.tsx`
+        - `src/components/work-detail/ChapterPreview.tsx`
+        - `src/components/work-manager/DocumentCarousel.tsx`
+- **验证方式**:
+    - **静态检查**: 使用 `npx tsc --noEmit` 进行全量 TypeScript 类型检查。
+    - **代码审计**: 人工核查上述组件的源码，确认术语和类型使用正确。
+- **结果**:
+    - `tsc` 检查通过，无类型错误。
+    - 所有关键组件均已正确迁移至 `Work` 体系。
+    - 修复了 `KnowledgeBaseForm` 因 API 变更导致的运行时错误。

@@ -1,0 +1,34 @@
+# 前端术语迁移日志：Novel -> Work
+
+- **时间**: 2026年01月31日 17:48
+- **目标**: 将前端项目中的 "novel" 术语全面迁移为 "work"，以符合最新的架构设计和后端 API 变更。
+- **变更范围**:
+    - **目录重命名**:
+        - `src/components/novel-manager` -> `src/components/work-manager`
+        - `src/components/novel-detail` -> `src/components/work-detail`
+    - **文件重命名**:
+        - `NovelCard.tsx` -> `WorkCard.tsx`
+        - `NovelDirectory.tsx` -> `WorkDirectory.tsx`
+        - `NovelHeader.tsx` -> `WorkHeader.tsx`
+        - `NovelSettingsModal.tsx` -> `WorkSettingsModal.tsx`
+        - `CreateNovelCard.tsx` -> `CreateWorkCard.tsx`
+        - `EditNovelModal.tsx` -> `EditWorkModal.tsx`
+        - `NovelPluginConfigModal.tsx` -> `WorkPluginConfigModal.tsx`
+        - `NovelPluginSettingsModal.tsx` -> `WorkPluginSettingsModal.tsx`
+    - **代码重构**:
+        - 更新所有组件和服务的引用路径。
+        - 将 `Novel` 类型替换为 `Work` 类型 (`@/types/work`)。
+        - 将 `novelService` 替换为 `workService`，并更新 API 调用（如 `getNovelDetail` -> `getWorkDetail`）。
+        - 更新 `config.novel` 为 `config.work`。
+        - 更新路由路径 `/novels` -> `/works`。
+        - 批量替换 UI 文本和变量名（`novel` -> `work`）。
+    - **Mock 数据**:
+        - 更新 `mockData.ts` 中的数据结构以匹配 `Work` 类型。
+- **验证方式**:
+    - **静态检查**: 使用 `grep` 搜索 codebase 中的 `novel` 关键字，确认仅保留必要的非功能性引用（如 mock 数据中的 `type: 'novel'` 值）。
+    - **类型检查**: 确认所有重构文件无明显的 TypeScript 类型错误。
+    - **文件完整性**: 确认重命名后的目录和文件结构正确，无丢失文件。
+- **结果**:
+    - 迁移工作已完成。
+    - 项目结构已对齐新的架构标准。
+    - 遗留的 `novel` 引用仅限于特定的业务类型值（如 `type: 'novel'`），不影响系统功能。
