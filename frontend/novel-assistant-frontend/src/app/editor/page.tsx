@@ -7,8 +7,8 @@ import AIAssistant from '@/components/editor/AIAssistant';
 // Wrap content in Suspense for useSearchParams
 function EditorContent() {
   const searchParams = useSearchParams();
-  const novelId = searchParams.get('novelId');
-  const initialChapterId = searchParams.get('initialChapterId');
+  const documentId = searchParams.get('documentId') || searchParams.get('initialChapterId'); // Support both for transition or just documentId
+  const workId = searchParams.get('workId'); 
   
   const [isAiExpanded, setIsAiExpanded] = useState(true);
 
@@ -47,8 +47,8 @@ function EditorContent() {
         <div className="flex-1 h-full relative z-10 min-w-0">
             <DocumentEditor 
                 isChatExpanded={isAiExpanded}
-                novelId={novelId}
-                initialChapterId={initialChapterId}
+                documentId={documentId} 
+                workId={workId}
             />
         </div>
     </div>

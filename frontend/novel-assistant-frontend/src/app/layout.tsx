@@ -27,7 +27,7 @@ export default function RootLayout({
           <NotificationToast />
           
           {/* Global Floating Entry Button (Positioned Top Right) */}
-          <div className="fixed top-6 right-8 z-50">
+          <div className="fixed top-24 right-8 z-50">
              <MailButton />
           </div>
         </MailProvider>
