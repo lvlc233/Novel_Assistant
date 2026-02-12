@@ -38,3 +38,18 @@ class MemoryTypeEnum(str, Enum):
     LONG_TERM = "long_term"  # 长期记忆
     SHORT_TERM = "short_term"  # 短期记忆
 
+class RenderType(str, Enum):
+    """UI渲染类型."""
+    CONFIG = "CONFIG"
+    AGENT_MESSAGES = "AGENT_MESSAGES"
+    CARD = "CARD"
+    LIST = "LIST"
+    DETAIL = "DETAIL"
+    DASHBOARD = "DASHBOARD"
+
+class DataSourceType(str, Enum):
+    """插件数据源类型."""
+    URL = "url"
+    CHECKPOINT = "checkpoint"
+    JSON = "json"
+    INTERNAL = "internal"
