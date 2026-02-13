@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+
 from common.config import settings
 
 API_V1 = settings.API_V1_STR
@@ -34,7 +35,11 @@ async def test_get_plugin_detail(client: AsyncClient, plugin_id):
 async def test_update_plugin(client: AsyncClient, plugin_id):
     payload = {
         "enabled": False,
-        "config": {"key": "value"}
+        "config": {
+            "items": [
+                {"key": "key", "value": "value"}
+            ]
+        }
     }
     response = await client.patch(f"{API_V1}/plugin/{plugin_id}", json=payload)
     assert response.status_code == 200
@@ -42,5 +47,5 @@ async def test_update_plugin(client: AsyncClient, plugin_id):
     # Verify
     response = await client.get(f"{API_V1}/plugin/{plugin_id}")
     data = response.json()
-    assert data["data"]["enabled"] == False
-    assert data["data"]["config"] == {"key": "value"}
+    assert not data["data"]["enabled"]
+    assert data["data"]["config"]["items"] == [{"key": "key", "value": "value"}]

@@ -1,7 +1,7 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.base import Response
@@ -9,6 +9,7 @@ from api.routes.plugin.schema import (
     PluginMetaResponse,
     PluginResponse,
     PluginUpdateRequest,
+    StandardDataResponse
 )
 from infrastructure.pg.pg_client import get_session
 from services.plugin.service import PluginService
@@ -40,6 +41,18 @@ async def get_expand_plugins(
 ) -> Response[List[PluginMetaResponse]]:
     """获取扩展插件列表 (OFFICIAL, CUSTOM)."""
     data = await service.get_expand_plugins()
+    return Response.ok(data=data)
+
+@router.get("/proxy/{plugin_id}/data", response_model=Response[StandardDataResponse])
+async def proxy_plugin_data(
+    plugin_id: UUID,
+    request: Request,
+    service: PluginService = Depends(get_plugin_service)
+) -> Response[StandardDataResponse]:
+    """BFF Proxy for plugin data."""
+    # Capture all query params
+    params = dict(request.query_params)
+    data = await service.proxy_plugin_data(plugin_id, params)
     return Response.ok(data=data)
 
 @router.get("/{plugin_id}", response_model=Response[PluginResponse])

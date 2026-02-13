@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+
 from common.config import settings
 from infrastructure.pg.pg_models import WorkTypeSQLEntity
 

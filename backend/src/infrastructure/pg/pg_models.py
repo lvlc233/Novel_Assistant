@@ -12,8 +12,9 @@ from common.enums import (
     PluginScopeTypeEnum,
     WorkTypeEnum,
     WorkStateEnum,
-    MemoryTypeEnum
-    
+    MemoryTypeEnum,
+    RenderType,
+    DataSourceType
 )
 from common.utils import create_uuid, get_now_time
 
@@ -38,6 +39,13 @@ class PluginSQLEntity(SQLModel, table=True):
     config_schema: Dict = Field(default={}, sa_column=Column(JSON), description="配置Schema定义")
     default_config: Dict = Field(default={}, sa_column=Column(JSON), description="默认配置值")
     
+    # BFF 代理配置
+    data_source_type: DataSourceType | None = Field(default=None, description="数据源类型")
+    data_source_config: Dict = Field(default={}, sa_column=Column(JSON), description="数据源配置") #如果是url的话,类似存储请求参数
+    data_source_url: str | None = Field(default=None, description="数据源URL")
+    render_type: RenderType = Field(default=RenderType.LIST, description="UI渲染类型")
+    auth_config: Dict = Field(default={}, sa_column=Column(JSON), description="鉴权配置(加密存储)")
+
     tags: List[str] = Field(default=[], sa_column=Column(JSON), description="标签列表")
 
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))

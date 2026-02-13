@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+
 from common.config import settings
 from common.enums import MemoryTypeEnum
 
@@ -57,7 +58,7 @@ async def test_update_memory(client: AsyncClient):
     response = await client.get(f"{API_V1}/plugin/memory/{memory_id}")
     data = response.json()
     assert data["data"]["name"] == "Updated Memory"
-    assert data["data"]["enabled"] == False
+    assert not data["data"]["enabled"]
 
 @pytest.mark.asyncio
 async def test_delete_memory(client: AsyncClient):

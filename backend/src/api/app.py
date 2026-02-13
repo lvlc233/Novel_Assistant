@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.error_handler import register_exception_handlers
@@ -14,11 +15,6 @@ from api.routes.file.router import router as file_router
 from api.routes.kd.router import router as kd_router
 from api.routes.memory.router import router as memory_router
 from api.routes.node.router import router as node_router
-
-# Old Routers (Legacy) - Commented out due to model refactoring
-# from api.routes.novel.router import router as novel_router
-# from api.routes.document.router import router as document_router
-# New Routers (Refactored)
 from api.routes.plugin.router import router as plugin_router
 from api.routes.work.router import router as work_router
 from api.routes.work_type.router import router as work_type_router
@@ -94,6 +90,11 @@ def create_app() -> FastAPI:
 
     # Register global exception handlers
     register_exception_handlers(app)
+
+    @app.get("/")
+    async def root():
+        """Root endpoint redirecting to docs."""
+        return RedirectResponse(url="/docs")
 
     return app
 

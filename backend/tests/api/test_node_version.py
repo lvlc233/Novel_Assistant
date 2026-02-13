@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+
 from common.config import settings
 
 API_V1 = settings.API_V1_STR
@@ -20,7 +21,6 @@ async def test_document_version_switch(client: AsyncClient, work_id):
     assert response.status_code == 200
     versions = response.json()["data"]["versions"]
     assert len(versions) > 0
-    v1_id = versions[0]["id"]
     v1_ver = versions[0]["version"]
     
     # 3. Update Version 1 Content

@@ -1,21 +1,19 @@
-import sys
 import os
-import asyncio
+import sys
+
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 # Ensure src is in python path
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
 from api.app import app
 from common.config import settings
+from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum
 from infrastructure.pg.pg_client import get_session
 from infrastructure.pg.pg_models import PluginSQLEntity
-from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum
-
-from sqlalchemy.pool import NullPool
 
 # Use the same database URL but ensure async
 DATABASE_URL = settings.SQLALCHEMY_DATABASE_URI

@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+
 from common.config import settings
 
 API_V1 = settings.API_V1_STR
