@@ -22,6 +22,119 @@ export type PluginType = 'system' | 'user';
 export type PluginStatus = 'enabled' | 'disabled' | 'not_installed';
 
 /**
+ * UI 渲染类型
+ * - 'LIST': 列表视图
+ * - 'DETAIL': 详情视图
+ * - 'DASHBOARD': 仪表盘视图
+ */
+export type RenderType = 'CONFIG' | 'AGENT_MESSAGES' | 'CARD' | 'LIST' | 'DETAIL' | 'DASHBOARD';
+
+/**
+ * 标准数据项
+ * 用于插件数据的统一渲染
+ */
+export interface KeyValueItem {
+  key: string;
+  value: string | number | boolean | null;
+}
+
+export interface PluginConfigItem {
+  key: string;
+  value: string | number | boolean | null;
+}
+
+export type PluginConfig = { items: PluginConfigItem[] } | Record<string, unknown>;
+
+export interface ConfigField {
+  key: string;
+  label?: string | null;
+  description?: string | null;
+  value_type: string;
+  value: string | number | boolean | null;
+  readOnly?: boolean;
+  children: ConfigField[];
+}
+
+export interface ConfigPayload {
+  fields: ConfigField[];
+}
+
+export interface AgentSession {
+  session_id: string;
+  title?: string | null;
+  source?: string | null;
+  created_at?: string | null;
+  token_usage?: number | null;
+}
+
+export interface AgentMessagesPayload {
+  sessions: AgentSession[];
+}
+
+export interface CardItem {
+  id: string;
+  title: string;
+  summary?: string | null;
+  tags: string[];
+  parent_id?: string | null;
+}
+
+export interface CardPayload {
+  cards: CardItem[];
+}
+
+export interface ListItem {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  content?: string | null;
+  tags: string[];
+  metadata: KeyValueItem[];
+}
+
+export interface ListPayload {
+  items: ListItem[];
+}
+
+export interface DetailItem {
+  id: string;
+  title: string;
+  content?: string | null;
+  fields: KeyValueItem[];
+}
+
+export interface DetailPayload {
+  detail: DetailItem;
+}
+
+export interface DashboardWidget {
+  id: string;
+  title: string;
+  value: string | number | boolean | null;
+  unit?: string | null;
+  tags: string[];
+}
+
+export interface DashboardPayload {
+  widgets: DashboardWidget[];
+}
+
+export type RenderPayload =
+  | ConfigPayload
+  | AgentMessagesPayload
+  | CardPayload
+  | ListPayload
+  | DetailPayload
+  | DashboardPayload;
+
+export interface StandardDataResponse {
+  plugin_id: string;
+  render_type: RenderType;
+  payload: RenderPayload;
+  total?: number;
+}
+
+/**
  * 插件清单 (Manifest)
  * 描述插件的静态元数据，类似于 package.json
  */
@@ -40,6 +153,10 @@ export interface PluginManifest {
   icon?: string;
   /** 插件类型 (系统/用户) */
   type: PluginType;
+  
+  /** 渲染类型 */
+  render_type?: RenderType;
+  
   /** 
    * 作用域类型 (可选)
    * 定义插件生效的范围，如 'global'(全局), 'work'(特定作品), 'document'(特定文档) 
@@ -81,7 +198,7 @@ export interface PluginInstance {
    * 插件配置数据 
    * 键值对形式，具体结构由插件自身定义
    */
-  config: Record<string, unknown>;
+  config: PluginConfig;
   /** 安装时间 (ISO 8601 格式字符串) */
   installedAt?: string;
 }

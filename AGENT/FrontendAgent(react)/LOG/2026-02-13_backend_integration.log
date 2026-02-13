@@ -1,0 +1,15 @@
+时间: 2026-02-13 16:00
+目标: 完成项目助手前端与后端的初步对接，实现配置管理和资源开关的状态同步。
+变更范围:
+1. frontend/novel-assistant-frontend/src/services/projectAgentService.ts (新增)
+2. frontend/novel-assistant-frontend/src/components/dashboard/PluginManagerModal.tsx (集成Service，支持数据加载与保存)
+3. frontend/novel-assistant-frontend/src/components/dashboard/plugin-renderers/ProjectAgentRenderer.tsx (支持历史记录显示，集成Service类型)
+4. frontend/novel-assistant-frontend/src/components/dashboard/plugin-renderers/ConfigRenderer.tsx (支持textarea输入)
+5. backend/src/api/routes/agent/project_helper/router.py (新增简易内存存储，支持配置和资源的读写)
+验证方式:
+1. 打开项目助手面板，验证配置项是否从后端加载（默认值）。
+2. 修改配置项（如Prompt）并保存，刷新页面验证是否持久化。
+3. 切换区域开关，验证状态是否同步且刷新后保持。
+4. 展开区域查看历史记录，验证是否显示（Mock数据）。
+结果:
+对接完成，前后端数据通路打通，配置和开关状态可正常同步。历史记录目前使用Mock数据，待后端提供真实接口。

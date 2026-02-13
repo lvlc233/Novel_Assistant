@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { getPlugins, togglePluginStatus, uninstallPlugin } from '@/services/pluginService';
-import { PluginInstance } from '@/types/plugin';
+import { PluginConfig, PluginInstance } from '@/types/plugin';
 import { logger } from '@/lib/logger';
 import { Power, Trash2, Settings, Puzzle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -67,7 +67,7 @@ export default function PluginsPage() {
       setIsSettingsOpen(true);
   };
 
-  const saveSettings = async (config: Record<string, unknown>) => {
+  const saveSettings = async (config: PluginConfig) => {
       if (!selectedPlugin) return;
       // TODO: API call to save config
       logger.info('Saving config for', selectedPlugin.id, config);
@@ -189,4 +189,3 @@ export default function PluginsPage() {
     </AppLayout>
   );
 }
-
