@@ -34,9 +34,9 @@ async def lifespan(app: FastAPI):
     checkpointer = PostgresCheckpointer(conn_string)
     await checkpointer.setup()
     logger.info("LangGraph Checkpointer tables initialized")
-
     # 使用自定义的日志。
     logger.info("数据库初始化完成")
+    config = settings.model_dump()
     yield
     await engine.dispose()
     logger.info("数据库连接关闭")
