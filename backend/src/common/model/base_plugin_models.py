@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Dict, Any, List, Literal, Sequence, Generic, TypeVar, Type, TypedDict
 from abc import ABC, abstractmethod
 
-from common.enums import DataSourceType
+from common.enums import LoaderType
 
 
 @dataclass
@@ -33,7 +33,7 @@ class BasePluginOperation(TypedDict):
     基础的插件交互的数据结构.
     用于定义插件交互的时候的交互接口和参数.所有插件的操作类型都需要继承该父类
     """
-    type: DataSourceType
+    type: LoaderType
     operations: Sequence[BasePluginOperationItem]
 
 
@@ -121,7 +121,7 @@ class InternalOperationBuilder(BaseOperationBuilder):
 class BasePluginOperation(Generic[T]):
     """基础插件操作容器"""
     
-    def __init__(self, ds_type: DataSourceType, builder_class: Type[T]):
+    def __init__(self, ds_type: LoaderType, builder_class: Type[T]):
         self.type = ds_type
         self._builder_class = builder_class
         self._builders: List[T] = []
@@ -152,11 +152,11 @@ class URLPluginOperation(BasePluginOperation[URLOperationBuilder]):
     """URL插件操作"""
     
     def __init__(self):
-        super().__init__(DataSourceType.URL, URLOperationBuilder)
+        super().__init__(LoaderType.URL, URLOperationBuilder)
 
 
 class InternalPluginOperation(BasePluginOperation[InternalOperationBuilder]):
     """内部插件操作"""
     
     def __init__(self):
-        super().__init__(DataSourceType.INTERNAL, InternalOperationBuilder)
+        super().__init__(LoaderType.INTERNAL, InternalOperationBuilder)

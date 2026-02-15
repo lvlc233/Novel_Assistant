@@ -43,13 +43,9 @@ class RenderType(str, Enum):
     CONFIG = "CONFIG"
     AGENT_MESSAGES = "AGENT_MESSAGES"
     CARD = "CARD"
-    LIST = "LIST"
-    DETAIL = "DETAIL"
-    DASHBOARD = "DASHBOARD"
 
-class DataSourceType(str, Enum):
+class LoaderType(str, Enum):
     """插件数据源类型."""
     URL = "url"
-    CHECKPOINT = "checkpoint"
     JSON = "json"
     INTERNAL = "internal"

@@ -1,6 +1,7 @@
 """PostgreSQL Models Module."""
 from datetime import datetime
 from typing import Dict, List
+from typing_extensions import runtime
 from uuid import UUID
 
 from sqlalchemy import JSON, TIMESTAMP, Column
@@ -14,9 +15,9 @@ from common.enums import (
     WorkStateEnum,
     MemoryTypeEnum,
     RenderType,
-    DataSourceType
+    LoaderType
 )
-from common.utils import create_uuid, get_now_time
+from common.utils.utils import create_uuid, get_now_time
 
 # --- 7.1 Core & Plugin ---
 
@@ -35,15 +36,19 @@ class PluginSQLEntity(SQLModel, table=True):
     # 全局开关
     enabled: bool = Field(default=True, description="全局启用状态")
     
-    # 配置定义 (Schema) 与 默认配置
-    config_schema: Dict = Field(default={}, sa_column=Column(JSON), description="配置Schema定义") # 这个可以再敲下,1. 需要分析下把enable放在config里还是外,2. 下面的数据源配置是否等同于与这里的配置,是否合并?还是不合并?核心的问题就是我们的配置要来干嘛
-    default_config: Dict = Field(default={}, sa_column=Column(JSON), description="默认配置值")
+    # 版本控制
+    version: str = Field(default="1.0.0", description="插件版本号")
+    checksum: str = Field(default="", description="配置校验和")
     
+    # 配置定义 (Schema) 与 默认配置
+    loader_type: LoaderType | None = Field(default=None, description="加载器类型")
+    runtime_config: Dict = Field(default={}, sa_column=Column(JSON), description="运行时配置") 
+    default_config: Dict = Field(default={}, sa_column=Column(JSON), description="默认配置值")
+    plugin_operation_schema: Dict = Field(default={}, sa_column=Column(JSON), description="插件操作定义")
     # BFF 代理配置
-    data_source_type: DataSourceType | None = Field(default=None, description="数据源类型")
-    data_source_config: Dict = Field(default={}, sa_column=Column(JSON), description="数据源配置") # TODO:这个可能可以移除
-    render_type: RenderType = Field(default=RenderType.LIST, description="UI渲染类型")
-    auth_config: Dict = Field(default={}, sa_column=Column(JSON), description="鉴权配置(加密存储)")
+
+   
+    render_type: RenderType = Field( description="UI渲染类型")
     tags: List[str] = Field(default=[], sa_column=Column(JSON), description="标签列表")
 
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
