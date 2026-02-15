@@ -21,7 +21,7 @@ class KDDescriptionResponse(BaseModel):
     update_at: datetime | None = None
 
 class KDCreateRequest(BaseModel):
-    name: str
+    title: str
     work_id: UUID | None = None
     description: str | None = None
 
@@ -32,7 +32,7 @@ class KDDescriptionCreateRequest(BaseModel):
 
 class KDUpdateRequest(BaseModel):
     enabled: bool
-    name: str
+    title: str
     description: str | None = None
 
 class KDDescriptionUpdateRequest(BaseModel):
