@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.error_handler import register_exception_handlers
 from api.routes.agent.document_helper.router import router as document_helper_router
@@ -22,6 +23,12 @@ from common.config import settings
 from common.log.log import logger
 from infrastructure.langgraph.checkpointer import PostgresCheckpointer
 from infrastructure.pg.pg_client import engine
+from core.plugin.manager import PluginManager
+from core.plugin.operation_scanner import scan_and_register_operations
+from core.plugin.operation_registry import PluginOperationRegistry
+from services.memory.service import MemoryService
+from services.work.service import WorkService
+from services.agent.service import AgentService
 
 
 @asynccontextmanager
@@ -30,14 +37,47 @@ async def lifespan(app: FastAPI):
     conn_string = settings.SQLALCHEMY_DATABASE_URI
     if "postgresql+asyncpg://" in conn_string:
         conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+    # TODO: 这里应该不需要,因为langgraph会自动进行checkpointer的初始化
+    # checkpointer = PostgresCheckpointer(conn_string)
+    # await checkpointer.setup()
+    # logger.info("LangGraph Checkpointer tables initialized")
     
-    checkpointer = PostgresCheckpointer(conn_string)
-    await checkpointer.setup()
-    logger.info("LangGraph Checkpointer tables initialized")
-    # 使用自定义的日志。
-    logger.info("数据库初始化完成")
-    config = settings.model_dump()
+
+    # TODO:扫描项目中的插件,并加载到数据库中?那还有必要存储到数据中吗?我们都是使用本地代码扫描的方式加载插件了...要怎么设计呢?
+    # 初始化插件管理器: 加载插件信息到内存中
+    plugin_manager = PluginManager()
+    async with AsyncSession(engine) as session:
+        await plugin_manager.load_all_plugins(session)
+    logger.info(f"已加载: {len(plugin_manager.definitions)} 个插件定义")
+    logger.info(f"已预实例化: {len(plugin_manager.instances)} 个全局插件实例")
+    
+    # 挂载到app状态
+    app.state.plugin_manager = plugin_manager
+    logger.info("插件管理器挂载完成")
+    
+    #  TODO: 这里合理吗?
+    service_classes = [MemoryService, WorkService, AgentService]
+    async with AsyncSession(engine) as session:
+        await scan_and_register_operations(service_classes, session)
+    logger.info(f"Registered {len(PluginOperationRegistry.get_all_operations())} plugin operations")
+    
+
+    # 动态创建插件操作路由
+    operation_map = PluginOperationRegistry.get_all_operations()
+    for op_key, handler in operation_map.items():
+        plugin_id, operation_name = op_key.split(":")
+        app.add_api_route(
+            f"/plugin/{plugin_id}/operation/{operation_name}",
+            handler,
+            methods=["POST"]
+        )
+    logger.info(f"Created {len(operation_map)} plugin operation routes")
+    
     yield
+    
+    # 清理插件管理器
+    await plugin_manager.cleanup()
+    logger.info("Plugin manager cleaned up")
     await engine.dispose()
     logger.info("数据库连接关闭")
 

@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.routes.plugin.schema import (
     DataSourceConfig,
     UrlDataSourceConfig,
-    CheckpointDataSourceConfig,
     JsonDataSourceConfig,
     InternalDataSourceConfig,
     PluginConfig,
@@ -71,11 +70,7 @@ class PluginService:
             return AgentMessagesPayload(sessions=[])
         if render_type == RenderType.CARD:
             return CardPayload(cards=[])
-        if render_type == RenderType.DETAIL:
-            return DetailPayload(detail=DetailItem(id="", title="", content=None, fields=[]))
-        if render_type == RenderType.DASHBOARD:
-            return DashboardPayload(widgets=[])
-        return ListPayload(items=[])
+        return CardPayload(cards=[])
 
     async def get_plugin_list(self) -> List[PluginMetaResponse]:
         """获取所有插件列表."""
@@ -219,13 +214,7 @@ class PluginService:
                 total=None
             )
 
-        if isinstance(data_source_config, CheckpointDataSourceConfig):
-            return StandardDataResponse(
-                plugin_id=plugin_id,
-                render_type=plugin.render_type,
-                payload=self._empty_payload(plugin.render_type),
-                total=0
-            )
+
 
         url = None
         if isinstance(data_source_config, UrlDataSourceConfig):

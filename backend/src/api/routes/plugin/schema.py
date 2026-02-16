@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum, RenderType, DataSourceType
+from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum, RenderType, LoaderType
 
 
 # --- Standard Data Protocol ---
@@ -97,32 +97,27 @@ RenderPayload = Union[
 可配置项
 """
 class UrlDataSourceConfig(BaseModel):
-    type: DataSourceType = DataSourceType.URL
+    type: LoaderType = LoaderType.URL
     url: str
 
-class CheckpointDataSourceConfig(BaseModel):
-    type: DataSourceType = DataSourceType.CHECKPOINT
-    namespace: str
-    thread_id: str | None = None
-    limit: int | None = None
+
 
 class JsonDataSourceConfig(BaseModel):
-    type: DataSourceType = DataSourceType.JSON
+    type: LoaderType = LoaderType.JSON
     payload: RenderPayload
 
 class InternalDataSourceConfig(BaseModel):
-    type: DataSourceType = DataSourceType.INTERNAL
+    type: LoaderType = LoaderType.INTERNAL
     endpoint: str
 """
 可配置项载体
 """
 DataSourceConfig = Union[
     UrlDataSourceConfig,
-    CheckpointDataSourceConfig,
     JsonDataSourceConfig,
     InternalDataSourceConfig,
 ]
-
+#  TODO: 标准输出: 所有的插件的最终在系统中的终端的结构应该保持阅读的结构:?或许进行迁移,或需思考其合理性
 class StandardDataResponse(BaseModel):
     plugin_id: UUID
     render_type: RenderType
@@ -136,7 +131,7 @@ class PluginMetaResponse(BaseModel):
     id: UUID
     name: str
     enabled: bool
-    render_type: RenderType = RenderType.LIST
+    render_type: RenderType = RenderType.CARD
 
 class PluginResponse(BaseModel):
     id: UUID
@@ -145,9 +140,9 @@ class PluginResponse(BaseModel):
     enabled: bool
     config: PluginConfig = Field(default_factory=PluginConfig)
     
-    data_source_type: DataSourceType | None = None
+    data_source_type: LoaderType | None = None
     data_source_config: DataSourceConfig | None = None
-    render_type: RenderType = RenderType.LIST
+    render_type: RenderType = RenderType.CARD
     auth_config: PluginConfig | None = None
     
     from_type: PluginFromTypeEnum  # 插件来源类型
@@ -157,6 +152,6 @@ class PluginResponse(BaseModel):
 class PluginUpdateRequest(BaseModel):
     enabled: bool | None = None
     config: PluginConfig | None = None
-    data_source_type: DataSourceType | None = None
+    data_source_type: LoaderType | None = None
     data_source_config: DataSourceConfig | None = None
     auth_config: PluginConfig | None = None

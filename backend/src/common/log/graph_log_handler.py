@@ -12,7 +12,7 @@ from langchain_core.load import dumpd
 from langchain_core.messages import AIMessage
 
 from common.log.log import logger
-from common.utils import (
+from common.utils.utils import (
     _safe_to_dict,
     get_run_id_for_node,
     pick_msg_fields,

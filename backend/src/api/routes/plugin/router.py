@@ -11,8 +11,10 @@ from api.routes.plugin.schema import (
     PluginUpdateRequest,
     StandardDataResponse
 )
+from backend.src.core.plugin.manager import PluginManager
 from infrastructure.pg.pg_client import get_session
 from services.plugin.service import PluginService
+from api.dependencies import get_plugin_manager
 
 router = APIRouter(prefix="/plugin", tags=["plugins"])
 
@@ -47,12 +49,18 @@ async def get_expand_plugins(
 async def proxy_plugin_data(
     plugin_id: UUID,
     request: Request,
-    service: PluginService = Depends(get_plugin_service)
+    plugin_manager: PluginManager = Depends(get_plugin_manager)
 ) -> Response[StandardDataResponse]:
     """BFF Proxy for plugin data."""
     # Capture all query params
     params = dict(request.query_params)
-    data = await service.proxy_plugin_data(plugin_id, params)
+    
+    # 使用插件管理器获取实例并执行
+    instance = await plugin_manager.get_instance(plugin_id)
+    if not instance:
+        return Response.fail("找不到插件")
+    
+    data = await instance.execute(params)
     return Response.ok(data=data)
 
 @router.get("/{plugin_id}", response_model=Response[PluginResponse])
