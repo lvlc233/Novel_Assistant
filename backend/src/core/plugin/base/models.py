@@ -4,10 +4,12 @@
 """
 from __future__ import annotations
 
-from typing import Dict, Any, List, Generic, TypeVar, Type, TypedDict, Optional
+from os import name
+from typing import Callable, Dict, Any, List, Generic, TypeVar, Type, TypedDict, Optional
 from abc import ABC
 from uuid import UUID
 from pydantic import BaseModel
+# from backend.src.services import plugin
 from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
 from core.plugin.utils import build_plugin_id
 
@@ -29,7 +31,7 @@ class BasePluginOperationItem(TypedDict):
     """
     interface: str
     args: Dict[str, Any]
-
+    # callable: Callable[..., Any] = None  # 可调用对象（插件方法）
 
 
 T = TypeVar('T', bound='BaseOperationBuilder')
@@ -125,8 +127,8 @@ class PluginDefinition(BaseModel):
     from_type: PluginFromTypeEnum                  # 插件来源类型
     scope_type: PluginScopeTypeEnum                # 插件作用域类型
     loader_type: LoaderType                       # 插件加载器类型
+    config_schema: Dict[str, Any] = {}           # 插件配置参数结构定义
     runtime_config: Dict[str, Any] = {}           # 插件运行时配置
-    default_config: Dict[str, Any] = {}           # 插件默认配置
     plugin_operation_schema: Dict[str, Any] = {}  # 插件操作接口定义
     render_type: RenderType                       # 插件渲染类型
     tags: List[str] = []                          # 插件标签
@@ -156,22 +158,5 @@ class PluginDefinition(BaseModel):
             plugin_operation_schema={"operations": operations_schema},
             **kwargs
         )
-
-
-
-"""
-插件运行时实例
-"""
-class PluginInstance:
-    """插件运行时实例"""
-    
-    def __init__(self, plugin_def: PluginDefinition, config: Dict[str, Any]):
-        # 插件结构
-        self.plugin_def = plugin_def
-        # 插件运行时配置参数
-        self.config = config
-        # 插件的运行时的数据
-        self.runtime_data: Dict[str, Any] = {}
-    
 
 
