@@ -170,28 +170,8 @@ class PluginInstance:
         self.plugin_def = plugin_def
         # 插件运行时配置参数
         self.config = config
-        # 插件加载器
-        self.loader: PluginLoader = create_loader(plugin_def.loader_type)
+        # 插件的运行时的数据
+        self.runtime_data: Dict[str, Any] = {}
     
-    
-    def get_info(self) -> Dict[str, Any]:
-        """获取插件实例信息"""
-        return {
-            "plugin_id": str(self.plugin_def.id),
-            "name": self.plugin_def.name,
-            "loader_type": self.plugin_def.loader_type.value,
-            "render_type": self.plugin_def.render_type.value,
-            "scope_type": self.plugin_def.scope_type.value
-        }
 
 
-# 插件加载器
-# TODO: 使用泛型动态加载不同的插件实例?
-class PluginLoader(ABC):
-    """插件加载器抽象接口"""
-    
-    @abstractmethod
-    async def load(self, plugin_def: PluginDefinition, config: Dict[str, Any])->PluginInstance:
-        """加载插件数据"""
-        pass
-    
