@@ -11,8 +11,9 @@ from api.routes.memory.schema import (
     MemoryMetaResponse,
     MemoryUpdateRequest,
 )
+from common.decorators.plugin_operation import plugin_operation
 from common.errors import ResourceNotFoundError
-from common.utils import create_uuid, get_now_time
+from common.utils.utils import create_uuid, get_now_time
 from infrastructure.pg.pg_models import MemorySQLEntity
 
 
@@ -22,6 +23,11 @@ class MemoryService:
         """Initialize MemoryService."""
         self.session = session
 
+    @plugin_operation(
+        plugin_id=UUID("00000000-0000-0000-0000-000000000002"), 
+        operation_name="get_memory_list",
+        response_model=List[MemoryMetaResponse]
+    )
     async def get_memory_list(self) -> List[MemoryMetaResponse]:
         """获取记忆列表."""
         stmt = select(MemorySQLEntity)

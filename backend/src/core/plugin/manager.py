@@ -7,8 +7,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.plugin.schema import PluginResponse
-from common.model.plugin_definition import PluginDefinition
-from core.plugin.instance import PluginInstance
+from backend.src.core.plugin.base.models import PluginDefinition, PluginInstance
 from services.plugin.service import PluginService
 
 # TODO: 这个不太好啊

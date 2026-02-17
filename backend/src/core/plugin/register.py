@@ -5,14 +5,13 @@
 from __future__ import annotations
 import hashlib
 import json
-from typing import Dict, List, Optional
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from common.model.base_plugin_models import BaseOperationBuilder
-from common.model.plugin_definition import PluginDefinition
+from backend.src.core.plugin.base.models import PluginDefinition
 from infrastructure.pg.pg_models import PluginSQLEntity
 from common.utils.utils import get_now_time
 from common.enums import LoaderType
@@ -122,27 +121,6 @@ class PluginRegistry:
             self._errors.append(error_msg)
             raise
     
-    async def register_from_builders(self,
-                                   plugin_id: UUID,
-                                   plugin_name: str,
-                                   loader_type: LoaderType,
-                                   operation_builders: List[BaseOperationBuilder],
-                                   **kwargs) -> UUID:
-        """从操作构建器注册插件"""
-        try:
-            plugin_def = PluginDefinition.from_operation_builders(
-                plugin_id=plugin_id,
-                plugin_name=plugin_name,
-                loader_type=loader_type,
-                operation_builders=operation_builders,
-                **kwargs
-            )
-            return await self.register(plugin_def)
-            
-        except Exception as e:
-            error_msg = f"Failed to register plugin from builders {plugin_name}: {str(e)}"
-            self._errors.append(error_msg)
-            raise
     
     async def register_with_deterministic_id(self,
                                           source_namespace: str,
@@ -152,7 +130,7 @@ class PluginRegistry:
                                           **kwargs) -> UUID:
         """使用确定性ID注册插件"""
         try:
-            plugin_def = PluginDefinition.with_deterministic_id(
+            plugin_def = PluginDefinition.create_plugin(
                 source_namespace=source_namespace,
                 plugin_name=plugin_name,
                 loader_type=loader_type,

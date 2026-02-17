@@ -7,3 +7,4 @@ def build_plugin_id(from_type:str,plugin_name:str):
     plugin_id = uuid.uuid5(from_type_space,plugin_name)
 
     return plugin_id
+

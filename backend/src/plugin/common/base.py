@@ -45,4 +45,4 @@ async def load_llm_with_dict(llm_dict: LLMBaseRuntime)->Tuple[BaseChatModel,str|
     user_prompt = llm_dict.get("user_prompt", None)
     
     return llm_model,user_prompt
-    
+    # 内部依赖

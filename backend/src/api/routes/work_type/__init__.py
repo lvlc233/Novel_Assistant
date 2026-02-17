@@ -1,1 +1,0 @@
-"""Work Type Routes package."""

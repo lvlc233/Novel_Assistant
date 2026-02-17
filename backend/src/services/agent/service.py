@@ -14,7 +14,6 @@ from api.routes.agent.schema import (
     MessagesSendRequest,
 )
 from common.errors import ResourceNotFoundError
-from core.agents.kd_builder.graph import kd_build_agent
 from infrastructure.pg.pg_models import AgentsManagerSQLEntity
 
 

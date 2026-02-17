@@ -54,44 +54,13 @@ class CardItem(BaseModel):
 class CardPayload(BaseModel):
     cards: List[CardItem]
 
-class ListItem(BaseModel):
-    id: str
-    title: str
-    subtitle: str | None = None
-    content: str | None = None
-    tags: List[str] = Field(default_factory=list)
-    metadata: List[KeyValueItem] = Field(default_factory=list)
 
-class ListPayload(BaseModel):
-    items: List[ListItem]
-
-class DetailItem(BaseModel):
-    id: str
-    title: str
-    content: str | None = None
-    fields: List[KeyValueItem] = Field(default_factory=list)
-
-class DetailPayload(BaseModel):
-    detail: DetailItem
-
-class DashboardWidget(BaseModel):
-    id: str
-    title: str
-    value: str | int | float | bool | None = None
-    unit: str | None = None
-    tags: List[str] = Field(default_factory=list)
-
-class DashboardPayload(BaseModel):
-    widgets: List[DashboardWidget]
 
 # 具体插件的UI数据载体
 RenderPayload = Union[
     ConfigPayload,
     AgentMessagesPayload,
-    CardPayload,
-    ListPayload,
-    DetailPayload,
-    DashboardPayload,
+    CardPayload
 ]
 """
 可配置项

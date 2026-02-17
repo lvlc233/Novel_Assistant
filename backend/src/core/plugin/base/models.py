@@ -1,0 +1,197 @@
+"""
+插件基础模型定义
+定义插件操作的数据结构和构建器
+"""
+from __future__ import annotations
+
+from typing import Dict, Any, List, Generic, TypeVar, Type, TypedDict, Optional
+from abc import ABC
+from uuid import UUID
+from pydantic import BaseModel
+from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
+from core.plugin.utils import build_plugin_id
+
+"""
+插件操作相关:
+"""
+class ParamDefinition(TypedDict):
+    """参数定义"""
+    type: str  # 类型描述字符串，如 "str", "int", "UUID|None"
+    description: str  # 参数描述
+    required: bool = True  # 是否必需
+    default: Any = None  # 默认值（可选）
+
+
+class BasePluginOperationItem(TypedDict):
+    """
+    基础的插件交互的数据结构.
+    用于定义插件交互的时候的交互接口和参数
+    """
+    interface: str
+    args: Dict[str, Any]
+
+
+
+T = TypeVar('T', bound='BaseOperationBuilder')
+
+# 操作构建器
+class BaseOperationBuilder(ABC):
+    """操作构建器基类"""
+    
+    def __init__(self, interface: str):
+        self._interface = interface  # 接口名
+        self._args_schema: Dict[str, ParamDefinition] = {}  # 参数结构定义
+        self._args_values: Dict[str, Any] = {}  # 参数值
+    
+    def param(self, name: str, value_type: str, description: str = "", 
+              required: bool = True, default: Any = None, tags:List[str] = None) -> 'BaseOperationBuilder':
+        """定义参数结构（基础方法）"""
+        self._args_schema[name] = ParamDefinition(
+            type=value_type,
+            description=description,
+            required=required,
+            default=default,
+            tags=tags
+        )
+        return self
+        
+    def value(self, name: str, value: Any) -> 'BaseOperationBuilder':
+        """设置参数值（基础方法）"""
+        self._args_values[name] = value
+        return self
+    
+    def build_schema(self) -> Dict[str, Any]:
+        """构建参数结构定义"""
+        return {
+            "interface": self._interface,
+            "params": {k: v.__dict__ for k, v in self._args_schema.items()}
+        }
+        
+    def build_runtime(self) -> Dict[str, Any]:
+        """构建运行时参数（包含默认值填充）"""
+        final_args = {}
+        for name, spec in self._args_schema.items():
+            # 核心填充逻辑：优先取 value，取不到则取 schema 里的 default
+            val = self._args_values.get(name, spec.default)
+            
+            # 必填校验
+            if spec.required and val is None:
+                raise ValueError(f"Missing required parameter: '{name}' for interface '{self._interface}'")
+            
+            if val is not None:
+                final_args[name] = val
+        
+        return {
+            "interface": self._interface,
+            "args": final_args
+        }
+
+# 插件操作容器
+class BasePluginOperation(Generic[T]):
+    """基础插件操作容器"""
+    
+    def __init__(self, builder_class: Type[T]):
+        self._builder_class = builder_class
+        self._builders: List[T] = []
+    
+    def add_operation(self, interface: str) -> T:
+        """开启一个新操作的构建"""
+        builder = self._builder_class(interface)
+        self._builders.append(builder)
+        return builder
+    
+    def create_schema(self) -> Dict[str, Any]:
+        """用于生成接口文档、UI 界面或 AI 提示词"""
+        return {
+            "operations": [b.build_schema() for b in self._builders]
+        }
+    
+    def create_runtime(self) -> Dict[str, Any]:
+        """用于实际的插件执行，此时默认值已填充"""
+        return {
+            "operations": [b.build_runtime() for b in self._builders]
+        }
+
+"""
+插件定义
+"""
+class PluginDefinition(BaseModel):
+    """插件定义模型"""
+    
+    id: UUID                                        # 插件ID
+    name: str                                       # 插件名称
+    version: str = "1.0.0"                         # 插件版本
+    description: Optional[str] = None              # 插件描述
+    from_type: PluginFromTypeEnum                  # 插件来源类型
+    scope_type: PluginScopeTypeEnum                # 插件作用域类型
+    loader_type: LoaderType                       # 插件加载器类型
+    runtime_config: Dict[str, Any] = {}           # 插件运行时配置
+    default_config: Dict[str, Any] = {}           # 插件默认配置
+    plugin_operation_schema: Dict[str, Any] = {}  # 插件操作接口定义
+    render_type: RenderType                       # 插件渲染类型
+    tags: List[str] = []                          # 插件标签
+    
+    @classmethod
+    def create_plugin(cls,
+                            source_namespace: str,
+                            plugin_name: str,
+                            loader_type: LoaderType,
+                            operation_builders: List[BaseOperationBuilder],
+                            **kwargs) -> 'PluginDefinition':
+        """
+        使用确定性ID创建插件定义
+        
+        :param source_namespace: 来源命名空间（如: "official", "user_123"）
+        :param plugin_name: 插件名称
+        :param loader_type: 加载器类型
+        :param operation_builders: 操作构建器列表
+        """
+        plugin_id = build_plugin_id(source_namespace, plugin_name)
+        operations_schema = [builder.build_schema() for builder in operation_builders]
+        
+        return cls(
+            id=plugin_id,
+            name=plugin_name,
+            loader_type=loader_type,
+            plugin_operation_schema={"operations": operations_schema},
+            **kwargs
+        )
+
+
+
+"""
+插件运行时实例
+"""
+class PluginInstance:
+    """插件运行时实例"""
+    
+    def __init__(self, plugin_def: PluginDefinition, config: Dict[str, Any]):
+        # 插件结构
+        self.plugin_def = plugin_def
+        # 插件运行时配置参数
+        self.config = config
+        # 插件加载器
+        self.loader: PluginLoader = create_loader(plugin_def.loader_type)
+    
+    
+    def get_info(self) -> Dict[str, Any]:
+        """获取插件实例信息"""
+        return {
+            "plugin_id": str(self.plugin_def.id),
+            "name": self.plugin_def.name,
+            "loader_type": self.plugin_def.loader_type.value,
+            "render_type": self.plugin_def.render_type.value,
+            "scope_type": self.plugin_def.scope_type.value
+        }
+
+
+# 插件加载器
+# TODO: 使用泛型动态加载不同的插件实例?
+class PluginLoader(ABC):
+    """插件加载器抽象接口"""
+    
+    @abstractmethod
+    async def load(self, plugin_def: PluginDefinition, config: Dict[str, Any])->PluginInstance:
+        """加载插件数据"""
+        pass
+    
