@@ -13,7 +13,7 @@ from sqlalchemy import desc
 @plugin_meta(
     name="kd",
     space="official", 
-    version="0.0.1",
+    version="0.0.2",
     description="知识库插件",
     render_type=RenderType.CARD,
     from_type=PluginFromTypeEnum.OFFICIAL,

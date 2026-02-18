@@ -12,10 +12,10 @@ from uuid import UUID
 from dataclasses import dataclass
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from core.plugin.base.models import PluginDefinition
-from infrastructure.pg.pg_models import PluginSQLEntity
+from infrastructure.pg.pg_models import PluginSQLEntity, WorkPluginMappingSQLEntity
 from common.utils.utils import get_now_time
 from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
 import importlib.util
@@ -141,6 +141,20 @@ class PluginManager:
         self._plugins[plugin.id] = self._entity_to_definition(plugin)
         plugin_id: UUID = plugin.id
         return plugin_id
+
+    async def remove_plugin(self, plugin_id: UUID) -> bool:
+        stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
+        result = await self.session.execute(stmt)
+        plugin = result.scalar_one_or_none()
+        if plugin is None:
+            return False
+        await self.session.execute(
+            delete(WorkPluginMappingSQLEntity).where(WorkPluginMappingSQLEntity.plugin_id == plugin_id)
+        )
+        await self.session.delete(plugin)
+        await self.session.commit()
+        self._plugins.pop(plugin_id, None)
+        return True
         
     
 

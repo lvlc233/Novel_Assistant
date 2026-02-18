@@ -7,7 +7,7 @@ import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
 import PluginManagerModal, { PluginType } from './PluginManagerModal';
 import { logger } from '@/lib/logger';
-import { getPlugins, getShopPlugins, registerShopPlugin, PluginShopItem } from '@/services/pluginService';
+import { getPlugins, getShopPlugins, registerShopPlugin, unregisterShopPlugin, PluginShopItem } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 
 /**
@@ -26,6 +26,7 @@ import { PluginInstance } from '@/types/plugin';
  * - [2026-02-18 20:05:FE-REF-20260218-03: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 打开弹窗后保持内容不透明且不溢出窗口; 实现概述: 调整遮罩层和弹窗尺寸样式。]
  * - [2026-02-18 20:08:FE-REF-20260218-04: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 保持遮罩透明但拦截交互; 实现概述: 移除黑色遮罩背景。]
  * - [2026-02-18 20:20:FE-REF-20260218-06: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 根据注册状态与版本差异显示加入/更新按钮; 实现概述: 增加注册状态与升级提示。]
+ * - [2026-02-19 01:39:FE-REF-20260219-01: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 已加入插件可点击“移除”完成卸载; 实现概述: 新增插件移除操作与接口调用。]
  */
 
 interface DashboardProps {
@@ -61,6 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const [isLoadingShop, setIsLoadingShop] = useState(false);
   const [shopError, setShopError] = useState<string | null>(null);
   const [registeringShopId, setRegisteringShopId] = useState<string | null>(null);
+  const [removingShopId, setRemovingShopId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCreateSelect = (type: 'blank' | 'template' | 'import') => {
@@ -121,6 +123,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
           setShopError('插件注册失败');
       } finally {
           setRegisteringShopId(null);
+      }
+  };
+
+  const handleUnregisterShopPlugin = async (pluginId: string) => {
+      try {
+          setRemovingShopId(pluginId);
+          await unregisterShopPlugin(pluginId);
+          await fetchShopPlugins();
+      } catch (error) {
+          logger.error('Failed to unregister shop plugin:', error);
+          setShopError('插件移除失败');
+      } finally {
+          setRemovingShopId(null);
       }
   };
 
@@ -333,6 +348,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                     const hasUpgrade = Boolean(plugin.upgrade_available);
                     const isInstalled = Boolean(plugin.installed);
                     const canUpgrade = isInstalled && hasUpgrade;
+                    const isRemoving = removingShopId === plugin.id;
                     const buttonLabel = isRegistering
                       ? '处理中...'
                       : canUpgrade
@@ -371,19 +387,34 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                           <div className="text-[11px] text-text-secondary">
                             {canUpgrade ? '检测到版本差异，可更新' : isInstalled ? '已加入系统' : '未加入系统'}
                           </div>
-                          <button
-                            onClick={() => handleRegisterShopPlugin(plugin.id)}
-                            disabled={isDisabled}
-                            className={`px-4 py-2 text-xs rounded-lg transition-colors ${
-                              isDisabled
-                                ? 'bg-gray-100 text-text-secondary cursor-not-allowed'
-                                : canUpgrade
-                                  ? 'bg-orange-500 text-white hover:bg-orange-600'
-                                  : 'bg-accent-primary text-white hover:bg-accent-primary/90'
-                            }`}
-                          >
-                            {buttonLabel}
-                          </button>
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              onClick={() => handleRegisterShopPlugin(plugin.id)}
+                              disabled={isDisabled}
+                              className={`px-4 py-2 text-xs rounded-lg transition-colors ${
+                                isDisabled
+                                  ? 'bg-gray-100 text-text-secondary cursor-not-allowed'
+                                  : canUpgrade
+                                    ? 'bg-orange-500 text-white hover:bg-orange-600'
+                                    : 'bg-accent-primary text-white hover:bg-accent-primary/90'
+                              }`}
+                            >
+                              {buttonLabel}
+                            </button>
+                            {isInstalled && (
+                              <button
+                                onClick={() => handleUnregisterShopPlugin(plugin.id)}
+                                disabled={isRegistering || isRemoving}
+                                className={`px-4 py-2 text-xs rounded-lg transition-colors ${
+                                  isRegistering || isRemoving
+                                    ? 'bg-gray-100 text-text-secondary cursor-not-allowed'
+                                    : 'bg-error/10 text-error hover:bg-error/20'
+                                }`}
+                              >
+                                {isRemoving ? '移除中...' : '移除'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

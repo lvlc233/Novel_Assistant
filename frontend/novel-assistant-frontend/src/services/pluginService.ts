@@ -130,6 +130,20 @@ export async function registerShopPlugin(pluginId: string): Promise<string> {
 }
 
 /**
+ * 移除插件市场插件
+ * 注释者: FrontendAgent(react)
+ * 时间: 2026-02-19 01:39
+ * 说明: 在插件市场卡片点击“移除”时调用，删除后端注册记录。
+ */
+export async function unregisterShopPlugin(pluginId: string): Promise<string> {
+  if (USE_MOCK) {
+    return pluginId;
+  }
+  await request.post(`/plugin/shop/${pluginId}/unregister`);
+  return pluginId;
+}
+
+/**
  * 获取插件数据 (BFF Proxy)
  * 注释者: FrontendAgent(react)
  * 时间: 2026-02-12 10:00:00
@@ -172,8 +186,8 @@ export async function updatePlugin(id: string, data: { enabled?: boolean; config
 /**
  * 卸载插件
  * 注释者: FrontendAgent(react)
- * 时间: 2026-01-26 19:40:00
- * 说明: 卸载指定ID的插件。对接后端 DELETE /plugin/{plugin_id} 接口。
+ * 时间: 2026-02-19 01:39
+ * 说明: 在插件管理页卸载插件时使用，改用插件市场移除接口。
  */
 export async function uninstallPlugin(pluginId: string): Promise<void> {
   if (USE_MOCK) {
@@ -183,6 +197,5 @@ export async function uninstallPlugin(pluginId: string): Promise<void> {
     }
     return new Promise((resolve) => setTimeout(resolve, 300));
   }
-  // Warning: Backend might not support DELETE yet
-  await request.delete(`/plugin/${pluginId}`);
+  await request.post(`/plugin/shop/${pluginId}/unregister`);
 }

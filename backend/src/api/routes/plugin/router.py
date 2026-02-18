@@ -116,6 +116,17 @@ async def register_internal_plugin(
     registered_id = await manager.add_plugin_with_register(plugin_def)
     return Response.ok(data=registered_id)
 
+@router.post("/internal/{plugin_id}/unregister", response_model=Response[UUID])
+async def unregister_internal_plugin(
+    plugin_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> Response[UUID]:
+    manager = PluginManager(session)
+    removed = await manager.remove_plugin(plugin_id)
+    if not removed:
+        return Response.fail(code=40400, message=f"插件不存在: {plugin_id}")
+    return Response.ok(data=plugin_id)
+
 @router.get("/shop", response_model=Response[List[PluginShopMetaResponse]])
 async def get_shop_plugins(
     # service: PluginService = Depends(get_plugin_service)
@@ -155,6 +166,17 @@ async def register_shop_plugin(
     manager = PluginManager(session)
     registered_id = await manager.add_plugin_with_register(plugin_def)
     return Response.ok(data=registered_id)
+
+@router.post("/shop/{plugin_id}/unregister", response_model=Response[UUID])
+async def unregister_shop_plugin(
+    plugin_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> Response[UUID]:
+    manager = PluginManager(session)
+    removed = await manager.remove_plugin(plugin_id)
+    if not removed:
+        return Response.fail(code=40400, message=f"插件不存在: {plugin_id}")
+    return Response.ok(data=plugin_id)
 
 @router.get("/{plugin_id}", response_model=Response[PluginResponse])
 async def get_plugin_detail(
