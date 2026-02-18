@@ -20,7 +20,7 @@ from api.routes.work.schema import (
 )
 from common.enums import PluginScopeTypeEnum, WorkStateCNEnum, WorkStateEnum
 from common.errors import PluginNotFoundError, ResourceNotFoundError
-from common.utils import get_now_time
+from common.utils.utils import get_now_time
 from infrastructure.pg.pg_models import (
     DocumentVersionSQLEntity,
     NodeRelationshipSQLEntity,

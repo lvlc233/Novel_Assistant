@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Union
+from typing import Any, List, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -124,3 +124,16 @@ class PluginUpdateRequest(BaseModel):
     data_source_type: LoaderType | None = None
     data_source_config: DataSourceConfig | None = None
     auth_config: PluginConfig | None = None
+
+class InternalPluginResponse(BaseModel):
+    id: UUID
+    name: str
+    version: str
+    description: str | None = None
+    from_type: PluginFromTypeEnum
+    scope_type: PluginScopeTypeEnum
+    loader_type: LoaderType
+    render_type: RenderType
+    tags: List[str] = Field(default_factory=list)
+    config_schema: dict[str, Any] = Field(default_factory=dict)
+    plugin_operation_schema: dict[str, Any] = Field(default_factory=dict)

@@ -15,7 +15,7 @@ from api.routes.node.schema import (
     DocumentDetailResponse
 )
 from common.errors import ResourceNotFoundError
-from common.utils import get_now_time
+from common.utils.utils import get_now_time
 from infrastructure.pg.pg_models import (
     DocumentVersionSQLEntity,
     NodeRelationshipSQLEntity,

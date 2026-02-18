@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from backend.src.core.plugin.base.models import PluginDefinition
+from core.plugin.utils import build_plugin_id
 from infrastructure.pg.pg_models import PluginSQLEntity
 from common.utils.utils import get_now_time
 from common.enums import LoaderType
@@ -88,7 +89,7 @@ class PluginManager:
             tags=plugin.tags or [],
         )
 
-    async def load_plugin(self):
+    async def load_plugin(self) -> None:
         """load插件"""
         # 从数据库中搜索插件,并将其转化到_plugins中
         stmt = select(PluginSQLEntity)
@@ -139,7 +140,8 @@ class PluginManager:
         await self.session.commit()
         await self.session.refresh(plugin)
         self._plugins[plugin.id] = self._entity_to_definition(plugin)
-        return plugin.id
+        plugin_id: UUID = plugin.id
+        return plugin_id
         
     
 
@@ -165,7 +167,7 @@ class PluginInternalRegistry(BaseModel):
         """根据ID获取插件定义"""
         return self.plugins
     
-    def discover_plugins(self,plugins_dir: str):
+    def discover_plugins(self, plugins_dir: str) -> List[PluginDefinition]:
         """
         递归扫描插件目录，发现所有插件定义,并注册到插件内部注册器中
         
@@ -192,9 +194,10 @@ class PluginInternalRegistry(BaseModel):
             raise PluginDiscoveryError(f"无法扫描插件目录 {plugins_dir}: {e}")
         
         self.plugins.extend(plugins)
+        return plugins
 
 
-    def _parse_plugin_file(self,plugin_file_path: str) -> Optional[PluginDefinition]:
+    def _parse_plugin_file(self, plugin_file_path: str) -> Optional[PluginDefinition]:
         """
         解析插件文件，提取插件定义
         
@@ -224,9 +227,9 @@ class PluginInternalRegistry(BaseModel):
                     not obj.__module__.startswith('builtins') and
                     not obj.__module__.startswith('__')):
                     
-                    plugin_metadata = self._extract_plugin_metadata(obj, plugin_file_path)
-                    if plugin_metadata:
-                        return plugin_metadata
+                    plugin_def = self._extract_plugin_metadata(obj, plugin_file_path)
+                    if plugin_def:
+                        return plugin_def
             
             return None
             
@@ -235,41 +238,12 @@ class PluginInternalRegistry(BaseModel):
             return None
 
 
-    def _extract_plugin_metadata(cls, plugin_file_path: str) -> Optional[Dict[str, Any]]:
+    def _extract_plugin_metadata(self, cls: type, plugin_file_path: str) -> Optional[PluginDefinition]:
         """
         从注解装饰的类中提取插件元数据
         """
-        # 检查是否有plugin装饰器的元数据
-        if (hasattr(cls, '__plugin_metadata__') and 
-            isinstance(getattr(cls, '__plugin_metadata__'), dict)):
-            
-            metadata = getattr(cls, '__plugin_metadata__').copy()
-            
-            # 添加必要的信息
-            metadata['file_path'] = plugin_file_path
-            metadata['module_name'] = f"plugin.{Path(plugin_file_path).parent.name}"
-            
-            # 如果没有ID，使用name作为ID
-            if 'id' not in metadata:
-                metadata['id'] = metadata.get('name', '').lower()
-                
-            # 提取配置信息
-            if hasattr(cls, '__plugin_config__') and cls.__plugin_config__:
-                metadata['config_schema'] = cls.__plugin_config__.schema
-            
-            # 提取操作信息
-            operations = {}
-            for name, method in inspect.getmembers(cls, inspect.isfunction):
-                if hasattr(method, '__plugin_operation__'):
-                    op_info = method.__plugin_operation__
-                    operations[op_info.name] = {
-                        'description': op_info.description,
-                        'input_schema': op_info.input_schema,
-                        'output_schema': op_info.output_schema
-                    }
-            
-            metadata['operations'] = operations
-            
-            return metadata
+        if hasattr(cls, "__plugin_wrapper__"):
+            wrapper = getattr(cls, "__plugin_wrapper__")
+            return wrapper.build_definition()
         
         return None

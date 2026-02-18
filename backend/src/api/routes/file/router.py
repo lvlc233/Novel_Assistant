@@ -3,7 +3,7 @@ import shutil
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-from common.utils import create_uuid
+from common.utils.utils import create_uuid
 
 router = APIRouter(tags=["file"])
 
