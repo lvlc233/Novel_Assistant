@@ -17,7 +17,7 @@ from sqlalchemy import select
 from core.plugin.base.models import PluginDefinition
 from infrastructure.pg.pg_models import PluginSQLEntity
 from common.utils.utils import get_now_time
-from common.enums import LoaderType
+from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
 import importlib.util
 import inspect
 from pathlib import Path
@@ -79,12 +79,12 @@ class PluginManager:
             name=plugin.name,
             version=plugin.version,
             description=plugin.description,
-            from_type=plugin.from_type,
-            scope_type=plugin.scope_type,
-            loader_type=plugin.loader_type or LoaderType.INTERNAL,
+            from_type=PluginFromTypeEnum(plugin.from_type),
+            scope_type=PluginScopeTypeEnum(plugin.scope_type),
+            loader_type=LoaderType(plugin.loader_type) if plugin.loader_type else LoaderType.INTERNAL,
             config_schema=plugin.runtime_config or {},
             plugin_operation_schema=plugin.plugin_operation_schema or {},
-            render_type=plugin.render_type,
+            render_type=RenderType(plugin.render_type),
             tags=plugin.tags or [],
         )
 
@@ -108,16 +108,16 @@ class PluginManager:
                 id=plugin_def["id"],
                 name=plugin_def["name"],
                 description=plugin_def.get("description"),
-                from_type=plugin_def["from_type"],
-                scope_type=plugin_def["scope_type"],
+                from_type=plugin_def["from_type"].value,
+                scope_type=plugin_def["scope_type"].value,
                 enabled=True,
                 version=plugin_def.get("version", "1.0.0"),
                 checksum=checksum,
-                loader_type=plugin_def["loader_type"],
+                loader_type=plugin_def["loader_type"].value,
                 runtime_config=plugin_def.get("config_schema", {}),
                 default_config={},
                 plugin_operation_schema=plugin_def.get("plugin_operation_schema", {}),
-                render_type=plugin_def["render_type"],
+                render_type=plugin_def["render_type"].value,
                 tags=plugin_def.get("tags", []),
                 update_at=get_now_time(),
             )
@@ -125,14 +125,14 @@ class PluginManager:
         else:
             plugin.name = plugin_def["name"]
             plugin.description = plugin_def.get("description")
-            plugin.from_type = plugin_def["from_type"]
-            plugin.scope_type = plugin_def["scope_type"]
+            plugin.from_type = plugin_def["from_type"].value
+            plugin.scope_type = plugin_def["scope_type"].value
             plugin.version = plugin_def.get("version", "1.0.0")
             plugin.checksum = checksum
-            plugin.loader_type = plugin_def["loader_type"]
+            plugin.loader_type = plugin_def["loader_type"].value
             plugin.runtime_config = plugin_def.get("config_schema", {})
             plugin.plugin_operation_schema = plugin_def.get("plugin_operation_schema", {})
-            plugin.render_type = plugin_def["render_type"]
+            plugin.render_type = plugin_def["render_type"].value
             plugin.tags = plugin_def.get("tags", [])
             plugin.update_at = get_now_time()
 

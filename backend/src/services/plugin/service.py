@@ -22,7 +22,7 @@ from api.routes.plugin.schema import (
     PluginUpdateRequest,
     StandardDataResponse
 )
-from common.enums import PluginFromTypeEnum, RenderType
+from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
 from common.errors import ResourceNotFoundError
 from infrastructure.pg.pg_models import PluginSQLEntity
 
@@ -81,13 +81,13 @@ class PluginService:
                 version=plugin.version,
                 description=plugin.description,
                 enabled=plugin.enabled,
-                render_type=plugin.render_type
+                render_type=RenderType(plugin.render_type)
             ) for plugin in plugins
         ]
 
     async def get_system_plugins(self) -> List[PluginResponse]:
         """获取系统插件列表 (SYSTEM)."""
-        stmt = select(PluginSQLEntity).where(PluginSQLEntity.from_type == PluginFromTypeEnum.SYSTEM)
+        stmt = select(PluginSQLEntity).where(PluginSQLEntity.from_type == PluginFromTypeEnum.SYSTEM.value)
         result = await self.session.execute(stmt)
         plugins = result.scalars().all()
         
@@ -98,12 +98,12 @@ class PluginService:
                 description=plugin.description,
                 enabled=plugin.enabled,
                 config=self._to_plugin_config(plugin.default_config),
-                data_source_type=plugin.data_source_type,
+                data_source_type=LoaderType(plugin.data_source_type) if plugin.data_source_type else None,
                 data_source_config=self._to_data_source_config(plugin),
-                render_type=plugin.render_type,
+                render_type=RenderType(plugin.render_type),
                 auth_config=self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
-                from_type=plugin.from_type,
-                scope_type=plugin.scope_type,
+                from_type=PluginFromTypeEnum(plugin.from_type),
+                scope_type=PluginScopeTypeEnum(plugin.scope_type),
                 tags=plugin.tags
             ) for plugin in plugins
         ]
@@ -111,7 +111,7 @@ class PluginService:
     async def get_expand_plugins(self) -> List[PluginMetaResponse]:
         """获取扩展插件列表 (OFFICIAL, CUSTOM)."""
         stmt = select(PluginSQLEntity).where(
-            PluginSQLEntity.from_type.in_([PluginFromTypeEnum.OFFICIAL, PluginFromTypeEnum.CUSTOM])
+            PluginSQLEntity.from_type.in_([PluginFromTypeEnum.OFFICIAL.value, PluginFromTypeEnum.CUSTOM.value])
         )
         result = await self.session.execute(stmt)
         plugins = result.scalars().all()
@@ -123,7 +123,7 @@ class PluginService:
                 version=plugin.version,
                 description=plugin.description,
                 enabled=plugin.enabled,
-                render_type=plugin.render_type
+                render_type=RenderType(plugin.render_type)
             ) for plugin in plugins
         ]
 
@@ -142,12 +142,12 @@ class PluginService:
             description=plugin.description,
             enabled=plugin.enabled,
             config=self._to_plugin_config(plugin.default_config),
-            data_source_type=plugin.data_source_type,
+            data_source_type=LoaderType(plugin.data_source_type) if plugin.data_source_type else None,
             data_source_config=self._to_data_source_config(plugin),
-            render_type=plugin.render_type,
+            render_type=RenderType(plugin.render_type),
             auth_config=self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
-            from_type=plugin.from_type,
-            scope_type=plugin.scope_type,
+            from_type=PluginFromTypeEnum(plugin.from_type),
+            scope_type=PluginScopeTypeEnum(plugin.scope_type),
             tags=plugin.tags
         )
 
@@ -161,7 +161,7 @@ class PluginService:
             raise ResourceNotFoundError(f"Plugin with id {plugin_id} not found")
             
         if request.enabled is not None:
-            if request.enabled is False and plugin.from_type == PluginFromTypeEnum.SYSTEM:
+            if request.enabled is False and plugin.from_type == PluginFromTypeEnum.SYSTEM.value:
                 # System plugins cannot be disabled
                 raise ValueError("System plugins cannot be disabled")
             plugin.enabled = request.enabled
@@ -170,12 +170,12 @@ class PluginService:
             plugin.default_config = self._to_config_dict(request.config)
 
         if request.data_source_type is not None:
-            plugin.data_source_type = request.data_source_type
+            plugin.data_source_type = request.data_source_type.value
 
         if request.data_source_config is not None:
             plugin.data_source_config = request.data_source_config.model_dump()
             if request.data_source_type is None:
-                plugin.data_source_type = request.data_source_config.type
+                plugin.data_source_type = request.data_source_config.type.value
             
         if request.auth_config is not None:
             plugin.auth_config = self._to_config_dict(request.auth_config)

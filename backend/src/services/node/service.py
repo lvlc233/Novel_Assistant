@@ -14,6 +14,7 @@ from api.routes.node.schema import (
     DocumentVersionItem,
     DocumentDetailResponse
 )
+from common.enums import NodeTypeEnum
 from common.errors import ResourceNotFoundError
 from common.utils.utils import get_now_time
 from infrastructure.pg.pg_models import (
@@ -39,7 +40,7 @@ class NodeService:
         new_node = NodeSQLEntity(
             work_id=work_id,
             name=request.name,
-            node_type=request.type,
+            node_type=request.type.value,
             description=request.description
         )
         self.session.add(new_node)
@@ -49,7 +50,7 @@ class NodeService:
         # 2. 如果是文档，创建初始版本
         content = ""
         word_count = 0
-        if request.type == "document":
+        if request.type == NodeTypeEnum.DOCUMENT:
             logger.info(f"[CreateNode] Creating initial version for document node {new_node.id}")
             version = DocumentVersionSQLEntity(
                 node_id=new_node.id,
@@ -84,7 +85,7 @@ class NodeService:
             id=new_node.id,
             name=new_node.name,
             content=content,
-            type=new_node.node_type, # type: ignore
+            type=NodeTypeEnum(new_node.node_type),
             word_count=word_count,
             description=new_node.description,
             parent_node_id=request.parent_node_id, # Return the parent_id from request as it's just created
@@ -108,7 +109,7 @@ class NodeService:
         content = ""
         word_count = 0
         
-        if node.node_type == "document":
+        if node.node_type == NodeTypeEnum.DOCUMENT.value:
             # 获取指定版本(now_version) 或 最新版本
             latest_version = None
             if node.now_version:
@@ -143,7 +144,7 @@ class NodeService:
             work_id=node.work_id,
             name=node.name,
             content=content,
-            type=node.node_type, # type: ignore
+            type=NodeTypeEnum(node.node_type),
             word_count=word_count,
             description=node.description,
             parent_node_id=parent_id,
@@ -229,7 +230,7 @@ class NodeService:
             work_id=node.work_id,
             name=node.name,
             content=content,
-            type=node.node_type, # type: ignore
+            type=NodeTypeEnum(node.node_type),
             word_count=word_count,
             description=node.description,
             parent_node_id=parent_id,
@@ -470,7 +471,7 @@ class NodeService:
             id=node.id,
             name=node.name,
             content=content,
-            type=node.node_type, # type: ignore
+            type=NodeTypeEnum(node.node_type),
             word_count=word_count,
             description=node.description,
             parent_node_id=current_parent_id

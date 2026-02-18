@@ -4,7 +4,7 @@ from typing import Dict, List
 from typing_extensions import runtime
 from uuid import UUID
 
-from sqlalchemy import JSON, TIMESTAMP, Column
+from sqlalchemy import JSON, TIMESTAMP, Column, String
 from sqlmodel import Field, Relationship, SQLModel
 
 from common.enums import (
@@ -30,8 +30,8 @@ class PluginSQLEntity(SQLModel, table=True):
     description: str | None = Field(default=None, description="插件描述")
     
     # 插件类型与作用域
-    from_type: PluginFromTypeEnum = Field(default=PluginFromTypeEnum.SYSTEM, description="来源: system(系统内置), custom(用户自定义)")
-    scope_type: PluginScopeTypeEnum = Field(default=PluginScopeTypeEnum.WORK, description="作用域: global(全局), work(作品级), document(文档级)")
+    from_type: str = Field(default=PluginFromTypeEnum.SYSTEM.value, sa_column=Column(String), description="来源: system(系统内置), custom(用户自定义)")
+    scope_type: str = Field(default=PluginScopeTypeEnum.WORK.value, sa_column=Column(String), description="作用域: global(全局), work(作品级), document(文档级)")
     
     # 全局开关
     enabled: bool = Field(default=True, description="全局启用状态")
@@ -41,14 +41,15 @@ class PluginSQLEntity(SQLModel, table=True):
     checksum: str = Field(default="", description="配置校验和")
     
     # 配置定义 (Schema) 与 默认配置
-    loader_type: LoaderType | None = Field(default=None, description="加载器类型")
+    loader_type: str | None = Field(default=None, sa_column=Column(String), description="加载器类型")
+    data_source_type: str | None = Field(default=None, sa_column=Column(String), description="数据源类型")
     runtime_config: Dict = Field(default={}, sa_column=Column(JSON), description="运行时配置") 
     default_config: Dict = Field(default={}, sa_column=Column(JSON), description="默认配置值")
     plugin_operation_schema: Dict = Field(default={}, sa_column=Column(JSON), description="插件操作定义")
     # BFF 代理配置
 
    
-    render_type: RenderType = Field( description="UI渲染类型")
+    render_type: str = Field(default=RenderType.CARD.value, sa_column=Column(String), description="UI渲染类型")
     tags: List[str] = Field(default=[], sa_column=Column(JSON), description="标签列表")
 
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
@@ -69,9 +70,9 @@ class WorkSQLEntity(SQLModel, table=True):
     summary: str | None = Field(default=None, description="作品简介")
     
     # 作品类型，对应某种 WorkType 插件的标识
-    work_type: WorkTypeEnum = Field(default=WorkTypeEnum.NOVEL, description="作品类型标识")
+    work_type: str = Field(default=WorkTypeEnum.NOVEL.value, sa_column=Column(String), description="作品类型标识")
     
-    state: WorkStateEnum = Field(default=WorkStateEnum.UPDATING, description="状态: updating, completed")
+    state: str = Field(default=WorkStateEnum.UPDATING.value, sa_column=Column(String), description="状态: updating, completed")
     
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
     update_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
@@ -148,7 +149,7 @@ class NodeSQLEntity(SQLModel, table=True):
     
     name: str = Field(default="未命名节点")
     description: str | None = Field(default=None, description="节点描述")
-    node_type: NodeTypeEnum = Field(description="类型: document, folder, whiteboard...")
+    node_type: str = Field(default=NodeTypeEnum.FOLDER.value, sa_column=Column(String), description="类型: document, folder, whiteboard...")
     
     now_version: str | None = Field(default=None, description="当前版本ID")
 
@@ -226,7 +227,7 @@ class MemorySQLEntity(SQLModel, table=True):
     name: str = Field(default="未命名记忆库")
     description: str | None = None
     enabled: bool = Field(default=True, description="是否启用记忆库")
-    type: MemoryTypeEnum = Field(description="记忆类型")
+    type: str = Field(default=MemoryTypeEnum.LONG_TERM.value, sa_column=Column(String), description="记忆类型")
     context: str
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
     update_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True)) 

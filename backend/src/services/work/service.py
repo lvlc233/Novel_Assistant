@@ -18,7 +18,13 @@ from api.routes.work.schema import (
     WorkPluginDetailResponse,
     WorkPluginMetaResponse,
 )
-from common.enums import PluginScopeTypeEnum, WorkStateCNEnum, WorkStateEnum
+from common.enums import (
+    NodeTypeEnum,
+    PluginScopeTypeEnum,
+    WorkStateCNEnum,
+    WorkStateEnum,
+    WorkTypeEnum,
+)
 from common.errors import PluginNotFoundError, ResourceNotFoundError
 from common.utils.utils import get_now_time
 from infrastructure.pg.pg_models import (
@@ -44,7 +50,7 @@ class WorkService:
             name=request.name or "未命名作品",
             cover_image_url=request.cover_image_url,
             summary=request.summary,
-            work_type=request.type
+            work_type=request.type.value
         )
         self.session.add(new_work)
         await self.session.flush() # 获取 ID
@@ -81,7 +87,7 @@ class WorkService:
                 name=new_work.name,
                 summary=new_work.summary,
                 state=WorkStateCNEnum.COMPLETED if new_work.state == WorkStateEnum.COMPLETED.value else WorkStateCNEnum.UPDATING,
-                type=new_work.work_type,
+                type=WorkTypeEnum(new_work.work_type),
                 create_at=new_work.create_at,
                 update_at=new_work.update_at
             )
@@ -161,7 +167,7 @@ class WorkService:
                 NodeDTO(
                     id=n.id,
                     name=n.name,
-                    type=n.node_type, # type: ignore
+                    type=NodeTypeEnum(n.node_type),
                     description=n.description,
                     now_version=n.now_version
                 ) for n in nodes
@@ -190,7 +196,11 @@ class WorkService:
         if request.summary is not None:
             work.summary = request.summary
         if request.state is not None:
-            work.state = WorkStateEnum.COMPLETED if request.state == WorkStateCNEnum.COMPLETED else WorkStateEnum.UPDATING
+            work.state = (
+                WorkStateEnum.COMPLETED.value
+                if request.state == WorkStateCNEnum.COMPLETED
+                else WorkStateEnum.UPDATING.value
+            )
             
         work.update_at = get_now_time()
         await self.session.commit()
@@ -202,7 +212,7 @@ class WorkService:
             name=work.name,
             summary=work.summary,
             state=WorkStateCNEnum.COMPLETED if work.state == WorkStateEnum.COMPLETED.value else WorkStateCNEnum.UPDATING,           
-            type=work.work_type,
+            type=WorkTypeEnum(work.work_type),
             create_at=work.create_at,
             update_at=work.update_at
         )
@@ -231,7 +241,7 @@ class WorkService:
                     plugin_id=p.id,
                     name=p.name,
                     enabled=m.enabled,
-                    scope_type=p.scope_type,
+                    scope_type=PluginScopeTypeEnum(p.scope_type),
                     tags=p.tags
                 ))
         return response
@@ -274,7 +284,7 @@ class WorkService:
             enabled=mapping.enabled,
             config=mapping.config,
             default_config=plugin.default_config,
-            scope_type=plugin.scope_type,
+            scope_type=PluginScopeTypeEnum(plugin.scope_type),
             config_schema=plugin.config_schema
         )
 
@@ -303,8 +313,7 @@ class WorkService:
             enabled=mapping.enabled,
             config=mapping.config,
             default_config=plugin.default_config,
-            scope_type=plugin.scope_type,
+            scope_type=PluginScopeTypeEnum(plugin.scope_type),
             config_schema=plugin.config_schema
         )
-
 
