@@ -3,17 +3,15 @@
 """
 from typing import Dict, Any, Optional
 
-from core.plugin.decorators import plugin, config, operation
+from core.plugin.annotations import plugin_meta, runtime_config, operation
 from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum, LoaderType, RenderType
 
 
-@config
-@plugin(
+@plugin_meta(
     name="demoPlugin",
     space="demoPlugin", 
     version="1.0.0",
     description="这是一个演示插件",
-    loader_type=LoaderType.INTERNAL,
     render_type=RenderType.CARD,
     from_type=PluginFromTypeEnum.OFFICIAL,
     scope_type=PluginScopeTypeEnum.GLOBAL,
@@ -25,6 +23,7 @@ class DemoPlugin:
     这是一个示例插件，展示了三注解系统的使用方法
     """
 
+    @runtime_config
     def __init__(self, 
                  database_url: str, 
                  max_connections: int = 10, 
@@ -46,12 +45,6 @@ class DemoPlugin:
             'enabled': enabled
         }
         self.runtime_data: Dict[str, Any] = {}
-
-    def __init__(self, 
-                 database_url: str, 
-                 max_connections: int = 10, 
-                 timeout: float = 30.0,
-                 enabled: bool = True):
         """
         插件初始化方法
         
