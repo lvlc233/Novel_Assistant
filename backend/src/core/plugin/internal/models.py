@@ -1,8 +1,8 @@
 
 
 from typing import Any, Dict
-from backend.src.common.enums import LoaderType
-from backend.src.core.plugin.base.models import BaseOperationBuilder, BasePluginOperation
+from common.enums import LoaderType
+from core.plugin.base.models import BaseOperationBuilder, BasePluginOperation
 
 
 class InternalOperationBuilder(BaseOperationBuilder):

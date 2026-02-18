@@ -14,8 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from backend.src.core.plugin.base.models import PluginDefinition
-from core.plugin.utils import build_plugin_id
+from core.plugin.base.models import PluginDefinition
 from infrastructure.pg.pg_models import PluginSQLEntity
 from common.utils.utils import get_now_time
 from common.enums import LoaderType

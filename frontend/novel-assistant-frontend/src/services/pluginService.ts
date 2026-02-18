@@ -9,6 +9,8 @@ const MOCK_PLUGINS: PluginInstance[] = [];
 interface PluginMetaResponse {
   id: string;
   name: string;
+  version: string;
+  description?: string | null;
   enabled: boolean;
   render_type: RenderType;
 }
@@ -22,6 +24,18 @@ interface PluginResponse extends PluginMetaResponse {
   tags: string[];
 }
 
+export interface PluginShopItem {
+  id: string;
+  name: string;
+  version: string;
+  description?: string | null;
+  enabled: boolean;
+  installed: boolean;
+  installed_version?: string | null;
+  latest_version?: string | null;
+  upgrade_available?: boolean;
+}
+
 
 // Mapper
 const mapMetaToInstance = (meta: PluginMetaResponse): PluginInstance => {
@@ -33,8 +47,8 @@ const mapMetaToInstance = (meta: PluginMetaResponse): PluginInstance => {
     manifest: {
       id: meta.id,
       name: meta.name,
-      version: '1.0.0', 
-      description: '', 
+      version: meta.version,
+      description: meta.description || '', 
       author: 'System', 
       type: 'system', 
       render_type: meta.render_type,
@@ -86,6 +100,33 @@ export async function getSystemPlugins(): Promise<PluginInstance[]> {
   }
   const response = await request.get<PluginResponse[]>('/plugin/system');
   return response.map(mapResponseToInstance);
+}
+
+/**
+ * 获取插件市场列表
+ * 注释者: FrontendAgent(react)
+ * 时间: 2026-02-18 20:20
+ * 说明: 在仪表盘插件市场弹窗中使用，获取插件注册状态与版本差异信息。
+ */
+export async function getShopPlugins(): Promise<PluginShopItem[]> {
+  if (USE_MOCK) {
+    return []; 
+  }
+  return request.get<PluginShopItem[]>('/plugin/shop');
+}
+
+/**
+ * 注册插件市场插件
+ * 注释者: FrontendAgent(react)
+ * 时间: 2026-02-18 18:31
+ * 说明: 在插件市场卡片点击“注册插件”时调用，触发后端注册流程。
+ */
+export async function registerShopPlugin(pluginId: string): Promise<string> {
+  if (USE_MOCK) {
+    return pluginId;
+  }
+  await request.post(`/plugin/shop/${pluginId}/register`);
+  return pluginId;
 }
 
 /**

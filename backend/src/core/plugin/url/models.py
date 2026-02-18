@@ -2,8 +2,8 @@
 from typing import Any, Dict, Literal
 
 import httpx
-from backend.src.common.enums import LoaderType
-from backend.src.core.plugin.base.models import BaseOperationBuilder, BasePluginOperation, PluginLoader
+from common.enums import LoaderType
+from core.plugin.base.models import BaseOperationBuilder, BasePluginOperation, PluginLoader
 
 
 

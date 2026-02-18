@@ -2,9 +2,9 @@
 from typing import List
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.common.errors import ResourceNotFoundError
-from backend.src.infrastructure.pg.pg_models import KnowledgeBaseSQLEntity, KnowledgeChunkSQLEntity
-from backend.src.plugin.kd.schema import KDCreateRequest, KDDescriptionCreateRequest, KDDescriptionResponse, KDDescriptionUpdateRequest, KDMetaResponse, KDUpdateRequest
+from common.errors import ResourceNotFoundError
+from infrastructure.pg.pg_models import KnowledgeBaseSQLEntity, KnowledgeChunkSQLEntity
+from plugin.kd.schema import KDCreateRequest, KDDescriptionCreateRequest, KDDescriptionResponse, KDDescriptionUpdateRequest, KDMetaResponse, KDUpdateRequest
 from core.plugin.annotations import plugin_meta, runtime_config, operation
 from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
 from sqlalchemy import delete, select

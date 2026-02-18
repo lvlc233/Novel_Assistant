@@ -9,7 +9,6 @@ from typing import Callable, Dict, Any, List, Generic, TypeVar, Type, TypedDict,
 from abc import ABC
 from uuid import UUID
 from pydantic import BaseModel
-# from backend.src.services import plugin
 from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
 from core.plugin.utils import build_plugin_id
 

@@ -2,25 +2,30 @@
 // 仪表盘
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Settings, Plus, LayoutGrid, Sparkles, BarChart3, Database, Brain, Bot, FileEdit, Briefcase, Puzzle } from 'lucide-react';
+import { FileText, Settings, LayoutGrid, Sparkles, Database, Brain, Bot, FileEdit, Briefcase, Puzzle, X, Loader2 } from 'lucide-react';
 import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
 import PluginManagerModal, { PluginType } from './PluginManagerModal';
 import { logger } from '@/lib/logger';
-import { getPlugins } from '@/services/pluginService';
+import { getPlugins, getShopPlugins, registerShopPlugin, PluginShopItem } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 
 /**
  * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260126-04
+ * 当前版本: FE-REF-20260218-06
  * 创建时间: 2026-01-20 22:35
- * 更新时间: 2026-01-26 21:40
+ * 更新时间: 2026-02-18 20:20
  * 更新记录:
  * - [2026-01-20 22:35:FE-REF-20260120-03: 在何处使用: 首页仪表盘；如何使用: 点击插件卡片展开扇形选择区；实现概述: 重构布局为 Fan Interaction，移除知识库入口以匹配设计稿。]
  * - [2026-01-25 15:30:FE-REF-20260125-01: 更新插件列表为实际业务模块（记忆、知识库、Agent）；添加点击跳转逻辑。]
  * - [2026-01-25 15:45:FE-REF-20260125-02: 修复滚动方向为横向；移除卡片旋转以修复渲染问题；点击卡片弹出模态框而非跳转。]
  * - [2026-01-25 16:30:FE-REF-20260125-03: 拆分 Agent 为文档助手和项目助手。]
  * - [2026-01-26 21:40:FE-REF-20260126-04: 对接后端插件列表接口 (GET /plugin)。]
+ * - [2026-02-18 18:21:FE-REF-20260218-01: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘卡片区; 如何使用: 点击“插件市场”跳转插件页面; 实现概述: 在插件扩展区右侧新增插件市场卡片。]
+ * - [2026-02-18 18:31:FE-REF-20260218-02: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 点击“插件市场”弹出卡片列表并注册; 实现概述: 新增插件市场弹窗与注册操作。]
+ * - [2026-02-18 20:05:FE-REF-20260218-03: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 打开弹窗后保持内容不透明且不溢出窗口; 实现概述: 调整遮罩层和弹窗尺寸样式。]
+ * - [2026-02-18 20:08:FE-REF-20260218-04: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 保持遮罩透明但拦截交互; 实现概述: 移除黑色遮罩背景。]
+ * - [2026-02-18 20:20:FE-REF-20260218-06: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 根据注册状态与版本差异显示加入/更新按钮; 实现概述: 增加注册状态与升级提示。]
  */
 
 interface DashboardProps {
@@ -51,6 +56,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const [selectedPlugin, setSelectedPlugin] = useState<PluginType | null>(null);
   const [plugins, setPlugins] = useState<PluginInstance[]>([]);
   const [isLoadingPlugins, setIsLoadingPlugins] = useState(false);
+  const [isShopOpen, setIsShopOpen] = useState(false);
+  const [shopPlugins, setShopPlugins] = useState<PluginShopItem[]>([]);
+  const [isLoadingShop, setIsLoadingShop] = useState(false);
+  const [shopError, setShopError] = useState<string | null>(null);
+  const [registeringShopId, setRegisteringShopId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCreateSelect = (type: 'blank' | 'template' | 'import') => {
@@ -58,6 +68,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
     setIsCreateMenuOpen(false);
     router.push('/editor');
   };
+
+  useEffect(() => {
+    if (!isShopOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isShopOpen]);
 
   const fetchPlugins = async () => {
       try {
@@ -68,6 +87,40 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
           logger.error('Failed to fetch plugins:', error);
       } finally {
           setIsLoadingPlugins(false);
+      }
+  };
+
+  const fetchShopPlugins = async () => {
+      try {
+          setIsLoadingShop(true);
+          setShopError(null);
+          const data = await getShopPlugins();
+          setShopPlugins(data);
+      } catch (error) {
+          logger.error('Failed to fetch shop plugins:', error);
+          setShopError('插件市场加载失败');
+      } finally {
+          setIsLoadingShop(false);
+      }
+  };
+
+  const handleOpenShop = () => {
+      setIsShopOpen(true);
+      if (shopPlugins.length === 0) {
+          fetchShopPlugins();
+      }
+  };
+
+  const handleRegisterShopPlugin = async (pluginId: string) => {
+      try {
+          setRegisteringShopId(pluginId);
+          await registerShopPlugin(pluginId);
+          await fetchShopPlugins();
+      } catch (error) {
+          logger.error('Failed to register shop plugin:', error);
+          setShopError('插件注册失败');
+      } finally {
+          setRegisteringShopId(null);
       }
   };
 
@@ -223,9 +276,129 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
             </div>
         </div>
 
+        {/* 4. Plugin Market (Fixed Right) */}
+        <div className={`transform transition-all duration-500 ${isPluginsExpanded ? 'translate-x-2 rotate-[4deg]' : 'rotate-3 hover:-translate-y-2'}`}>
+            <FeatureCard
+              title="插件市场"
+              icon={<Sparkles className="w-8 h-8" />}
+              rotation="rotate-0"
+              color="bg-white"
+              onClick={handleOpenShop}
+            />
+        </div>
+
       </div>
 
       <QuickCreateMenu isOpen={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} onSelect={handleCreateSelect} />
+
+      {isShopOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-transparent animate-fade-in">
+          <div className="w-[960px] max-w-[92vw] h-[640px] max-h-[90vh] bg-white rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden animate-scale-up relative mx-4">
+            <div className="h-16 px-6 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-surface-secondary flex items-center justify-center text-accent-primary">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-text-primary">插件市场</h2>
+                  <p className="text-xs text-text-secondary">从商店注册插件并启用到系统</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsShopOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 bg-white">
+              {isLoadingShop && (
+                <div className="flex items-center justify-center h-full text-text-secondary gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  加载插件市场中...
+                </div>
+              )}
+
+              {!isLoadingShop && shopError && (
+                <div className="text-center text-sm text-error bg-red-50 border border-red-100 rounded-lg py-3">
+                  {shopError}
+                </div>
+              )}
+
+              {!isLoadingShop && !shopError && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {shopPlugins.map((plugin) => {
+                    const isRegistering = registeringShopId === plugin.id;
+                    const hasUpgrade = Boolean(plugin.upgrade_available);
+                    const isInstalled = Boolean(plugin.installed);
+                    const canUpgrade = isInstalled && hasUpgrade;
+                    const buttonLabel = isRegistering
+                      ? '处理中...'
+                      : canUpgrade
+                        ? '更新到系统'
+                        : isInstalled
+                          ? '已加入'
+                          : '加入系统';
+                    const isDisabled = isRegistering || (isInstalled && !canUpgrade);
+                    return (
+                      <div
+                        key={plugin.id}
+                        className="bg-surface-white rounded-xl p-5 border border-border-primary shadow-sm flex flex-col gap-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-base font-bold text-text-primary">{plugin.name}</h3>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+                              <span>最新 v{plugin.latest_version || plugin.version}</span>
+                              {isInstalled && plugin.installed_version && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                                  canUpgrade ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'
+                                }`}>
+                                  当前 v{plugin.installed_version}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="w-10 h-10 rounded-lg bg-accent-secondary/10 text-accent-secondary flex items-center justify-center">
+                            <Puzzle className="w-5 h-5" />
+                          </div>
+                        </div>
+                        <p className="text-sm text-text-secondary line-clamp-3">
+                          {plugin.description || '暂无插件描述'}
+                        </p>
+                        <div className="mt-auto flex items-center justify-between gap-3">
+                          <div className="text-[11px] text-text-secondary">
+                            {canUpgrade ? '检测到版本差异，可更新' : isInstalled ? '已加入系统' : '未加入系统'}
+                          </div>
+                          <button
+                            onClick={() => handleRegisterShopPlugin(plugin.id)}
+                            disabled={isDisabled}
+                            className={`px-4 py-2 text-xs rounded-lg transition-colors ${
+                              isDisabled
+                                ? 'bg-gray-100 text-text-secondary cursor-not-allowed'
+                                : canUpgrade
+                                  ? 'bg-orange-500 text-white hover:bg-orange-600'
+                                  : 'bg-accent-primary text-white hover:bg-accent-primary/90'
+                            }`}
+                          >
+                            {buttonLabel}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {shopPlugins.length === 0 && (
+                    <div className="col-span-full text-center text-text-secondary py-12">
+                      暂无可注册插件
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       
       {selectedPlugin && (
           <PluginManagerModal 

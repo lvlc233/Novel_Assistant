@@ -1,4 +1,5 @@
 """FastAPI application for ufan_agent."""
+from math import log
 import os
 from contextlib import asynccontextmanager
 
@@ -80,7 +81,8 @@ async def lifespan(app: FastAPI):
     if os.path.exists(plugins_dir):
         internal_registry.discover_plugins(plugins_dir)
     app.state.internal_plugin_registry = internal_registry
-
+    logger.info(f"已加载: {len(internal_registry.get_plugin_list())} 个内部插件定义")
+    logger.info(f"已预实例化: {internal_registry}")
     yield
     
     # 清理插件管理器

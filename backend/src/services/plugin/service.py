@@ -78,6 +78,8 @@ class PluginService:
             PluginMetaResponse(
                 id=plugin.id,
                 name=plugin.name,
+                version=plugin.version,
+                description=plugin.description,
                 enabled=plugin.enabled,
                 render_type=plugin.render_type
             ) for plugin in plugins
@@ -118,6 +120,8 @@ class PluginService:
             PluginMetaResponse(
                 id=plugin.id,
                 name=plugin.name,
+                version=plugin.version,
+                description=plugin.description,
                 enabled=plugin.enabled,
                 render_type=plugin.render_type
             ) for plugin in plugins
@@ -241,4 +245,3 @@ class PluginService:
                 return StandardDataResponse.model_validate(data)
             except httpx.HTTPError as e:
                 raise ValueError(f"Upstream service error: {str(e)}")
-

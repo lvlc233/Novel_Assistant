@@ -99,8 +99,22 @@ class StandardDataResponse(BaseModel):
 class PluginMetaResponse(BaseModel):
     id: UUID
     name: str
+    version: str
+    description: str | None = None
     enabled: bool
     render_type: RenderType = RenderType.CARD
+
+class PluginShopMetaResponse(BaseModel):
+    id: UUID
+    name: str
+    version: str
+    description: str | None = None
+    enabled: bool
+    render_type: RenderType = RenderType.CARD
+    installed: bool = False
+    installed_version: str | None = None
+    latest_version: str | None = None
+    upgrade_available: bool = False
 
 class PluginResponse(BaseModel):
     id: UUID
