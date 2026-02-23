@@ -22,6 +22,21 @@ interface PluginResponse extends PluginMetaResponse {
   from_type: 'system' | 'custom' | 'official';
   scope_type: 'global' | 'work' | 'document';
   tags: string[];
+  data_source_entry_point?: string;
+}
+
+export interface InternalPluginItem {
+  id: string;
+  name: string;
+  version: string;
+  description?: string | null;
+  from_type: 'system' | 'custom' | 'official';
+  scope_type: 'global' | 'work' | 'document';
+  loader_type: 'internal' | 'url' | 'json';
+  render_type: RenderType;
+  tags: string[];
+  config_schema: Record<string, unknown>;
+  plugin_operation_schema: Record<string, unknown>;
 }
 
 export interface PluginShopItem {
@@ -30,11 +45,42 @@ export interface PluginShopItem {
   version: string;
   description?: string | null;
   enabled: boolean;
+  render_type: RenderType;
   installed: boolean;
   installed_version?: string | null;
   latest_version?: string | null;
   upgrade_available?: boolean;
+  data_source_entry_point?: string;
 }
+
+export interface PluginOperationInvokeResponse {
+  plugin_id: string;
+  operation: string;
+  render_type: RenderType;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * 注释者: FrontendAgent(react)
+ * 时间: 2026-02-23 21:44:00
+ * 说明: 在何处使用: 前端功能开关统一判断；如何使用: getPluginFeatureFlags 获取功能可用性；实现概述: 基于插件市场列表聚合核心功能的可见性状态。
+ */
+export interface PluginFeatureFlags {
+  quickInput: boolean;
+  mail: boolean;
+  docAssistant: boolean;
+}
+
+const PLUGIN_FEATURE_FLAGS_EVENT = 'plugin-feature-flags-changed';
+
+const FEATURE_PLUGIN_KEYS: Record<keyof PluginFeatureFlags, string[]> = {
+  quickInput: ['project_helper', '项目助手', 'project_agent'],
+  mail: ['agent_manager', 'Agent管理插件', '邮箱系统', 'mail'],
+  docAssistant: ['document_helper', 'doc_agent', '文档创作助手', '文档助手']
+};
+
+let featureFlagsCache: PluginFeatureFlags | null = null;
+let featureFlagsPromise: Promise<PluginFeatureFlags> | null = null;
 
 
 // Mapper
@@ -79,7 +125,8 @@ const mapResponseToInstance = (data: PluginResponse): PluginInstance => {
         sidebar: true,
         editor: true,
         header: false
-      }
+      },
+      data_source_entry_point: data.data_source_entry_point
     }
   };
 };
@@ -100,6 +147,23 @@ export async function getSystemPlugins(): Promise<PluginInstance[]> {
   }
   const response = await request.get<PluginResponse[]>('/plugin/system');
   return response.map(mapResponseToInstance);
+}
+
+export async function getInternalPlugins(): Promise<InternalPluginItem[]> {
+  if (USE_MOCK) {
+    return [];
+  }
+  return request.get<InternalPluginItem[]>('/plugin/internal');
+}
+
+export async function registerInternalPlugin(pluginId: string): Promise<string> {
+  if (USE_MOCK) {
+    return pluginId;
+  }
+  await request.post(`/plugin/internal/${pluginId}/register`);
+  invalidatePluginFeatureFlags();
+  notifyPluginFeatureFlagsChanged();
+  return pluginId;
 }
 
 /**
@@ -126,6 +190,8 @@ export async function registerShopPlugin(pluginId: string): Promise<string> {
     return pluginId;
   }
   await request.post(`/plugin/shop/${pluginId}/register`);
+  invalidatePluginFeatureFlags();
+  notifyPluginFeatureFlagsChanged();
   return pluginId;
 }
 
@@ -140,6 +206,8 @@ export async function unregisterShopPlugin(pluginId: string): Promise<string> {
     return pluginId;
   }
   await request.post(`/plugin/shop/${pluginId}/unregister`);
+  invalidatePluginFeatureFlags();
+  notifyPluginFeatureFlagsChanged();
   return pluginId;
 }
 
@@ -152,10 +220,30 @@ export async function unregisterShopPlugin(pluginId: string): Promise<string> {
  */
 export async function getPluginData(
   pluginId: string,
-  params?: Record<string, string | number | boolean>
+  params?: Record<string, any>
 ): Promise<StandardDataResponse> {
   // if (USE_MOCK) { ... }
   return request.get<StandardDataResponse>(`/plugin/proxy/${pluginId}/data`, { params });
+}
+
+export async function invokePluginOperation(
+  pluginId: string,
+  operation: string,
+  params?: Record<string, any>,
+  runtimeConfig?: Record<string, any>
+): Promise<PluginOperationInvokeResponse> {
+  if (USE_MOCK) {
+    return {
+      plugin_id: pluginId,
+      operation,
+      render_type: 'CARD',
+      payload: {}
+    };
+  }
+  return request.post<PluginOperationInvokeResponse>(`/plugin/${pluginId}/operation/${operation}`, {
+    params,
+    runtime_config: runtimeConfig
+  });
 }
 
 export async function togglePluginStatus(id: string, enable: boolean): Promise<void> {
@@ -169,6 +257,8 @@ export async function togglePluginStatus(id: string, enable: boolean): Promise<v
   await request.patch(`/plugin/${id}`, {
     enabled: enable
   });
+  invalidatePluginFeatureFlags();
+  notifyPluginFeatureFlagsChanged();
 }
 
 export async function updatePlugin(id: string, data: { enabled?: boolean; config?: PluginConfig }): Promise<void> {
@@ -181,6 +271,10 @@ export async function updatePlugin(id: string, data: { enabled?: boolean; config
     return new Promise((resolve) => setTimeout(resolve, 300));
   }
   await request.patch(`/plugin/${id}`, data);
+  if (data.enabled !== undefined) {
+    invalidatePluginFeatureFlags();
+    notifyPluginFeatureFlagsChanged();
+  }
 }
 
 /**
@@ -198,4 +292,64 @@ export async function uninstallPlugin(pluginId: string): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 300));
   }
   await request.post(`/plugin/shop/${pluginId}/unregister`);
+  invalidatePluginFeatureFlags();
+  notifyPluginFeatureFlagsChanged();
+}
+
+const normalizePluginKey = (value: string) => value.trim().toLowerCase();
+
+const matchPluginKey = (plugin: PluginShopItem, keys: string[]) => {
+  const pluginId = normalizePluginKey(plugin.id);
+  const pluginName = normalizePluginKey(plugin.name);
+  return keys.some((key) => {
+    const normalizedKey = normalizePluginKey(key);
+    return normalizedKey === pluginId || normalizedKey === pluginName;
+  });
+};
+
+const resolveFeatureEnabled = (plugins: PluginShopItem[], keys: string[]) => {
+  return plugins.some((plugin) => matchPluginKey(plugin, keys) && plugin.installed && plugin.enabled);
+};
+
+/**
+ * 注释者: FrontendAgent(react)
+ * 时间: 2026-02-23 22:12:00
+ * 说明: 在何处使用: 插件状态自动刷新；如何使用: 订阅事件并强制重新拉取；实现概述: 提供缓存失效与变更事件，支持 UI 即时刷新。
+ */
+export const invalidatePluginFeatureFlags = () => {
+  featureFlagsCache = null;
+};
+
+export const notifyPluginFeatureFlagsChanged = () => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(PLUGIN_FEATURE_FLAGS_EVENT));
+};
+
+export const subscribePluginFeatureFlagsChanged = (listener: () => void) => {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
+  return () => window.removeEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
+};
+
+export async function getPluginFeatureFlags(options?: { force?: boolean }): Promise<PluginFeatureFlags> {
+  if (!options?.force && featureFlagsCache) {
+    return featureFlagsCache;
+  }
+  if (!options?.force && featureFlagsPromise) {
+    return featureFlagsPromise;
+  }
+  featureFlagsPromise = getShopPlugins()
+    .then((plugins) => {
+      const flags: PluginFeatureFlags = {
+        quickInput: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.quickInput),
+        mail: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.mail),
+        docAssistant: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.docAssistant)
+      };
+      featureFlagsCache = flags;
+      return flags;
+    })
+    .finally(() => {
+      featureFlagsPromise = null;
+    });
+  return featureFlagsPromise;
 }

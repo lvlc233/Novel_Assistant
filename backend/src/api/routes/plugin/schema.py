@@ -31,6 +31,7 @@ class ConfigField(BaseModel):
 # 最终的插件配置项
 class ConfigPayload(BaseModel):
     fields: List[ConfigField]
+    actions: dict[str, Action] = Field(default_factory=dict)
 
 class AgentSession(BaseModel):
     session_id: str
@@ -43,12 +44,21 @@ class AgentSession(BaseModel):
 class AgentMessagesPayload(BaseModel):
     sessions: List[AgentSession]
 
+class Action(BaseModel):
+    type: str = "invoke_operation" # "invoke_operation" | "link"
+    operation: str | None = None
+    url: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
+    label: str | None = None
+    danger: bool = False
+
 class CardItem(BaseModel):
     id: str
     title: str
     summary: str | None = None
     tags: List[str] = Field(default_factory=list)
     parent_id: str | None = None
+    actions: dict[str, Action | List[Action]] = Field(default_factory=dict)
 
 # 卡片类型的UI数据载体
 class CardPayload(BaseModel):
@@ -115,6 +125,7 @@ class PluginShopMetaResponse(BaseModel):
     installed_version: str | None = None
     latest_version: str | None = None
     upgrade_available: bool = False
+    data_source_entry_point: str | None = None
 
 class PluginResponse(BaseModel):
     id: UUID
@@ -138,6 +149,16 @@ class PluginUpdateRequest(BaseModel):
     data_source_type: LoaderType | None = None
     data_source_config: DataSourceConfig | None = None
     auth_config: PluginConfig | None = None
+
+class PluginOperationInvokeRequest(BaseModel):
+    params: dict[str, Any] = Field(default_factory=dict)
+    runtime_config: dict[str, Any] | None = None
+
+class PluginOperationInvokeResponse(BaseModel):
+    plugin_id: UUID
+    operation: str
+    render_type: RenderType
+    payload: Any
 
 class InternalPluginResponse(BaseModel):
     id: UUID

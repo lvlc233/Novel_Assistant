@@ -43,9 +43,11 @@ class PluginSQLEntity(SQLModel, table=True):
     # 配置定义 (Schema) 与 默认配置
     loader_type: str | None = Field(default=None, sa_column=Column(String), description="加载器类型")
     data_source_type: str | None = Field(default=None, sa_column=Column(String), description="数据源类型")
+    data_source_config: Dict = Field(default={}, sa_column=Column(JSON), description="数据源配置")
     runtime_config: Dict = Field(default={}, sa_column=Column(JSON), description="运行时配置") 
     default_config: Dict = Field(default={}, sa_column=Column(JSON), description="默认配置值")
     plugin_operation_schema: Dict = Field(default={}, sa_column=Column(JSON), description="插件操作定义")
+    auth_config: Dict = Field(default={}, sa_column=Column(JSON), description="鉴权配置")
     # BFF 代理配置
 
    

@@ -1,8 +1,11 @@
 """FastAPI application for ufan_agent."""
+import asyncio
 from math import log
 import os
 from contextlib import asynccontextmanager
 
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -30,11 +33,20 @@ from infrastructure.pg.pg_client import engine
 # from services.memory.service import MemoryService
 from services.work.service import WorkService
 from services.agent.service import AgentService
-from core.plugin.runtime import PluginInternalRegistry
+from core.plugin.runtime import PluginInternalRegistry, PluginManager
+
+
+async def _run_migrations() -> None:
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    alembic_ini = os.path.abspath(os.path.join(base_dir, "..", "alembic.ini"))
+    config = Config(alembic_ini)
+    config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
+    await asyncio.to_thread(command.upgrade, config, "head")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await _run_migrations()
     # Initialize checkpointer tables
     conn_string = settings.SQLALCHEMY_DATABASE_URI
     if "postgresql+asyncpg://" in conn_string:
@@ -83,6 +95,10 @@ async def lifespan(app: FastAPI):
     app.state.internal_plugin_registry = internal_registry
     logger.info(f"已加载: {len(internal_registry.get_plugin_list())} 个内部插件定义")
     logger.info(f"已预实例化: {internal_registry}")
+    async with AsyncSession(engine) as session:
+        manager = PluginManager(session)
+        for plugin_def in internal_registry.get_plugin_list():
+            await manager.add_plugin_with_register(plugin_def)
     yield
     
     # 清理插件管理器

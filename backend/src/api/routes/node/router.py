@@ -14,32 +14,43 @@ from api.routes.node.schema import (
     NodeCreateRequest,
     NodeResponse,
     NodeUpdateRequest,
-    RelationshipResponse,
+    # RelationshipResponse,
     UpdateNodeDTO,
 )
 from common.enums import NodeTypeEnum
 from infrastructure.pg.pg_client import get_session
 from services.node.service import NodeService
-from services.work.service import WorkService
+# from services.work.service import WorkService
 
 router = APIRouter(tags=["nodes"])
 
 def get_node_service(session: AsyncSession = Depends(get_session)) -> NodeService:
     return NodeService(session)
 
-def get_work_service(session: AsyncSession = Depends(get_session)) -> WorkService:
-    return WorkService(session)
+# def get_work_service(session: AsyncSession = Depends(get_session)) -> WorkService:
+#     return WorkService(session)
 
 # --- Documents ---
 
-@router.get("/document/{document_id}", response_model=Response[DocumentDetailResponse])
-async def get_document_detail_by_id(
-    document_id: str,
-    service: NodeService = Depends(get_node_service)
-) -> Response[DocumentDetailResponse]:
-    """根据ID直接获取文档详情 (用于编辑器等不依赖Work上下文的场景)."""
-    data = await service.get_document_detail_by_id(document_id)
-    return Response.ok(data=data)
+# 开发者: BackendAgent(python)
+# 当前版本: BE-DEP-20260224-04
+# 创建时间: 2026-02-24 00:22
+# 更新时间: 2026-02-24 00:22
+# 更新记录:
+#     [2026-02-24 00:22:BE-DEP-20260224-04: 注释掉未使用的文档直连接口，避免绕过作品上下文。]
+# 注释者: BackendAgent(python)
+# 时间: 2026-02-24 00:22
+# 使用位置: 后端路由 /document/{document_id} (前端未调用)
+# 实现概述: 注释掉不依赖 Work 的文档详情接口，统一走 /work/{work_id}/document/{document_id}。
+# 废弃标记: 已废弃
+# @router.get("/document/{document_id}", response_model=Response[DocumentDetailResponse])
+# async def get_document_detail_by_id(
+#     document_id: str,
+#     service: NodeService = Depends(get_node_service)
+# ) -> Response[DocumentDetailResponse]:
+#     """根据ID直接获取文档详情 (用于编辑器等不依赖Work上下文的场景)."""
+#     data = await service.get_document_detail_by_id(document_id)
+#     return Response.ok(data=data)
 
 @router.post("/work/{work_id}/document", response_model=Response[DocumentResponse])
 async def create_document(
@@ -214,26 +225,37 @@ async def update_node(
 
 # --- Relationships ---
 
-@router.get("/work/{work_id}/document", response_model=Response[RelationshipResponse])
-async def get_work_relationships(
-    work_id: str,
-    service: WorkService = Depends(get_work_service)
-) -> Response[RelationshipResponse]:
-    """获取依赖关系."""
-    data = await service.get_work_detail(work_id)
-    return Response.ok(data=RelationshipResponse(
-        document=data.document,
-        relationship=data.relationship
-    ))
-
-@router.patch("/work/{work_id}/node/{node_id}/parent/{parent_node_id}", response_model=Response[None])
-async def move_node(
-    work_id: str,
-    node_id: str,
-    parent_node_id: str,
-    service: NodeService = Depends(get_node_service)
-) -> Response[None]:
-    """迁移节点(改变节点之间的关系)."""
-    req = UpdateNodeDTO(parent_node_id=parent_node_id)
-    await service.update_node(node_id, req)
-    return Response.ok()
+# 开发者: BackendAgent(python)
+# 当前版本: BE-DEP-20260224-05
+# 创建时间: 2026-02-24 00:22
+# 更新时间: 2026-02-24 00:22
+# 更新记录:
+#     [2026-02-24 00:22:BE-DEP-20260224-05: 注释掉未使用的作品关系与节点迁移接口。]
+# 注释者: BackendAgent(python)
+# 时间: 2026-02-24 00:22
+# 使用位置: 后端路由 /work/{work_id}/document 与 /work/{work_id}/node/{node_id}/parent/{parent_node_id}
+# 实现概述: 注释掉关系图返回与节点迁移接口，保留基础节点增删改。
+# 废弃标记: 已废弃
+# @router.get("/work/{work_id}/document", response_model=Response[RelationshipResponse])
+# async def get_work_relationships(
+#     work_id: str,
+#     service: WorkService = Depends(get_work_service)
+# ) -> Response[RelationshipResponse]:
+#     """获取依赖关系."""
+#     data = await service.get_work_detail(work_id)
+#     return Response.ok(data=RelationshipResponse(
+#         document=data.document,
+#         relationship=data.relationship
+#     ))
+#
+# @router.patch("/work/{work_id}/node/{node_id}/parent/{parent_node_id}", response_model=Response[None])
+# async def move_node(
+#     work_id: str,
+#     node_id: str,
+#     parent_node_id: str,
+#     service: NodeService = Depends(get_node_service)
+# ) -> Response[None]:
+#     """迁移节点(改变节点之间的关系)."""
+#     req = UpdateNodeDTO(parent_node_id=parent_node_id)
+#     await service.update_node(node_id, req)
+#     return Response.ok()

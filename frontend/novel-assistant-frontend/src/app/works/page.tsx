@@ -7,6 +7,7 @@ import { Work, Novel, KnowledgeBase } from '@/types/work';
 import { getWorkList, createWork, deleteWork, updateWork, CreateWorkDto } from '@/services/workService';
 import { knowledgeBaseService } from '@/services/knowledgeBaseService';
 import { logger } from '@/lib/logger';
+import { getPluginFeatureFlags, PluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
 
 import { WorkCreationData } from '@/components/work-manager/CreateWorkCard';
 import DocumentCarousel from '@/components/work-manager/DocumentCarousel';
@@ -26,6 +27,7 @@ const userId = "";
  * - [2026-01-31 14:25:FE-REF-20260131-01: 在何处使用: 作品列表页；如何使用: 替换Novel为Work terminology；实现概述: 重命名所有变量、状态、接口引用，对接新的WorkService。]
  * - [2026-01-26 20:45:FE-REF-20260126-02: 彻底移除 Mock 数据依赖，userId 传空（后端基于 Token）。]
  * - [2026-01-25 12:15:FE-REF-20260125-03: 集成知识库服务，移除 mock 数据。]
+ * - [2026-02-23 22:12:00:FE-REF-20260223-03: 注释者: FrontendAgent(react); 在何处使用: 作品列表页底部快捷输入框; 如何使用: 根据插件加载结果决定显示; 实现概述: 拉取插件市场状态并控制快捷输入框可见性。]
  */
 
 export default function DocumentsPage() {
@@ -35,6 +37,7 @@ export default function DocumentsPage() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
 
   // Fetch works and knowledge bases
   useEffect(() => {
@@ -71,9 +74,37 @@ export default function DocumentsPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    let isActive = true;
+    const loadFlags = (force = false) => {
+      getPluginFeatureFlags({ force })
+        .then((flags) => {
+          if (!isActive) return;
+          setFeatureFlags(flags);
+        })
+        .catch((err) => {
+          logger.error('DocumentsPage plugin flags load failed', err);
+          if (!isActive) return;
+          setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
+        });
+    };
+    loadFlags();
+    /**
+     * 注释者: FrontendAgent(react)
+     * 时间: 2026-02-23 22:12:00
+     * 说明: 在何处使用: 作品列表页插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新快捷输入框显示。
+     */
+    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, []);
+
   const [activeIndex, setActiveIndex] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const [pluginConfigWork, setPluginConfigWork] = useState<Novel | null>(null);
+  const isQuickInputEnabled = featureFlags?.quickInput ?? false;
 
   // Keyboard navigation
   useEffect(() => {
@@ -234,13 +265,15 @@ export default function DocumentsPage() {
         </div>
 
         <div className="h-24 shrink-0 flex items-center justify-center gap-4 px-4 pb-4 z-50 pointer-events-none">
-          <div className="pointer-events-auto w-full max-w-2xl">
-            <BottomInput 
-              position="static"
-              placeholder="快速指令 / 询问 AI..."
-              onSubmit={(val) => logger.debug('Doc Input:', val)}
-            />
-          </div>
+          {isQuickInputEnabled && (
+            <div className="pointer-events-auto w-full max-w-2xl">
+              <BottomInput 
+                position="static"
+                placeholder="快速指令 / 询问 AI..."
+                onSubmit={(val) => logger.debug('Doc Input:', val)}
+              />
+            </div>
+          )}
           <button 
              onClick={() => setIsCreating(true)}
              className="pointer-events-auto w-12 h-12 rounded-full bg-black text-white flex items-center justify-center shrink-0 hover:scale-105 transition-transform shadow-lg mb-1"

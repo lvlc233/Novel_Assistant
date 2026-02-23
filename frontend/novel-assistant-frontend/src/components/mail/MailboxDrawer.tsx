@@ -1,9 +1,11 @@
 
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMail, MailMessage, Agent } from '@/contexts/MailContext';
 import { X, Filter, User, ChevronLeft } from 'lucide-react';
 import BottomInput from '@/components/common/BottomInput'; // Reuse existing input
+import { getPluginFeatureFlags, PluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
+import { logger } from '@/lib/logger';
 
 // Helper to format time
 const formatTime = (timestamp: number) => {
@@ -168,6 +170,45 @@ export const MailboxDrawer: React.FC = () => {
   } = useMail();
   
   const [selectedMessage, setSelectedMessage] = useState<MailMessage | null>(null);
+  const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
+
+  /**
+   * 注释者: FrontendAgent(react)
+   * 时间: 2026-02-23 21:44:00
+   * 说明: 在何处使用: 全局邮箱抽屉；如何使用: 根据插件加载结果决定显示；实现概述: 拉取插件市场状态并控制邮箱抽屉可见性。
+   */
+  useEffect(() => {
+    let isActive = true;
+    const loadFlags = (force = false) => {
+      getPluginFeatureFlags({ force })
+        .then((flags) => {
+          if (!isActive) return;
+          setFeatureFlags(flags);
+        })
+        .catch((error) => {
+          logger.error('MailboxDrawer plugin flags load failed', error);
+          if (!isActive) return;
+          setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
+        });
+    };
+    loadFlags();
+    /**
+     * 注释者: FrontendAgent(react)
+     * 时间: 2026-02-23 22:05:00
+     * 说明: 在何处使用: 邮箱抽屉插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新邮箱抽屉显示。
+     */
+    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const isMailEnabled = featureFlags?.mail ?? false;
+
+  if (!isMailEnabled) {
+    return null;
+  }
 
   // Filter messages
   const filteredMessages = currentFilter === 'all' 

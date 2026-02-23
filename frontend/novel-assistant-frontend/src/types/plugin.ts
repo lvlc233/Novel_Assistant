@@ -57,6 +57,7 @@ export interface ConfigField {
 
 export interface ConfigPayload {
   fields: ConfigField[];
+  actions?: Record<string, Action>;
 }
 
 export interface AgentSession {
@@ -71,12 +72,23 @@ export interface AgentMessagesPayload {
   sessions: AgentSession[];
 }
 
+export interface Action {
+  type: 'invoke_operation' | 'link' | 'router';
+  operation?: string;
+  url?: string;
+  params?: Record<string, any>;
+  label?: string;
+  danger?: boolean;
+  confirm?: string;
+}
+
 export interface CardItem {
   id: string;
   title: string;
   summary?: string | null;
   tags: string[];
   parent_id?: string | null;
+  actions?: Record<string, Action | Action[]>;
 }
 
 export interface CardPayload {
@@ -181,6 +193,9 @@ export interface PluginManifest {
     /** 是否支持头部导航栏扩展 */
     header?: boolean;
   };
+  
+  /** 数据源入口操作名称 */
+  data_source_entry_point?: string;
 }
 
 /**

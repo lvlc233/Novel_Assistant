@@ -1,8 +1,8 @@
 "use client";
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { PluginConfig, PluginInstance, StandardDataResponse, ConfigField } from '@/types/plugin';
-import { getPluginData } from '@/services/pluginService';
+import { PluginConfig, PluginInstance, StandardDataResponse, ConfigField, RenderType } from '@/types/plugin';
+import { getPluginData, invokePluginOperation, PluginOperationInvokeResponse } from '@/services/pluginService';
 
 interface PluginSettingsModalProps {
   isOpen: boolean;
@@ -26,12 +26,60 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
     setError(null);
   }, [plugin.id, plugin.config]);
 
+  const normalizeOperationResponse = (response: PluginOperationInvokeResponse): StandardDataResponse => {
+    if (response.render_type !== 'CARD') {
+      return {
+        plugin_id: response.plugin_id,
+        render_type: response.render_type,
+        payload: response.payload
+      };
+    }
+    const payload = response.payload as {
+      total?: number;
+      items?: Array<{
+        id: string;
+        name: string;
+        version: string;
+        description?: string | null;
+        enabled: boolean;
+        render_type: RenderType;
+        tags?: string[];
+      }>;
+    };
+    const cards = (payload.items || []).map((item) => {
+      const summaryParts = [];
+      if (item.description) {
+        summaryParts.push(item.description);
+      }
+      summaryParts.push(`版本: ${item.version}`);
+      summaryParts.push(item.enabled ? '启用' : '停用');
+      return {
+        id: item.id,
+        title: item.name,
+        summary: summaryParts.join(' · '),
+        tags: item.tags || []
+      };
+    });
+    return {
+      plugin_id: response.plugin_id,
+      render_type: 'CARD',
+      payload: { cards },
+      total: payload.total
+    };
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
     setIsLoadingData(true);
     setDataError(null);
-    getPluginData(plugin.id)
+    const isAgentManager = plugin.manifest.name === 'agent_manager'
+      || plugin.manifest.name.includes('Agent管理')
+      || plugin.id === 'agent_manager';
+    const fetchData = isAgentManager
+      ? invokePluginOperation(plugin.id, 'list_agent_plugins', { limit: 50, offset: 0 }).then(normalizeOperationResponse)
+      : getPluginData(plugin.id);
+    fetchData
       .then((response) => {
         if (active) setData(response);
       })
@@ -76,8 +124,6 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
     };
   }, [isDragging]);
 
-  if (!isOpen) return null;
-
   const handleSave = () => {
     try {
       const config = JSON.parse(configJson) as PluginConfig;
@@ -109,7 +155,7 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
     ));
   };
 
-  const content = useMemo(() => {
+  const renderDataContent = () => {
     if (!data) return null;
     switch (data.render_type) {
       case 'CONFIG': {
@@ -150,23 +196,45 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
       case 'CARD': {
         const payload = data.payload as { cards: Array<{ id: string; title: string; summary?: string | null; tags: string[] }> };
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {payload.cards.length === 0 ? (
-              <div className="text-sm text-text-secondary">暂无卡片数据</div>
+              <div className="col-span-full text-sm text-text-secondary py-6 text-center rounded-xl border border-dashed border-border-primary bg-surface-secondary/40">
+                暂无卡片数据
+              </div>
             ) : (
               payload.cards.map((card) => (
-                <div key={card.id} className="rounded-lg border border-border-primary bg-surface-secondary p-3 space-y-2">
-                  <div className="text-sm font-medium text-text-primary">{card.title}</div>
-                  {card.summary && <div className="text-xs text-text-secondary line-clamp-3">{card.summary}</div>}
-                  {card.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {card.tags.map((tag) => (
-                        <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-white border border-border-primary text-text-secondary">
-                          {tag}
+                <div
+                  key={card.id}
+                  className="group relative overflow-hidden rounded-xl border border-border-primary bg-white p-4 shadow-sm hover:shadow-md transition-all"
+                >
+                  <div className="absolute left-0 top-0 h-full w-1 bg-text-primary/80" />
+                  <div className="pl-3 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="text-sm font-semibold text-text-primary line-clamp-2">{card.title}</div>
+                      {card.tags.length > 0 && (
+                        <span className="text-[10px] px-2 py-1 rounded-full bg-surface-secondary text-text-tertiary border border-border-primary">
+                          {card.tags.length} Tags
                         </span>
-                      ))}
+                      )}
                     </div>
-                  )}
+                    {card.summary && (
+                      <div className="text-xs text-text-secondary line-clamp-3 leading-relaxed">
+                        {card.summary}
+                      </div>
+                    )}
+                    {card.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {card.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-surface-secondary border border-border-primary text-text-secondary"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -178,28 +246,30 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
         return (
           <div className="space-y-3">
             {payload.items.length === 0 ? (
-              <div className="text-sm text-text-secondary">暂无列表数据</div>
+              <div className="text-sm text-text-secondary py-6 text-center rounded-xl border border-dashed border-border-primary bg-surface-secondary/40">
+                暂无列表数据
+              </div>
             ) : (
               payload.items.map((item) => (
-                <div key={item.id} className="rounded-lg border border-border-primary bg-surface-secondary p-3 space-y-2">
+                <div key={item.id} className="rounded-xl border border-border-primary bg-white p-4 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-text-primary">{item.title}</div>
-                      {item.subtitle && <div className="text-xs text-text-secondary">{item.subtitle}</div>}
+                      <div className="text-sm font-semibold text-text-primary">{item.title}</div>
+                      {item.subtitle && <div className="text-xs text-text-secondary line-clamp-2">{item.subtitle}</div>}
                     </div>
                   </div>
-                  {item.content && <div className="text-xs text-text-secondary">{item.content}</div>}
+                  {item.content && <div className="text-xs text-text-secondary line-clamp-3">{item.content}</div>}
                   {item.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {item.tags.map((tag) => (
-                        <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-white border border-border-primary text-text-secondary">
+                        <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-secondary border border-border-primary text-text-secondary">
                           {tag}
                         </span>
                       ))}
                     </div>
                   )}
                   {item.metadata.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 text-xs text-text-secondary">
+                    <div className="grid grid-cols-2 gap-2 text-xs text-text-secondary bg-surface-secondary/60 rounded-lg p-2.5">
                       {item.metadata.map((meta) => (
                         <div key={`${item.id}-${meta.key}`} className="flex items-center justify-between">
                           <span>{meta.key}</span>
@@ -266,7 +336,9 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
       default:
         return null;
     }
-  }, [data]);
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
@@ -318,7 +390,7 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
               ) : dataError ? (
                 <div className="text-sm text-error">{dataError}</div>
               ) : data ? (
-                content
+                renderDataContent()
               ) : (
                 <div className="text-sm text-text-secondary">暂无数据</div>
               )}

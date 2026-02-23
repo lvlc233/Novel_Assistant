@@ -1,29 +1,32 @@
 """Plugin Service Module."""
-from typing import List, Dict, Any
+import inspect
+from typing import Any, Dict, List
 from uuid import UUID
 
 import httpx
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.plugin.schema import (
-    DataSourceConfig,
-    UrlDataSourceConfig,
-    JsonDataSourceConfig,
-    InternalDataSourceConfig,
-    PluginConfig,
-    PluginConfigItem,
-    ConfigPayload,
     AgentMessagesPayload,
     CardPayload,
+    ConfigPayload,
+    DataSourceConfig,
+    InternalDataSourceConfig,
+    JsonDataSourceConfig,
+    PluginConfig,
+    PluginConfigItem,
     PluginMetaResponse,
+    PluginOperationInvokeResponse,
     PluginResponse,
     PluginUpdateRequest,
-    StandardDataResponse
+    StandardDataResponse,
+    UrlDataSourceConfig,
 )
 from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
 from common.errors import ResourceNotFoundError
+from core.plugin.runtime import PluginInternalRegistry
 from infrastructure.pg.pg_models import PluginSQLEntity
 
 
@@ -87,7 +90,10 @@ class PluginService:
 
     async def get_system_plugins(self) -> List[PluginResponse]:
         """获取系统插件列表 (SYSTEM)."""
-        stmt = select(PluginSQLEntity).where(PluginSQLEntity.from_type == PluginFromTypeEnum.SYSTEM.value)
+        stmt = select(PluginSQLEntity).where(
+            PluginSQLEntity.from_type == PluginFromTypeEnum.SYSTEM.value,
+            PluginSQLEntity.name != "agent_manager",
+        )
         result = await self.session.execute(stmt)
         plugins = result.scalars().all()
         
@@ -109,9 +115,13 @@ class PluginService:
         ]
 
     async def get_expand_plugins(self) -> List[PluginMetaResponse]:
-        """获取扩展插件列表 (OFFICIAL, CUSTOM)."""
+        """获取扩展插件列表 (SYSTEM, OFFICIAL, CUSTOM)."""
         stmt = select(PluginSQLEntity).where(
-            PluginSQLEntity.from_type.in_([PluginFromTypeEnum.OFFICIAL.value, PluginFromTypeEnum.CUSTOM.value])
+            PluginSQLEntity.from_type.in_([
+                PluginFromTypeEnum.SYSTEM.value,
+                PluginFromTypeEnum.OFFICIAL.value,
+                PluginFromTypeEnum.CUSTOM.value
+            ])
         )
         result = await self.session.execute(stmt)
         plugins = result.scalars().all()
@@ -181,6 +191,65 @@ class PluginService:
             plugin.auth_config = self._to_config_dict(request.auth_config)
             
         await self.session.commit()
+
+    async def _invoke_plugin_operation(
+        self,
+        plugin_id: UUID,
+        operation_name: str,
+        params: Dict[str, Any],
+        runtime_config: Dict[str, Any] | None,
+        registry: PluginInternalRegistry
+    ) -> PluginOperationInvokeResponse:
+        stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
+        result = await self.session.execute(stmt)
+        plugin = result.scalar_one_or_none()
+        if not plugin:
+            raise ResourceNotFoundError(f"Plugin {plugin_id} not found")
+        if not plugin.enabled:
+            raise ValueError(f"Plugin {plugin.name} is disabled")
+
+        wrapper = registry.get_plugin_wrapper(plugin_id)
+        if wrapper is None:
+            raise ResourceNotFoundError(f"Plugin {plugin_id} not found in internal registry")
+
+        merged_config: Dict[str, Any] = {}
+        if isinstance(plugin.default_config, dict):
+            merged_config.update(plugin.default_config)
+        if runtime_config:
+            merged_config.update(runtime_config)
+
+        signature = inspect.signature(wrapper.plugin_cls.__init__)
+        runtime_kwargs: Dict[str, Any] = {}
+        for name in signature.parameters:
+            if name == "self":
+                continue
+            if name == "session":
+                runtime_kwargs[name] = self.session
+                continue
+            if name in merged_config:
+                runtime_kwargs[name] = merged_config[name]
+
+        instance = wrapper.create_instance(**runtime_kwargs)
+        result_value = wrapper.invoke(instance, operation_name, **(params or {}))
+        if inspect.iscoroutine(result_value):
+            result_value = await result_value
+
+        if isinstance(result_value, BaseModel):
+            payload: Any = result_value.model_dump()
+        elif isinstance(result_value, list):
+            payload = [
+                item.model_dump() if isinstance(item, BaseModel) else item
+                for item in result_value
+            ]
+        else:
+            payload = result_value
+
+        return PluginOperationInvokeResponse(
+            plugin_id=plugin_id,
+            operation=operation_name,
+            render_type=RenderType(plugin.render_type),
+            payload=payload
+        )
 
     async def proxy_plugin_data(self, plugin_id: UUID, params: Dict[str, Any]) -> StandardDataResponse:
         """BFF Proxy for plugin data."""

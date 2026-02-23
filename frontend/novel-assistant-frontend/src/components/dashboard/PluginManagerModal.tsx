@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Brain, Database, Bot, ChevronRight, Loader2, Calendar, Trash2, FileEdit, Briefcase, GripVertical } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -6,14 +7,18 @@ import { knowledgeBaseService } from '@/services/knowledgeBaseService';
 import { agentService } from '@/services/agentService';
 import { projectAgentService, ProjectConfig, HistoryItem } from '@/services/projectAgentService';
 import { KnowledgeBaseManager } from '@/components/knowledge-base/KnowledgeBaseManager';
+import { logger } from '@/lib/logger';
+
 import { ConfigRenderer } from './plugin-renderers/ConfigRenderer';
 import { ProjectAgentRenderer } from './plugin-renderers/ProjectAgentRenderer';
-import { ListItem, ConfigField } from '@/types/plugin';
+import { ListItem, ConfigField, PluginInstance, StandardDataResponse, CardPayload, CardItem, ConfigPayload, RenderType } from '@/types/plugin';
+import { invokePluginOperation } from '@/services/pluginService';
 
 export type PluginType = 'memory' | 'knowledge' | 'agent' | 'doc_agent' | 'project_agent';
 
 interface PluginManagerModalProps {
   type: PluginType;
+  plugin?: PluginInstance;
   onClose: () => void;
 }
 
@@ -37,14 +42,21 @@ interface ConfigItem {
   }[];
 }
 
-const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }) => {
+const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, plugin, onClose }) => {
   const router = useRouter();
   const [items, setItems] = useState<ListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [panelRatio, setPanelRatio] = useState(30);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Dynamic Plugin State
+  const [dynamicItems, setDynamicItems] = useState<CardItem[]>([]);
+  const [currentView, setCurrentView] = useState<RenderType>('CARD');
+  const [dynamicConfig, setDynamicConfig] = useState<ConfigPayload | null>(null);
 
+  const [dynamicConfigValues, setDynamicConfigValues] = useState<Record<string, any>>({});
+  
   // Project Agent State
   const [projectConfig, setProjectConfig] = useState<Record<string, any>>({
     model_name: '',
@@ -271,27 +283,52 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await currentConfig.fetch();
-      setItems(data);
+      if (plugin && plugin.manifest.data_source_entry_point) {
+          try {
+            const response = await invokePluginOperation(
+                plugin.id, 
+                plugin.manifest.data_source_entry_point
+            );
+            // Verify if payload is StandardDataResponse structure
+            const standardData = response.payload as unknown as StandardDataResponse;
+            if (standardData.render_type === 'CARD') {
+                const payload = standardData.payload as CardPayload;
+                setDynamicItems(payload.cards);
+                setItems(payload.cards.map(c => ({
+                    id: c.id,
+                    title: c.title,
+                    subtitle: c.summary,
+                    tags: c.tags,
+                    metadata: []
+                })));
+                setCurrentView('CARD');
+            }
+          } catch (e) {
+              console.error('Failed to load dynamic plugin data:', e);
+          }
+      } else {
+          const data = await currentConfig.fetch();
+          setItems(data);
 
-      // Load extra data for project_agent
-      if (type === 'project_agent') {
-        try {
-            // Load config
-            const configData = await projectAgentService.getConfig();
-            setProjectConfig(configData);
+          // Load extra data for project_agent
+          if (type === 'project_agent') {
+            try {
+                // Load config
+                const configData = await projectAgentService.getConfig();
+                setProjectConfig(configData);
 
-            // Load enabled resources
-            const enabledResources = await projectAgentService.getEnabledResources();
-            const enabledMap: Record<string, boolean> = {};
-            // Initialize all items as disabled first, then enable if in list
-            data.forEach(item => {
-                 enabledMap[item.id] = enabledResources.includes(item.id);
-            });
-            setRegionEnabled(enabledMap);
-        } catch (err) {
-            console.error('Failed to load project agent extra data:', err);
-        }
+                // Load enabled resources
+                const enabledResources = await projectAgentService.getEnabledResources();
+                const enabledMap: Record<string, boolean> = {};
+                // Initialize all items as disabled first, then enable if in list
+                data.forEach(item => {
+                     enabledMap[item.id] = enabledResources.includes(item.id);
+                });
+                setRegionEnabled(enabledMap);
+            } catch (err) {
+                console.error('Failed to load project agent extra data:', err);
+            }
+          }
       }
     } catch (error) {
       console.error(`Failed to load ${type} data:`, error);
@@ -344,7 +381,39 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
     };
   }, [isDragging, panelRatio]);
 
-  const handleItemClick = (id: string) => {
+  const handleItemClick = async (id: string) => {
+    if (plugin && currentView === 'CARD') {
+        const card = dynamicItems.find(c => c.id === id);
+        if (card && card.actions && card.actions.click) {
+            const action = Array.isArray(card.actions.click) ? card.actions.click[0] : card.actions.click;
+            if (action.type === 'invoke_operation' && action.operation) {
+                try {
+                    setIsLoading(true);
+                    const response = await invokePluginOperation(plugin.id, action.operation, action.params);
+                    const standardData = response.payload as unknown as StandardDataResponse;
+                    if (standardData.render_type === 'CONFIG') {
+                          const configPayload = standardData.payload as ConfigPayload;
+                          setDynamicConfig(configPayload);
+                          
+                          // Initialize values from fields
+                          const initialValues: Record<string, any> = {};
+                          configPayload.fields.forEach(f => {
+                              initialValues[f.key] = f.value;
+                          });
+                          setDynamicConfigValues(initialValues);
+                          
+                          setCurrentView('CONFIG');
+                     }
+                } catch (e) {
+                    console.error('Action failed:', e);
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+        }
+        return;
+    }
+
     if (type === 'project_agent') return;
     const path = `${currentConfig.route}/${id}`;
     router.push(path);
@@ -520,8 +589,18 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
                 // Default List View (for other plugins)
                 <>
                     <div className="px-6 py-4 border-b border-border-primary text-sm text-text-secondary flex items-center justify-between bg-white">
-                        <span>{type === 'project_agent' ? '区域列表' : '插件内容'}</span>
-                        <span className="text-xs text-text-tertiary">{isLoading ? '加载中...' : `共 ${items.length} 项`}</span>
+                        <div className="flex items-center gap-2">
+                             {currentView === 'CONFIG' && (
+                                 <button 
+                                    onClick={() => setCurrentView('CARD')}
+                                    className="p-1 hover:bg-gray-100 rounded-full mr-2"
+                                 >
+                                     <ChevronRight className="w-4 h-4 rotate-180" />
+                                 </button>
+                             )}
+                             <span>{type === 'project_agent' ? '区域列表' : (currentView === 'CONFIG' ? '配置详情' : '插件内容')}</span>
+                        </div>
+                        <span className="text-xs text-text-tertiary">{isLoading ? '加载中...' : (currentView === 'CARD' ? `共 ${items.length} 项` : '')}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     {isLoading ? (
@@ -529,6 +608,27 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, onClose }
                         <Loader2 className="w-10 h-10 animate-spin mb-4 text-accent-primary" />
                         <p className="text-lg">正在获取数据...</p>
                         </div>
+                    ) : currentView === 'CONFIG' && dynamicConfig ? (
+                         <ConfigRenderer 
+                             fields={dynamicConfig.fields}
+                             configValues={dynamicConfigValues}
+                             onConfigChange={(key, value) => setDynamicConfigValues(prev => ({ ...prev, [key]: value }))}
+                             onSave={dynamicConfig.actions?.save ? async () => {
+                                 if (!plugin || !dynamicConfig.actions?.save) return;
+                                 const action = dynamicConfig.actions.save;
+                                 if (action.type === 'invoke_operation' && action.operation) {
+                                     try {
+                                         // Merge action params with form values
+                                          const params = { ...action.params, ...dynamicConfigValues };
+                                          await invokePluginOperation(plugin.id, action.operation, params);
+                                          logger.info('Configuration saved successfully');
+                                          // Refresh data?
+                                      } catch (e) {
+                                          logger.error('Configuration save failed', e);
+                                      }
+                                  }
+                             } : undefined}
+                         />
                     ) : items.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {items.map((item) => (

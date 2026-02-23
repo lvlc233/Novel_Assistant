@@ -13,6 +13,7 @@ import ChapterPreview from '@/components/work-detail/ChapterPreview';
 import BottomInput from '@/components/common/BottomInput';
 import { ArrowLeft, Settings2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { getPluginFeatureFlags, PluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
 
 // userId is no longer needed for backend API but kept for function signature compatibility
 const userId = "";
@@ -54,6 +55,7 @@ export default function WorkDetailPage() {
   const [selectedChapterId, setSelectedChapterId] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
 
   // Plugin Settings
   const [isPluginSettingsOpen, setIsPluginSettingsOpen] = useState(false);
@@ -89,6 +91,38 @@ export default function WorkDetailPage() {
     fetchWorkDetail();
   }, [id]);
 
+  /**
+   * 注释者: FrontendAgent(react)
+   * 时间: 2026-02-23 21:44:00
+   * 说明: 在何处使用: 作品详情页底部快捷输入框；如何使用: 根据插件加载结果决定显示；实现概述: 拉取插件市场状态并控制快捷输入框可见性。
+   */
+  useEffect(() => {
+    let isActive = true;
+    const loadFlags = (force = false) => {
+      getPluginFeatureFlags({ force })
+        .then((flags) => {
+          if (!isActive) return;
+          setFeatureFlags(flags);
+        })
+        .catch((err) => {
+          logger.error('WorkDetailPage plugin flags load failed', err);
+          if (!isActive) return;
+          setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
+        });
+    };
+    loadFlags();
+    /**
+     * 注释者: FrontendAgent(react)
+     * 时间: 2026-02-23 22:05:00
+     * 说明: 在何处使用: 作品详情页插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新快捷输入框显示。
+     */
+    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, []);
+
   // Helper to find chapter by ID
   const findChapter = (id?: string): Chapter | undefined => {
       if (!id) return undefined;
@@ -103,6 +137,7 @@ export default function WorkDetailPage() {
   };
 
   const selectedChapter = findChapter(selectedChapterId);
+  const isQuickInputEnabled = featureFlags?.quickInput ?? false;
 
   // Effect to fetch chapter details (content & versions) when selected
   useEffect(() => {
@@ -450,15 +485,17 @@ export default function WorkDetailPage() {
             </div>
 
             {/* 底部输入框 */}
-            <div className="fixed bottom-8 left-64 right-0 z-50 flex justify-center px-4 pointer-events-none">
-              <div className="pointer-events-auto w-full max-w-2xl shadow-2xl rounded-2xl overflow-hidden ring-1 ring-black/5 bg-surface-white">
-                <BottomInput 
-                  position="static"
-                  placeholder="询问 AI 助手或快速创建..."
-                  onSubmit={(val) => logger.debug('Doc Detail Input:', val)}
-                />
+            {isQuickInputEnabled && (
+              <div className="fixed bottom-8 left-64 right-0 z-50 flex justify-center px-4 pointer-events-none">
+                <div className="pointer-events-auto w-full max-w-2xl shadow-2xl rounded-2xl overflow-hidden ring-1 ring-black/5 bg-surface-white">
+                  <BottomInput 
+                    position="static"
+                    placeholder="询问 AI 助手或快速创建..."
+                    onSubmit={(val) => logger.debug('Doc Detail Input:', val)}
+                  />
+                </div>
               </div>
-            </div>
+            )}
         </div>
         
         <WorkPluginSettingsModal 

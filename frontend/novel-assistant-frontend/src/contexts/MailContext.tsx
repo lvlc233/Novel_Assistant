@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { logger } from '@/lib/logger';
 import { agentService } from '@/services/agentService';
+import { getPluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
 
 // --- Types ---
 
@@ -57,9 +58,45 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [agents, setAgents] = useState<Agent[]>([]);
   const [currentFilter, setCurrentFilter] = useState<string | 'all'>('all');
   const [latestNotification, setLatestNotification] = useState<MailMessage | null>(null);
+  const [isMailEnabled, setIsMailEnabled] = useState(false);
 
   // Load Agents on Mount
   useEffect(() => {
+    let isActive = true;
+    const loadFlags = (force = false) => {
+      getPluginFeatureFlags({ force })
+        .then((flags) => {
+          if (!isActive) return;
+          setIsMailEnabled(flags.mail);
+        })
+        .catch((error) => {
+          logger.error('MailContext plugin flags load failed', error);
+          if (!isActive) return;
+          setIsMailEnabled(false);
+        });
+    };
+    loadFlags();
+    /**
+     * 注释者: FrontendAgent(react)
+     * 时间: 2026-02-23 22:12:00
+     * 说明: 在何处使用: 邮箱上下文插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新邮箱可用状态。
+     */
+    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, []);
+
+  /**
+   * 注释者: FrontendAgent(react)
+   * 时间: 2026-02-23 21:44:00
+   * 说明: 在何处使用: 邮箱上下文数据加载；如何使用: 根据插件状态决定是否拉取 Agent 列表；实现概述: 仅在邮箱插件启用时触发数据加载。
+   */
+  useEffect(() => {
+    if (!isMailEnabled) {
+      return;
+    }
     const fetchAgents = async () => {
         try {
             const metaList = await agentService.getAgents();
@@ -87,7 +124,7 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
     fetchAgents();
-  }, []);
+  }, [isMailEnabled]);
 
   // Calculate unread count
   const unreadCount = messages.filter(m => !m.isRead).length;

@@ -131,32 +131,7 @@ class PluginDefinition(TypedDict):
     plugin_operation_schema: Dict[str, Any] = {}  # 插件操作接口定义
     render_type: RenderType                       # 插件渲染类型
     tags: List[str] = []                          # 插件标签
+    data_source_entry_point: Optional[str] = None # 插件数据源入口操作名称
     
-    # 或准备放弃,准备使用基于注解的插件定义方式
-    # @classmethod
-    # def create_plugin(cls,
-    #                         source_namespace: str,
-    #                         plugin_name: str,
-    #                         loader_type: LoaderType,
-    #                         operation_builders: List[BaseOperationBuilder],
-    #                         **kwargs) -> 'PluginDefinition':
-    #     """
-    #     使用确定性ID创建插件定义
-        
-    #     :param source_namespace: 来源命名空间（如: "official", "user_123"）
-    #     :param plugin_name: 插件名称
-    #     :param loader_type: 加载器类型
-    #     :param operation_builders: 操作构建器列表
-    #     """
-    #     plugin_id = build_plugin_id(source_namespace, plugin_name)
-    #     operations_schema = [builder.build_schema() for builder in operation_builders]
-        
-    #     return cls(
-    #         id=plugin_id,
-    #         name=plugin_name,
-    #         loader_type=loader_type,
-    #         plugin_operation_schema={"operations": operations_schema},
-    #         **kwargs
-    #     )
 
 

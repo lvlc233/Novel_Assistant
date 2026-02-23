@@ -106,6 +106,7 @@ class PluginWrapper:
             config_schema=self.config_schema,
             plugin_operation_schema={"operations": operations_schema},
             tags=self.metadata["tags"],
+            data_source_entry_point=self.metadata["data_source_entry_point"]
         )
 
     def create_instance(self, **kwargs):
@@ -135,7 +136,8 @@ def plugin_meta(
     description: Optional[str] = None,                          # 插件描述
     render_type: RenderType = RenderType.CARD,                 # 渲染类型
     from_type: PluginFromTypeEnum = PluginFromTypeEnum.OFFICIAL,
-    tags: List[str] = None
+    tags: List[str] = None,
+    data_source_entry_point: Optional[str] = None
 ):
     """
     插件元数据装饰器
@@ -150,6 +152,7 @@ def plugin_meta(
         from_type: 来源类型
         scope_type: 作用域类型
         tags: 标签列表
+        data_source_entry_point: 数据源入口操作名称
     cls: with 
         __plugin_metadata__
         __plugin_config__
@@ -171,7 +174,8 @@ def plugin_meta(
             "render_type": render_type,
             "from_type": from_type,
             "scope_type": scope_type,
-            "tags": tags
+            "tags": tags,
+            "data_source_entry_point": data_source_entry_point
         }
         config_schema = {}
         # 收集配置信息->基于runtime_config装饰器,从__init__方法参数中收集
@@ -235,13 +239,17 @@ def runtime_config(init_func: Callable):
     return init_func
 
 
-def operation(name: Optional[str] = None, description: Optional[str] = None):
+def operation(name: Union[str, Callable, None] = None, description: Optional[str] = None):
     """
     操作接口装饰器
+    支持:
+    @operation
+    @operation()
+    @operation(name="op_name")
     """
-    def decorator(func):
-        op_name = name or func.__name__
-        op_description = description or func.__doc__
+    def _process(func, op_name, op_desc):
+        real_name = op_name or func.__name__
+        real_desc = op_desc or func.__doc__
         
         # 获取函数类型提示
         type_hints = get_type_hints(func)
@@ -275,8 +283,8 @@ def operation(name: Optional[str] = None, description: Optional[str] = None):
         
         # 创建操作信息
         op_info = OperationInfo(
-            name=op_name,
-            description=op_description,
+            name=real_name,
+            description=real_desc,
             input_schema=input_schema,
             output_schema=output_schema,
             func=func
@@ -287,6 +295,12 @@ def operation(name: Optional[str] = None, description: Optional[str] = None):
             func.__plugin_operation__ = op_info
         
         return func
+
+    if callable(name):
+        return _process(name, None, description)
+        
+    def decorator(func):
+        return _process(func, name, description)
     
     return decorator
 

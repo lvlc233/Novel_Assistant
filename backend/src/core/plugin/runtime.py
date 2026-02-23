@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from dataclasses import dataclass
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
@@ -176,9 +176,13 @@ class PluginInternalRegistry(BaseModel):
     在插件管理器中,负责对系统的内部定义的插件进行扫描并注册到插件内部注册器中。
     """
     plugins: List[PluginDefinition] = []
+    _plugin_wrappers: Dict[UUID, Any] = PrivateAttr(default_factory=dict)
     def get_plugin_list(self) -> List[PluginDefinition]:
         """根据ID获取插件定义"""
         return self.plugins
+
+    def get_plugin_wrapper(self, plugin_id: UUID) -> Any | None:
+        return self._plugin_wrappers.get(plugin_id)
     
     def discover_plugins(self, plugins_dir: str) -> List[PluginDefinition]:
         """
@@ -187,26 +191,33 @@ class PluginInternalRegistry(BaseModel):
         Args:
             plugins_dir: 插件目录路径
         """
+        is_root = not getattr(self, "_discovering", False)
+        if is_root:
+            self._discovering = True
+
         plugins = []
-        
         try:
             for item in os.scandir(plugins_dir):
                 if item.is_dir():
-                    # 检查是否存在 plugin.py
                     plugin_file = os.path.join(item.path, "plugin.py")
                     if os.path.exists(plugin_file):
-                        # 解析插件定义
                         plugin_def = self._parse_plugin_file(plugin_file)
                         if plugin_def:
                             plugins.append(plugin_def)
-                    
-                    # 递归扫描子目录（子插件）
+
                     subplugins = self.discover_plugins(item.path)
                     plugins.extend(subplugins)
         except OSError as e:
             raise PluginDiscoveryError(f"无法扫描插件目录 {plugins_dir}: {e}")
-        
-        self.plugins.extend(plugins)
+        finally:
+            if is_root:
+                self._discovering = False
+
+        if is_root:
+            unique_plugins = {plugin["id"]: plugin for plugin in plugins}
+            self.plugins = list(unique_plugins.values())
+            return self.plugins
+
         return plugins
 
 
@@ -257,6 +268,8 @@ class PluginInternalRegistry(BaseModel):
         """
         if hasattr(cls, "__plugin_wrapper__"):
             wrapper = getattr(cls, "__plugin_wrapper__")
-            return wrapper.build_definition()
+            plugin_def = wrapper.build_definition()
+            self._plugin_wrappers[plugin_def["id"]] = wrapper
+            return plugin_def
         
         return None

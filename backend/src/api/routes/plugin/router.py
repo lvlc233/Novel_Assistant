@@ -12,7 +12,9 @@ from api.routes.plugin.schema import (
     PluginMetaResponse,
     PluginResponse,
     PluginShopMetaResponse,
-    PluginUpdateRequest
+    PluginUpdateRequest,
+    PluginOperationInvokeRequest,
+    PluginOperationInvokeResponse
 )
 from core.plugin.base.models import PluginDefinition
 from core.plugin.runtime import PluginInternalRegistry, PluginManager
@@ -66,7 +68,8 @@ def _to_shop_meta_response(
         installed=installed,
         installed_version=installed_version,
         latest_version=latest_version,
-        upgrade_available=installed and installed_version != latest_version
+        upgrade_available=installed and installed_version != latest_version,
+        data_source_entry_point=plugin_def.get("data_source_entry_point")
     )
 
 @router.get("", response_model=Response[List[PluginMetaResponse]])
@@ -89,7 +92,7 @@ async def get_system_plugins(
 async def get_expand_plugins(
     service: PluginService = Depends(get_plugin_service)
 ) -> Response[List[PluginMetaResponse]]:
-    """获取扩展插件列表 (OFFICIAL, CUSTOM)."""
+    """获取扩展插件列表 (SYSTEM, OFFICIAL, CUSTOM)."""
     data = await service.get_expand_plugins()
     return Response.ok(data=data)
 
@@ -116,16 +119,27 @@ async def register_internal_plugin(
     registered_id = await manager.add_plugin_with_register(plugin_def)
     return Response.ok(data=registered_id)
 
-@router.post("/internal/{plugin_id}/unregister", response_model=Response[UUID])
-async def unregister_internal_plugin(
-    plugin_id: UUID,
-    session: AsyncSession = Depends(get_session),
-) -> Response[UUID]:
-    manager = PluginManager(session)
-    removed = await manager.remove_plugin(plugin_id)
-    if not removed:
-        return Response.fail(code=40400, message=f"插件不存在: {plugin_id}")
-    return Response.ok(data=plugin_id)
+# 开发者: BackendAgent(python)
+# 当前版本: BE-DEP-20260224-02
+# 创建时间: 2026-02-24 00:22
+# 更新时间: 2026-02-24 00:22
+# 更新记录:
+#     [2026-02-24 00:22:BE-DEP-20260224-02: 注释掉未使用的内部插件卸载接口，避免误用。]
+# 注释者: BackendAgent(python)
+# 时间: 2026-02-24 00:22
+# 使用位置: 后端路由 /plugin/internal/{plugin_id}/unregister (前端未调用)
+# 实现概述: 注释掉内部插件卸载接口，保留注册与查询流程。
+# 废弃标记: 已废弃
+# @router.post("/internal/{plugin_id}/unregister", response_model=Response[UUID])
+# async def unregister_internal_plugin(
+#     plugin_id: UUID,
+#     session: AsyncSession = Depends(get_session),
+# ) -> Response[UUID]:
+#     manager = PluginManager(session)
+#     removed = await manager.remove_plugin(plugin_id)
+#     if not removed:
+#         return Response.fail(code=40400, message=f"插件不存在: {plugin_id}")
+#     return Response.ok(data=plugin_id)
 
 @router.get("/shop", response_model=Response[List[PluginShopMetaResponse]])
 async def get_shop_plugins(
@@ -196,3 +210,20 @@ async def update_plugin(
     """更新插件配置."""
     await service.update_plugin(plugin_id, request)
     return Response.ok()
+
+@router.post("/{plugin_id}/operation/{operation_name}", response_model=Response[PluginOperationInvokeResponse])
+async def invoke_plugin_operation(
+    plugin_id: UUID,
+    operation_name: str,
+    request: PluginOperationInvokeRequest,
+    registry: PluginInternalRegistry = Depends(get_internal_plugin_registry),
+    service: PluginService = Depends(get_plugin_service),
+) -> Response[PluginOperationInvokeResponse]:
+    data = await service._invoke_plugin_operation(
+        plugin_id=plugin_id,
+        operation_name=operation_name,
+        params=request.params,
+        runtime_config=request.runtime_config,
+        registry=registry
+    )
+    return Response.ok(data=data)

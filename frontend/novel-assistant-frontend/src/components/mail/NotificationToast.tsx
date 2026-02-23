@@ -3,11 +3,48 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useMail } from '@/contexts/MailContext';
 import { X, MessageSquare } from 'lucide-react';
+import { getPluginFeatureFlags, PluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
+import { logger } from '@/lib/logger';
 
 export const NotificationToast: React.FC = () => {
   const { latestNotification, clearNotification, openMailbox } = useMail();
   const [visible, setVisible] = useState(false);
   const [displayContent, setDisplayContent] = useState('');
+  const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
+
+  /**
+   * 注释者: FrontendAgent(react)
+   * 时间: 2026-02-23 21:44:00
+   * 说明: 在何处使用: 全局邮箱通知弹层；如何使用: 根据插件加载结果决定显示；实现概述: 拉取插件市场状态并控制通知弹层可见性。
+   */
+  useEffect(() => {
+    let isActive = true;
+    const loadFlags = (force = false) => {
+      getPluginFeatureFlags({ force })
+        .then((flags) => {
+          if (!isActive) return;
+          setFeatureFlags(flags);
+        })
+        .catch((error) => {
+          logger.error('NotificationToast plugin flags load failed', error);
+          if (!isActive) return;
+          setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
+        });
+    };
+    loadFlags();
+    /**
+     * 注释者: FrontendAgent(react)
+     * 时间: 2026-02-23 22:05:00
+     * 说明: 在何处使用: 邮箱通知插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新通知弹层显示。
+     */
+    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const isMailEnabled = featureFlags?.mail ?? false;
 
   const handleClose = useCallback(() => {
     setVisible(false);
@@ -46,6 +83,7 @@ export const NotificationToast: React.FC = () => {
     handleClose();
   };
 
+  if (!isMailEnabled) return null;
   if (!latestNotification && !visible) return null;
 
   return (

@@ -1,50 +1,345 @@
-# from core.plugin.annotations import plugin_meta, runtime_config, operation
-# from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum, LoaderType, RenderType
+from typing import List
+from uuid import UUID
 
-# @plugin_meta(
-#     name="agent_manager",
-#     space="official", 
-#     version="0.0.1",
-#     description="管理Agent的插件",
-#     render_type=RenderType.CARD,
-#     from_type=PluginFromTypeEnum.SYSTEM,
-#     scope_type=PluginScopeTypeEnum.GLOBAL,
-#     tags=["agent"]
-# )
-# class AgentManagerPlugin:
+import httpx
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import cast
 
-#     @runtime_config
-#     def __init__(self, 
-#                  database_url: str, 
-#                  max_connections: int = 10, 
-#                  timeout: float = 30.0,
-#                  enabled: bool = True):
-#         """
-#         插件初始化方法
-        
-#         Args:
-#             database_url: 数据库连接URL
-#             max_connections: 最大连接数
-#             timeout: 超时时间(秒)
-#             enabled: 是否启用插件
-#         """
+from api.routes.plugin.schema import (
+    StandardDataResponse, 
+    CardPayload, 
+    CardItem, 
+    Action, 
+    ConfigPayload,
+    ConfigField
+)
+from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
+from common.errors import ResourceNotFoundError
+from core.plugin.annotations import plugin_meta, runtime_config, operation
+from core.plugin.utils import build_plugin_id
+from infrastructure.pg.pg_models import AgentsManagerSQLEntity, PluginSQLEntity
 
-#     # async def get_current_agent(self) -> Optional[Dict[str, Any]]:
-#     #     """
-#     #     获取当前运行中的智能体
-        
-#     #     Returns:
-#     #         当前智能体的字典表示，如果没有运行中的智能体则返回None
-#     #     """
-#     @operation
-#     async def send_message_to_email(self, email: str, message: str) -> bool:
-#         """
-#         向指定邮箱发送消息
-        
-#         Args:
-#             email: 目标邮箱地址
-#             message: 要发送的消息内容
+
+class AgentPluginMeta(BaseModel):
+    id: UUID
+    name: str
+    version: str
+    description: str | None = None
+    enabled: bool
+    render_type: RenderType
+    tags: List[str] = Field(default_factory=list)
+
+
+class AgentPluginListResponse(BaseModel):
+    total: int
+    items: List[AgentPluginMeta] = Field(default_factory=list)
+
+
+class AgentPluginUpdateRequest(BaseModel):
+    plugin_id: UUID
+    enabled: bool | None = None
+    description: str | None = None
+    tags: List[str] | None = None
+
+
+class AgentPluginUpdateResponse(BaseModel):
+    updated: bool
+    plugin: AgentPluginMeta | None = None
+
+
+class AgentConfigLink(BaseModel):
+    agent_id: str
+    url: str
+
+
+class AgentMailMetaItem(BaseModel):
+    key: str
+    value: str
+
+
+class AgentMailRequest(BaseModel):
+    to_email: str
+    subject: str
+    content: str
+    agent_id: str | None = None
+    metadata: List[AgentMailMetaItem] = Field(default_factory=list)
+
+
+class AgentMailResponse(BaseModel):
+    accepted: bool
+    status_code: int
+    message: str | None = None
+
+
+class AgentConversationSummary(BaseModel):
+    agent_id: UUID
+    session_ids: List[str] = Field(default_factory=list)
+    session_count: int
+
+
+class AgentConversationListResponse(BaseModel):
+    total: int
+    items: List[AgentConversationSummary] = Field(default_factory=list)
+
+
+
+# Agent管理插件的作用如下：
+# 1. 收集所有标记为[Agent]的已注册的插件,
+# 2. 在管理插件则可以直接修改Agent的插件信息
+# 3. 可以跳转到Agent的配置页面,进行详情查看
+# 4. 代理发送消息到邮箱中
+# 5. 收集所有Agent的插件的对话信息
+@plugin_meta(
+    name="agent_manager",
+    space="official", 
+    version="0.0.1",
+    description="管理Agent的插件",
+    render_type=RenderType.CARD,
+    from_type=PluginFromTypeEnum.SYSTEM,
+    scope_type=PluginScopeTypeEnum.GLOBAL,
+    data_source_entry_point="get_card_view"
+)
+class AgentManagerPlugin:
+
+    @runtime_config
+    def __init__(
+        self,
+        session: AsyncSession,
+        frontend_base_url: str | None = None,
+        mail_endpoint: str | None = None,
+        mail_api_key: str | None = None,
+    ):
+        self.session = session
+        self.frontend_base_url = frontend_base_url
+        self.mail_endpoint = mail_endpoint
+        self.mail_api_key = mail_api_key
+
+    def _to_agent_plugin_meta(self, plugin: PluginSQLEntity) -> AgentPluginMeta:
+        return AgentPluginMeta(
+            id=plugin.id,
+            name=plugin.name,
+            version=plugin.version,
+            description=plugin.description,
+            enabled=plugin.enabled,
+            render_type=RenderType(plugin.render_type),
+            tags=plugin.tags or [],
+        )
+
+    @operation
+    async def list_agent_plugins(self, limit: int = 50, offset: int = 0) -> AgentPluginListResponse:
+        stmt = (
+            select(PluginSQLEntity)
+            .where(cast(PluginSQLEntity.tags, JSONB).contains(["agent"]))
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        plugins = result.scalars().all()
+
+        count_stmt = (
+            select(func.count())
+            .select_from(PluginSQLEntity)
+            .where(cast(PluginSQLEntity.tags, JSONB).contains(["agent"]))
+        )
+        total_result = await self.session.execute(count_stmt)
+        total = total_result.scalar_one()
+
+        return AgentPluginListResponse(
+            total=total,
+            items=[self._to_agent_plugin_meta(plugin) for plugin in plugins],
+        )
+
+    @operation
+    async def update_agent_plugin(self, request: AgentPluginUpdateRequest) -> AgentPluginUpdateResponse:
+        stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == request.plugin_id)
+        result = await self.session.execute(stmt)
+        plugin = result.scalar_one_or_none()
+        if not plugin:
+            raise ResourceNotFoundError(f"Plugin {request.plugin_id} not found")
+
+        if request.enabled is not None:
+            plugin.enabled = request.enabled
+        if request.description is not None:
+            plugin.description = request.description
+        if request.tags is not None:
+            plugin.tags = request.tags
+
+        await self.session.commit()
+        await self.session.refresh(plugin)
+
+        return AgentPluginUpdateResponse(updated=True, plugin=self._to_agent_plugin_meta(plugin))
+
+    @operation
+    async def get_agent_config_url(self, agent_id: str) -> AgentConfigLink:
+        base_url = self.frontend_base_url.rstrip("/") if self.frontend_base_url else ""
+        url = f"{base_url}/agents/{agent_id}" if base_url else f"/agents/{agent_id}"
+        return AgentConfigLink(agent_id=agent_id, url=url)
+
+    @operation
+    async def proxy_send_mail(self, request: AgentMailRequest) -> AgentMailResponse:
+        if not self.mail_endpoint:
+            return AgentMailResponse(
+                accepted=False,
+                status_code=0,
+                message="mail_endpoint_not_configured",
+            )
+
+        headers = {}
+        if self.mail_api_key:
+            headers["Authorization"] = self.mail_api_key
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.mail_endpoint,
+                    json=request.model_dump(),
+                    headers=headers,
+                    timeout=10.0,
+                )
+            if response.status_code >= 400:
+                return AgentMailResponse(
+                    accepted=False,
+                    status_code=response.status_code,
+                    message=response.text,
+                )
+            return AgentMailResponse(
+                accepted=True,
+                status_code=response.status_code,
+                message=None,
+            )
+        except httpx.HTTPError as exc:
+            return AgentMailResponse(
+                accepted=False,
+                status_code=0,
+                message=str(exc),
+            )
+
+    @operation
+    async def list_agent_conversations(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> AgentConversationListResponse:
+        stmt = select(AgentsManagerSQLEntity).offset(offset).limit(limit)
+        result = await self.session.execute(stmt)
+        agents = result.scalars().all()
+
+        count_stmt = select(func.count()).select_from(AgentsManagerSQLEntity)
+        total_result = await self.session.execute(count_stmt)
+        total = total_result.scalar_one()
+
+        items = [
+            AgentConversationSummary(
+                agent_id=agent.id,
+                session_ids=list(agent.sessions or []),
+                session_count=len(agent.sessions or []),
+            )
+            for agent in agents
+        ]
+
+        return AgentConversationListResponse(total=total, items=items)
+
+    @operation
+    async def get_card_view(self, limit: int = 50, offset: int = 0) -> StandardDataResponse:
+        """
+        获取Agent卡片视图，包含交互动作
+        """
+        stmt = (
+            select(PluginSQLEntity)
+            .where(cast(PluginSQLEntity.tags, JSONB).contains(["agent"]))
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        plugins = result.scalars().all()
+
+        count_stmt = (
+            select(func.count())
+            .select_from(PluginSQLEntity)
+            .where(cast(PluginSQLEntity.tags, JSONB).contains(["agent"]))
+        )
+        total_result = await self.session.execute(count_stmt)
+        total = total_result.scalar_one()
+
+        cards = []
+        for plugin in plugins:
+            # 构建交互动作
+            actions = {
+                "click": Action(
+                    type="invoke_operation",
+                    operation="get_agent_detail",
+                    params={"agent_id": str(plugin.id)}
+                ),
+                "menu": [
+                    Action(
+                        type="invoke_operation",
+                        operation="update_agent_plugin", 
+                        params={"plugin_id": str(plugin.id), "enabled": not plugin.enabled},
+                        label="禁用" if plugin.enabled else "启用"
+                    )
+                ]
+            }
             
-#         Returns:
-#             如果消息发送成功则返回True，否则返回False
-#         """
+            cards.append(CardItem(
+                id=str(plugin.id),
+                title=plugin.name,
+                summary=plugin.description,
+                tags=plugin.tags or [],
+                actions=actions
+            ))
+
+        return StandardDataResponse(
+            plugin_id=build_plugin_id("official", "agent_manager"),
+            render_type=RenderType.CARD,
+            payload=CardPayload(cards=cards),
+            total=total
+        )
+
+    @operation
+    async def get_agent_detail(self, agent_id: str) -> StandardDataResponse:
+        """
+        获取Agent详情/配置
+        """
+        stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == UUID(agent_id))
+        result = await self.session.execute(stmt)
+        plugin = result.scalar_one_or_none()
+        
+        if not plugin:
+             raise ResourceNotFoundError(f"Agent {agent_id} not found")
+
+        # 构造配置表单 (示例)
+        fields = [
+            ConfigField(
+                key="description",
+                label="描述",
+                value_type="string",
+                value=plugin.description
+            ),
+             ConfigField(
+                key="enabled",
+                label="启用状态",
+                value_type="boolean",
+                value=plugin.enabled
+            )
+        ]
+
+        return StandardDataResponse(
+            plugin_id=UUID(agent_id),
+            render_type=RenderType.CONFIG,
+            payload=ConfigPayload(
+                fields=fields,
+                actions={
+                    "save": Action(
+                        type="invoke_operation",
+                        operation="update_agent_plugin",
+                        params={"plugin_id": agent_id}
+                    )
+                }
+            )
+        )
+
+
+

@@ -1,4 +1,4 @@
-
+"use client";
 // 仪表盘
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,7 +7,7 @@ import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
 import PluginManagerModal, { PluginType } from './PluginManagerModal';
 import { logger } from '@/lib/logger';
-import { getPlugins, getShopPlugins, registerShopPlugin, unregisterShopPlugin, PluginShopItem } from '@/services/pluginService';
+import { getShopPlugins, registerShopPlugin, unregisterShopPlugin, PluginShopItem, subscribePluginFeatureFlagsChanged, getInternalPlugins } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 
 /**
@@ -27,6 +27,8 @@ import { PluginInstance } from '@/types/plugin';
  * - [2026-02-18 20:08:FE-REF-20260218-04: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 保持遮罩透明但拦截交互; 实现概述: 移除黑色遮罩背景。]
  * - [2026-02-18 20:20:FE-REF-20260218-06: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 根据注册状态与版本差异显示加入/更新按钮; 实现概述: 增加注册状态与升级提示。]
  * - [2026-02-19 01:39:FE-REF-20260219-01: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 已加入插件可点击“移除”完成卸载; 实现概述: 新增插件移除操作与接口调用。]
+ * - [2026-02-23 19:13:FE-REF-20260223-01: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 未加入插件显示更明显的加入按钮; 实现概述: 强化未安装插件的主操作按钮样式。]
+ * - [2026-02-23 19:20:FE-REF-20260223-02: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 未加入按钮文字清晰可见; 实现概述: 调整未安装按钮的颜色与边框。]
  */
 
 interface DashboardProps {
@@ -48,13 +50,14 @@ const SYSTEM_PLUGIN_MAP: Record<string, { icon: React.ReactNode, type: PluginTyp
     'knowledge_base': { icon: <Database />, type: 'knowledge' },
     'doc_agent': { icon: <FileEdit />, type: 'doc_agent' },
     'project_agent': { icon: <Briefcase />, type: 'project_agent' },
+    'project_helper': { icon: <Briefcase />, type: 'project_agent' },
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const router = useRouter();
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isPluginsExpanded, setIsPluginsExpanded] = useState(false);
-  const [selectedPlugin, setSelectedPlugin] = useState<PluginType | null>(null);
+  const [selectedPlugin, setSelectedPlugin] = useState<PluginType | PluginInstance | null>(null);
   const [plugins, setPlugins] = useState<PluginInstance[]>([]);
   const [isLoadingPlugins, setIsLoadingPlugins] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(false);
@@ -63,6 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const [shopError, setShopError] = useState<string | null>(null);
   const [registeringShopId, setRegisteringShopId] = useState<string | null>(null);
   const [removingShopId, setRemovingShopId] = useState<string | null>(null);
+  const [systemPluginIds, setSystemPluginIds] = useState<Set<string>>(new Set());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCreateSelect = (type: 'blank' | 'template' | 'import') => {
@@ -80,11 +84,36 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
     };
   }, [isShopOpen]);
 
+  const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
+      return {
+          id: item.id,
+          status: item.enabled ? 'enabled' : 'disabled',
+          config: { items: [] },
+          installedAt: new Date().toISOString(),
+          manifest: {
+              id: item.id,
+              name: item.name,
+              version: item.version,
+              description: item.description || '',
+              author: 'System',
+              type: 'system',
+              render_type: item.render_type,
+              capabilities: {
+                  sidebar: true,
+                  editor: true,
+                  header: false
+              },
+              data_source_entry_point: item.data_source_entry_point
+          }
+      };
+  };
+
   const fetchPlugins = async () => {
       try {
           setIsLoadingPlugins(true);
-          const data = await getPlugins();
-          setPlugins(data);
+          const data = await getShopPlugins();
+          const enabledPlugins = data.filter((plugin) => plugin.installed && plugin.enabled);
+          setPlugins(enabledPlugins.map(mapShopItemToPlugin));
       } catch (error) {
           logger.error('Failed to fetch plugins:', error);
       } finally {
@@ -96,11 +125,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       try {
           setIsLoadingShop(true);
           setShopError(null);
-          const data = await getShopPlugins();
-          setShopPlugins(data);
+          const [shopData, internalData] = await Promise.all([getShopPlugins(), getInternalPlugins()]);
+          const systemIds = new Set(
+            internalData.filter((plugin) => plugin.from_type === 'system').map((plugin) => plugin.id)
+          );
+          setShopPlugins(shopData);
+          setSystemPluginIds(systemIds);
       } catch (error) {
           logger.error('Failed to fetch shop plugins:', error);
           setShopError('插件市场加载失败');
+          setSystemPluginIds(new Set());
       } finally {
           setIsLoadingShop(false);
       }
@@ -118,6 +152,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
           setRegisteringShopId(pluginId);
           await registerShopPlugin(pluginId);
           await fetchShopPlugins();
+          await fetchPlugins();
       } catch (error) {
           logger.error('Failed to register shop plugin:', error);
           setShopError('插件注册失败');
@@ -131,6 +166,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
           setRemovingShopId(pluginId);
           await unregisterShopPlugin(pluginId);
           await fetchShopPlugins();
+          await fetchPlugins();
       } catch (error) {
           logger.error('Failed to unregister shop plugin:', error);
           setShopError('插件移除失败');
@@ -146,12 +182,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
         fetchPlugins();
     }
   };
+
+  useEffect(() => {
+      const unsubscribe = subscribePluginFeatureFlagsChanged(() => {
+          if (isPluginsExpanded) {
+              fetchPlugins();
+          }
+      });
+      return () => {
+          unsubscribe();
+      };
+  }, [isPluginsExpanded]);
   
   const handlePluginCardClick = (plugin: PluginInstance) => {
+      logger.debug('Dashboard handlePluginCardClick:', plugin);
       // 尝试匹配系统插件类型
       const systemMap = SYSTEM_PLUGIN_MAP[plugin.manifest.name] || SYSTEM_PLUGIN_MAP[plugin.id];
       
-      if (systemMap) {
+      if (plugin.manifest.data_source_entry_point) {
+          logger.debug('Dashboard: Opening dynamic plugin:', plugin.manifest.name);
+          setSelectedPlugin(plugin);
+      } else if (systemMap) {
+          logger.debug('Dashboard: Opening system plugin:', systemMap.type);
           setSelectedPlugin(systemMap.type);
       } else {
           // 对于非系统内置的插件，暂时跳转到插件详情或列表页
@@ -349,14 +401,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                     const isInstalled = Boolean(plugin.installed);
                     const canUpgrade = isInstalled && hasUpgrade;
                     const isRemoving = removingShopId === plugin.id;
+                    const isSystem = systemPluginIds.has(plugin.id);
                     const buttonLabel = isRegistering
                       ? '处理中...'
                       : canUpgrade
                         ? '更新到系统'
                         : isInstalled
-                          ? '已加入'
+                          ? (isSystem ? '系统内置' : '已加入')
                           : '加入系统';
-                    const isDisabled = isRegistering || (isInstalled && !canUpgrade);
+                    const isDisabled = isRegistering || (isInstalled && !canUpgrade) || (isInstalled && isSystem);
                     return (
                       <div
                         key={plugin.id}
@@ -387,21 +440,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                           <div className="text-[11px] text-text-secondary">
                             {canUpgrade ? '检测到版本差异，可更新' : isInstalled ? '已加入系统' : '未加入系统'}
                           </div>
-                          <div className="flex items-center justify-between gap-2">
+                          <div className={isInstalled ? 'flex items-center justify-between gap-2' : 'flex items-center'}>
                             <button
                               onClick={() => handleRegisterShopPlugin(plugin.id)}
                               disabled={isDisabled}
                               className={`px-4 py-2 text-xs rounded-lg transition-colors ${
                                 isDisabled
-                                  ? 'bg-gray-100 text-text-secondary cursor-not-allowed'
+                                  ? 'bg-surface-white text-text-secondary border border-border-primary cursor-not-allowed'
                                   : canUpgrade
-                                    ? 'bg-orange-500 text-white hover:bg-orange-600'
-                                    : 'bg-accent-primary text-white hover:bg-accent-primary/90'
+                                    ? 'bg-warning text-surface-white hover:bg-warning/90'
+                                    : 'bg-text-primary text-surface-white hover:bg-text-primary/90 border border-text-primary shadow-md min-w-[120px] text-sm font-semibold'
                               }`}
                             >
                               {buttonLabel}
                             </button>
-                            {isInstalled && (
+                            {isInstalled && !isSystem && (
                               <button
                                 onClick={() => handleUnregisterShopPlugin(plugin.id)}
                                 disabled={isRegistering || isRemoving}
@@ -433,7 +486,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       
       {selectedPlugin && (
           <PluginManagerModal 
-            type={selectedPlugin} 
+            type={typeof selectedPlugin === 'string' ? selectedPlugin : 'agent'} 
+            plugin={typeof selectedPlugin === 'object' ? selectedPlugin : undefined}
             onClose={() => setSelectedPlugin(null)} 
           />
       )}
