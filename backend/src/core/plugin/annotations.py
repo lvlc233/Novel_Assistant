@@ -73,7 +73,12 @@ class OperationInfo:
     input_schema: Optional[Dict[str, Any]] = None
     output_schema: Optional[Dict[str, Any]] = None
     """
-    2026.03.01: 新增两个属性,bound_ui和render_target,用于指定哪些组件触发此操作,以及操作结果渲染到哪个组件
+    2026.03.01: 新增属性
+    with_ui: 绑定的ui类型,点击该ui组件后触发对应的逻辑
+    ui_target: 渲染的目标ui
+    target_props: 接口的参数传入方式
+    is_stream: 流式输出适配
+    trigger: 接口的触发模式
     """
     # UI 绑定属性
     with_ui: List[UIBinding]= field(default_factory=list)
