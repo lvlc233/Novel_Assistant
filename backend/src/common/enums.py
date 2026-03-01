@@ -9,7 +9,6 @@ class WorkStateEnum(str, Enum):
     """作品状态(DB)."""
     UPDATING = "updating"  # 连载中
     COMPLETED = "completed"  # 已完结
-    HIATUS = "hiatus"  # 断更
 
 class WorkStateCNEnum(str, Enum):
     """作品状态(前端显示)."""
@@ -27,22 +26,23 @@ class PluginFromTypeEnum(str, Enum):
     CUSTOM = "custom"
     OFFICIAL = "official"
 
-class PluginScopeTypeEnum(str, Enum):
-    """插件作用域类型."""
-    GLOBAL = "global"
-    WORK = "work"
-    DOCUMENT = "document"
-
 class MemoryTypeEnum(str, Enum):
     """记忆类型."""
     LONG_TERM = "long_term"  # 长期记忆
     SHORT_TERM = "short_term"  # 短期记忆
 
-class RenderType(str, Enum):
-    """UI渲染类型."""
-    CONFIG = "CONFIG"
-    AGENT_MESSAGES = "AGENT_MESSAGES"
-    CARD = "CARD"
+"""
+2026.03.01:新增加
+--- 参数来源常量 ---
+"""
+class UIParamSourceEnum(str, Enum):
+    CONTEXT = "context"  # 来自前端环境（URL, Session, Global State）
+    PROPS = "props"      # 来自触发组件自身的属性
+    INPUT = "input"      # 来自用户实时输入（默认）
+
+class UITrigger(str, Enum):
+    CLICK = "click"  #点击 
+    MOUNT = "mount"  #挂载
 
 class LoaderType(str, Enum):
     """插件数据源类型."""

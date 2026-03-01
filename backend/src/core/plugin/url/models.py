@@ -35,32 +35,3 @@ class URLPluginOperation(BasePluginOperation[URLOperationBuilder]):
         super().__init__(LoaderType.URL, URLOperationBuilder)
 
 
-# # TODO?
-# class URLLoader(PluginLoader):
-#     """URL数据源加载器"""
-    
-#     async def load(self, config: Dict[str, Any]) :
-#         """从URL加载数据"""
-#         url = config.get("url")
-#         if not url:
-#             raise ValueError("URL configuration is required")
-        
-#         headers = config.get("headers", {})
-#         timeout = config.get("timeout", 30.0)
-        
-#         async with httpx.AsyncClient() as client:
-#             try:
-#                 response = await client.get(
-#                     url,
-#                     headers=headers,
-#                     timeout=timeout
-#                 )
-#                 response.raise_for_status()
-                
-#                 data = response.json()
-                
-                
-#             except httpx.HTTPError as e:
-#                 raise ValueError(f"HTTP error: {str(e)}")
-#             except Exception as e:
-#                 raise ValueError(f"Failed to load from URL: {str(e)}")

@@ -3,13 +3,17 @@
 @plugin, @config, @operation
 """
 from __future__ import annotations
-from typing import Dict, Any, Optional, List, Union, Callable, get_type_hints
-from dataclasses import dataclass
+from typing import Annotated, Dict, Any, Optional, List, Type, Union, Callable, get_args, get_origin, get_type_hints
+from dataclasses import dataclass, field
 from inspect import signature, Parameter
 import inspect
-from common.enums import LoaderType, RenderType, PluginFromTypeEnum, PluginScopeTypeEnum
+from urllib.parse import urlencode
+
+from pydantic import Field
+from common.enums import LoaderType, PluginFromTypeEnum, UIParamSourceEnum,UITrigger
 from core.plugin.base.models import PluginDefinition
 from core.plugin.utils import build_plugin_id
+from core.ui.base import UIBinding, UINode
 
 """构建流程
 类定义开始
@@ -68,8 +72,41 @@ class OperationInfo:
     description: Optional[str] = None
     input_schema: Optional[Dict[str, Any]] = None
     output_schema: Optional[Dict[str, Any]] = None
+    """
+    2026.03.01: 新增两个属性,bound_ui和render_target,用于指定哪些组件触发此操作,以及操作结果渲染到哪个组件
+    """
+    # UI 绑定属性
+    with_ui: List[UIBinding]= field(default_factory=list)
+    ui_target: Optional[str] = None
+    target_props: List[str] = field(default_factory=list)# 组件的“入参契约”,前端拿到后，会自动做一个过滤（Pick）：只把后端返回中匹配 target_props 的字段传给组件，多余的字段存入缓存，缺少的字段给默认值。
+    # 交互属性
+    is_stream: bool = False
+    trigger: UITrigger = UITrigger.CLICK
     func: Optional[Callable] = None
 
+    def get_full_routes(self) -> List[str]:
+        """
+        生成最终前端可用的接口路径列表。
+        输出示例: ["/home/card/item/get_page?name=item"]
+        """
+        routes = []
+
+        # 操作后缀，例如 /get_page
+        op_suffix = f"/{self.name}"
+        
+        for binding in self.with_ui:
+            # 基础路径
+            path = "/" + "/".join([p.lower() for p in binding.path_list])
+            full_path = f"{path}{op_suffix}"
+            
+            # 拼接参数
+            if binding.predicates:
+                query_string = urlencode(binding.predicates)
+                routes.append(f"{full_path}?{query_string}")
+            else:
+                routes.append(full_path)
+                
+        return routes
 
 @dataclass
 class ConfigInfo:
@@ -100,13 +137,11 @@ class PluginWrapper:
             version=self.metadata["version"],
             description=self.metadata["description"],
             loader_type=self.metadata["loader_type"],
-            render_type=self.metadata["render_type"],
             from_type=self.metadata["from_type"],
-            scope_type=self.metadata["scope_type"],
             config_schema=self.config_schema,
             plugin_operation_schema={"operations": operations_schema},
             tags=self.metadata["tags"],
-            data_source_entry_point=self.metadata["data_source_entry_point"]
+            # data_source_entry_point=self.metadata["data_source_entry_point"]
         )
 
     def create_instance(self, **kwargs):
@@ -131,10 +166,8 @@ def _collect_operations(cls) -> Dict[str, OperationInfo]:
 def plugin_meta(
     name: str,                                                  # 插件名称
     space: str,                                                 # 插件命名空间
-    scope_type: PluginScopeTypeEnum,                            # 作用域类型
     version: str = "1.0.0",                                     # 插件版本  
     description: Optional[str] = None,                          # 插件描述
-    render_type: RenderType = RenderType.CARD,                 # 渲染类型
     from_type: PluginFromTypeEnum = PluginFromTypeEnum.OFFICIAL,
     tags: List[str] = None,
     data_source_entry_point: Optional[str] = None
@@ -148,9 +181,7 @@ def plugin_meta(
         version: 版本号
         description: 插件描述
         loader_type: 加载器类型
-        render_type: 渲染类型
         from_type: 来源类型
-        scope_type: 作用域类型
         tags: 标签列表
         data_source_entry_point: 数据源入口操作名称
     cls: with 
@@ -171,11 +202,9 @@ def plugin_meta(
             "version": version,
             "description": description,
             "loader_type": LoaderType.INTERNAL,
-            "render_type": render_type,
             "from_type": from_type,
-            "scope_type": scope_type,
             "tags": tags,
-            "data_source_entry_point": data_source_entry_point
+            # "data_source_entry_point": data_source_entry_point
         }
         config_schema = {}
         # 收集配置信息->基于runtime_config装饰器,从__init__方法参数中收集
@@ -239,69 +268,86 @@ def runtime_config(init_func: Callable):
     return init_func
 
 
-def operation(name: Union[str, Callable, None] = None, description: Optional[str] = None):
+def operation(
+    name: Union[str, Callable, None] = None, 
+    description: Optional[str] = None,
+    with_ui: List[UIBinding] = None,
+    ui_target: Optional[Type[UINode]] = None,
+    trigger: UITrigger = UITrigger.CLICK
+):
     """
     操作接口装饰器
-    支持:
-    @operation
-    @operation()
-    @operation(name="op_name")
+    整合了：1. 路径自动生成 2. 参数来源鉴定 3. 流式检测 4. UI 契约提取
     """
     def _process(func, op_name, op_desc):
+        # 基础元数据提取
         real_name = op_name or func.__name__
         real_desc = op_desc or func.__doc__
         
-        # 获取函数类型提示
-        type_hints = get_type_hints(func)
-        
-        # 解析函数参数生成input_schema
-        sig = signature(func)
+        # 1. 参数来源鉴定 (区分 Context / Props / Input)
+        type_hints = get_type_hints(func, include_extras=True)
+        sig = inspect.signature(func)
         input_schema = {}
         
         for param_name, param in sig.parameters.items():
-            if param_name == 'self':
-                continue
-                
-            # 获取参数类型
-            param_type = type_hints.get(param_name, Any)
+            if param_name == 'self': continue
             
-            param_schema = {
-                "type": _map_python_type_to_json(param_type),
-                "required": param.default is Parameter.empty,
+            hint = type_hints.get(param_name, Any)
+            # 默认来源为用户输入
+            source = UIParamSourceEnum.INPUT 
+            context_key = param_name
+            
+            # 解析 Annotated[type, Source, key]
+            if get_origin(hint) is Annotated:
+                base_type = get_args(hint)[0]
+                metadata = get_args(hint)[1:]
+                for meta in metadata:
+                    if isinstance(meta, UIParamSourceEnum):
+                        source = meta
+                    elif isinstance(meta, str):
+                        context_key = meta
+            else:
+                base_type = hint
+
+            input_schema[param_name] = {
+                "type": _map_python_type_to_json(base_type),
+                "required": param.default is inspect.Parameter.empty,
+                "source": source.value,
+                "context_key": context_key
             }
-            
-            if param.default is not Parameter.empty:
-                param_schema["default"] = param.default
-            
-            input_schema[param_name] = param_schema
-        
-        # 解析返回类型生成output_schema
-        return_type = type_hints.get('return', Dict[str, Any])
-        output_schema = {
-            "type": _map_python_type_to_json(return_type)
-        }
-        
-        # 创建操作信息
+
+        # 2. 自动检测流式输出 (AsyncGenerator)
+        is_stream = inspect.isasyncgenfunction(func)
+
+        # 3. 创建增强的操作信息 (包含路径生成能力)
         op_info = OperationInfo(
             name=real_name,
             description=real_desc,
             input_schema=input_schema,
-            output_schema=output_schema,
-            func=func
+            # 这里的 output_schema 可以根据需要解析 return hint
+            output_schema={"type": _map_python_type_to_json(type_hints.get('return', Any))},
+            func=func,
+            with_ui=with_ui or [],
+            ui_target=ui_target.get_path() if ui_target else None,
+            # 自动提取目标组件的“入参契约”
+            target_props=ui_target.get_prop_schema() if ui_target else [],
+            is_stream=is_stream,
+            trigger=trigger
         )
         
-        # 存储操作信息
-        if not hasattr(func, '__plugin_operation__'):
-            func.__plugin_operation__ = op_info
-        
+        # 将元数据绑定到函数对象，供 PluginWrapper 收集
+        func.__plugin_operation__ = op_info
         return func
 
+    # --- Decorator 兼容性处理逻辑 ---
     if callable(name):
+        # 处理 @operation 无括号调用的情况
         return _process(name, None, description)
         
     def decorator(func):
+        # 处理 @operation(name="...") 有参数调用的情况
         return _process(func, name, description)
-    
+        
     return decorator
 
 
@@ -333,41 +379,3 @@ def _map_python_type_to_json(python_type) -> str:
     return "object"
 
 
-# def get_plugin_definition(cls) -> Optional[PluginDefinition]:
-#     """
-#     从装饰的类获取完整的PluginDefinition
-#     """
-#     if hasattr(cls, '__plugin_wrapper__'):
-#         return cls.__plugin_wrapper__.build_definition()
-#     if not hasattr(cls, '__plugin_metadata__'):
-#         return None
-    
-#     metadata = cls.__plugin_metadata__
-    
-#     operations = _collect_operations(cls)
-    
-#     config_schema = {}
-#     if hasattr(cls, '__plugin_config__') and cls.__plugin_config__:
-#         config_schema = cls.__plugin_config__.schema
-    
-#     operations_schema = {
-#         name: {
-#             "description": info.description,
-#             "input_schema": info.input_schema,
-#             "output_schema": info.output_schema,
-#         }
-#         for name, info in operations.items()
-#     }
-#     return PluginDefinition(
-#         id=build_plugin_id(metadata["space"], metadata["name"]),
-#         name=metadata["name"],
-#         version=metadata["version"],
-#         description=metadata["description"],
-#         loader_type=metadata["loader_type"],
-#         render_type=metadata["render_type"],
-#         from_type=metadata["from_type"],
-#         scope_type=metadata["scope_type"],
-#         config_schema=config_schema,
-#         plugin_operation_schema={"operations": operations_schema},
-#         tags=metadata["tags"],
-#     )

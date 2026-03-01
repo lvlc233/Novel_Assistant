@@ -9,7 +9,7 @@ from typing import Callable, Dict, Any, List, Generic, TypeVar, Type, TypedDict,
 from abc import ABC
 from uuid import UUID
 from pydantic import BaseModel
-from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
+from common.enums import LoaderType, PluginFromTypeEnum
 from core.plugin.utils import build_plugin_id
 
 """
@@ -115,6 +115,7 @@ class BasePluginOperation(Generic[T]):
 
 """
 插件定义
+2026.03.01: 适配SDUI的思路移除了render_type,scope,数据源入口的概念
 """
 class PluginDefinition(TypedDict):
     """插件定义模型"""
@@ -123,15 +124,11 @@ class PluginDefinition(TypedDict):
     name: str                                       # 插件名称
     version: str = "1.0.0"                         # 插件版本
     description: Optional[str] = None              # 插件描述
-    from_type: PluginFromTypeEnum                  # 插件来源类型
-    scope_type: PluginScopeTypeEnum                # 插件作用域类型
+    from_type: PluginFromTypeEnum = PluginFromTypeEnum.CUSTOM # 插件来源类型
     loader_type: LoaderType                       # 插件加载器类型
     config_schema: Dict[str, Any] = {}           # 插件配置参数结构定义
-    # runtime_config: Dict[str, Any] = {}           # 插件运行时配置TODO:准备移动到管理器中
     plugin_operation_schema: Dict[str, Any] = {}  # 插件操作接口定义
-    render_type: RenderType                       # 插件渲染类型
     tags: List[str] = []                          # 插件标签
-    data_source_entry_point: Optional[str] = None # 插件数据源入口操作名称
     
 
 
