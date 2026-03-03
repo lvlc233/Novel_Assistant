@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Puzzle, Save } from 'lucide-react';
 import { PluginInstance } from '@/types/plugin';
-import { getPlugins } from '@/services/pluginService';
+import { getShopPlugins, PluginShopItem } from '@/services/pluginService';
 
 interface WorkPluginSettingsModalProps {
   isOpen: boolean;
@@ -13,13 +13,13 @@ interface WorkPluginSettingsModalProps {
 export default function WorkPluginSettingsModal({ isOpen, onClose, workId }: WorkPluginSettingsModalProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _workId = workId;
-  const [plugins, setPlugins] = useState<PluginInstance[]>([]);
+  const [plugins, setPlugins] = useState<PluginShopItem[]>([]);
   const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen) {
         // Load global plugins
-        getPlugins().then(setPlugins);
+        getShopPlugins().then(setPlugins);
         // TODO: Load work specific configuration
         // For now, assume all global enabled plugins are enabled here
     }
@@ -62,8 +62,8 @@ export default function WorkPluginSettingsModal({ isOpen, onClose, workId }: Wor
                            <Puzzle className="w-4 h-4" />
                        </div>
                        <div>
-                           <div className="font-medium text-sm text-text-primary">{plugin.manifest.name}</div>
-                           <div className="text-xs text-text-secondary">{plugin.manifest.description}</div>
+                           {/* <div className="font-medium text-sm text-text-primary">{plugin.manifest.name}</div>
+                           <div className="text-xs text-text-secondary">{plugin.manifest.description}</div> */}
                        </div>
                    </div>
                    
@@ -71,8 +71,8 @@ export default function WorkPluginSettingsModal({ isOpen, onClose, workId }: Wor
                       <input 
                         type="checkbox" 
                         className="sr-only peer"
-                        checked={plugin.manifest.type === 'system' || enabledPlugins.has(plugin.id)}
-                        disabled={plugin.manifest.type === 'system'}
+                        // checked={plugin.manifest.type === 'system' || enabledPlugins.has(plugin.id)}
+                        // disabled={plugin.manifest.type === 'system'}
                         onChange={() => togglePlugin(plugin.id)}
                       />
                       <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-primary"></div>

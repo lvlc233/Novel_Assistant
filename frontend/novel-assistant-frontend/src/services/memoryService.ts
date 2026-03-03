@@ -60,14 +60,17 @@ export const memoryService = {
       }));
     }
     
-    const response = await request.get<BackendMemoryMeta[]>('/plugin/memory');
-    return response.map(m => ({
-      memory_id: m.memory_id,
-      enable: m.enable,
-      memory_name: m.memory_name,
-      memory_description: m.memory_description,
-      create_at: m.create_at
-    }));
+    // const response = await request.get<BackendMemoryMeta[]>('/plugin/memory');
+    // return response.map(m => ({
+    //   memory_id: m.memory_id,
+    //   enable: m.enable,
+    //   memory_name: m.memory_name,
+    //   memory_description: m.memory_description,
+    //   create_at: m.create_at
+    // }));
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Memory Service API is deprecated. Please migrate to Plugin Operation.");
+    return [];
   },
 
   getMemoryDetail: async (id: string): Promise<MemoryDetail> => {
@@ -78,16 +81,19 @@ export const memoryService = {
       return { ...memory };
     }
     
-    const response = await request.get<BackendMemoryDetail>(`/plugin/memory/${id}`);
-    return {
-      memory_id: response.memory_id,
-      enable: response.enable,
-      memory_name: response.memory_name,
-      memory_type: response.memory_type,
-      memory_description: response.memory_description,
-      memory_content: response.memory_content,
-      create_at: response.create_at
-    };
+    // const response = await request.get<BackendMemoryDetail>(`/plugin/memory/${id}`);
+    // return {
+    //   memory_id: response.memory_id,
+    //   enable: response.enable,
+    //   memory_name: response.memory_name,
+    //   memory_type: response.memory_type,
+    //   memory_description: response.memory_description,
+    //   memory_content: response.memory_content,
+    //   create_at: response.create_at
+    // };
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Memory Service API is deprecated. Please migrate to Plugin Operation.");
+    throw new Error("API deprecated");
   },
 
   createMemory: async (data: MemoryCreateRequest): Promise<MemoryMeta> => {
@@ -107,14 +113,17 @@ export const memoryService = {
       return meta;
     }
     
-    const response = await request.post<BackendMemoryMeta>('/plugin/memory', data);
-    return {
-      memory_id: response.memory_id,
-      enable: response.enable,
-      memory_name: response.memory_name,
-      memory_description: response.memory_description,
-      create_at: response.create_at
-    };
+    // const response = await request.post<BackendMemoryMeta>('/plugin/memory', data);
+    // return {
+    //   memory_id: response.memory_id,
+    //   enable: response.enable,
+    //   memory_name: response.memory_name,
+    //   memory_description: response.memory_description,
+    //   create_at: response.create_at
+    // };
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Memory Service API is deprecated. Please migrate to Plugin Operation.");
+    throw new Error("API deprecated");
   },
 
   updateMemory: async (id: string, data: MemoryUpdateRequest): Promise<void> => {
@@ -126,7 +135,9 @@ export const memoryService = {
       return;
     }
     
-    await request.patch(`/plugin/memory/${id}`, data);
+    // await request.patch(`/plugin/memory/${id}`, data);
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Memory Service API is deprecated. Please migrate to Plugin Operation.");
   },
 
   deleteMemory: async (id: string): Promise<void> => {
@@ -137,6 +148,8 @@ export const memoryService = {
       return;
     }
     
-    await request.delete(`/plugin/memory/${id}`);
+    // await request.delete(`/plugin/memory/${id}`);
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Memory Service API is deprecated. Please migrate to Plugin Operation.");
   }
 };

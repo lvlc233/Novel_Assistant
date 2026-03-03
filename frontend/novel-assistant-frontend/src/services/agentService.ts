@@ -89,8 +89,11 @@ export const agentService = {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return mockAgents.map(({ history_meta, ...meta }) => meta);
     }
-    const response = await request.get<AgentResponse[]>('/plugin/agent/manager');
-    return response.map(mapAgentResponseToMeta);
+    // const response = await request.get<AgentResponse[]>('/plugin/agent/manager');
+    // return response.map(mapAgentResponseToMeta);
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Agent Service API is deprecated. Please migrate to Plugin Operation.");
+    return [];
   },
 
   getAgentDetail: async (id: string): Promise<AgentDetail> => {
@@ -100,8 +103,11 @@ export const agentService = {
       if (!agent) throw new Error('Agent not found');
       return { ...agent };
     }
-    const response = await request.get<AgentResponse>(`/plugin/agent/manager/${id}`);
-    return mapAgentResponseToDetail(response);
+    // const response = await request.get<AgentResponse>(`/plugin/agent/manager/${id}`);
+    // return mapAgentResponseToDetail(response);
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Agent Service API is deprecated. Please migrate to Plugin Operation.");
+    throw new Error("API deprecated");
   },
 
   createAgent: async (data: AgentCreateRequest): Promise<AgentMeta> => {
@@ -127,14 +133,17 @@ export const agentService = {
     }
     // Assuming a create endpoint exists or fallback to error
     console.warn("Create Agent API not explicitly defined in doc. Trying /plugin/agent/manager");
-    const response = await request.post<AgentResponse>('/plugin/agent/manager', {
-      name: data.agent_name,
-      agent_type: data.agent_type,
-      description: data.agent_description,
-      broadcast: data.broadcast,
-      config: {} // Default empty config
-    });
-    return mapAgentResponseToMeta(response);
+    // const response = await request.post<AgentResponse>('/plugin/agent/manager', {
+    //   name: data.agent_name,
+    //   agent_type: data.agent_type,
+    //   description: data.agent_description,
+    //   broadcast: data.broadcast,
+    //   config: {} // Default empty config
+    // });
+    // return mapAgentResponseToMeta(response);
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Agent Service API is deprecated. Please migrate to Plugin Operation.");
+    throw new Error("API deprecated");
   },
 
   updateAgent: async (id: string, data: AgentUpdateRequest): Promise<void> => {
@@ -145,9 +154,11 @@ export const agentService = {
       mockAgents[index] = { ...mockAgents[index], ...data };
       return;
     }
-    await request.patch<AgentResponse>(`/plugin/agent/manager/${id}`, {
-      broadcast: data.broadcast
-    });
+    // await request.patch<AgentResponse>(`/plugin/agent/manager/${id}`, {
+    //   broadcast: data.broadcast
+    // });
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Agent Service API is deprecated. Please migrate to Plugin Operation.");
   },
 
   // Simulate SSE chat or use backend invoke
@@ -312,6 +323,8 @@ export const agentService = {
     }
     // Backend Doc does not explicitly list DELETE for agent manager.
     console.warn("Delete Agent API not explicitly defined in doc. Trying DELETE /plugin/agent/manager/{id}");
-    await request.delete(`/plugin/agent/manager/${id}`);
+    // await request.delete(`/plugin/agent/manager/${id}`);
+    // TODO: Migrate to new Plugin Operation API
+    console.warn("Agent Service API is deprecated. Please migrate to Plugin Operation.");
   }
 };

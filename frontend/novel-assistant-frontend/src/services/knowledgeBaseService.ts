@@ -25,45 +25,65 @@ import { PluginInstance } from '@/types/plugin';
 export const knowledgeBaseService = {
     // 1. Get List
     getKnowledgeBases: async (): Promise<KnowledgeBaseMeta[]> => {
-        return await request.get<KnowledgeBaseMeta[]>('/plugin/kd');
+        // return await request.get<KnowledgeBaseMeta[]>('/plugin/kd');
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
+        return [];
     },
 
     // 2. Get Detail (Chunks List)
     // 注意：后端返回的是 List[KDDescriptionResponse]，即 KnowledgeBaseChunk[]
     getKnowledgeBaseChunks: async (id: string): Promise<KnowledgeBaseChunk[]> => {
-        return await request.get<KnowledgeBaseChunk[]>(`/plugin/kd/${id}`);
+        // return await request.get<KnowledgeBaseChunk[]>(`/plugin/kd/${id}`);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
+        return [];
     },
 
     // 3. Create KB
     createKnowledgeBase: async (data: CreateKnowledgeBaseRequest): Promise<KnowledgeBaseMeta> => {
-        return await request.post<KnowledgeBaseMeta>('/plugin/kd', data);
+        // return await request.post<KnowledgeBaseMeta>('/plugin/kd', data);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
+        throw new Error("API deprecated");
     },
 
     // 4. Update KB Meta
     updateKnowledgeBase: async (id: string, data: UpdateKnowledgeBaseRequest): Promise<void> => {
-        await request.patch(`/plugin/kd/${id}`, data);
+        // await request.patch(`/plugin/kd/${id}`, data);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
     },
 
     // 5. Delete KB
     deleteKnowledgeBase: async (id: string): Promise<void> => {
-        await request.delete(`/plugin/kd/${id}`);
+        // await request.delete(`/plugin/kd/${id}`);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
     },
 
     // 6. Create Chunk
     createChunk: async (kdId: string, data: CreateKnowledgeBaseChunkRequest): Promise<KnowledgeBaseChunk> => {
         // Backend API: POST /plugin/kd/{kdId}
-        return await request.post<KnowledgeBaseChunk>(`/plugin/kd/${kdId}`, data);
+        // return await request.post<KnowledgeBaseChunk>(`/plugin/kd/${kdId}`, data);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
+        throw new Error("API deprecated");
     },
 
     // 7. Update Chunk
     updateChunk: async (kdId: string, chunkId: string, data: UpdateKnowledgeBaseChunkRequest): Promise<void> => {
         // Backend API: PATCH /plugin/kd/{kdId}/{chunkId}
-        await request.patch(`/plugin/kd/${kdId}/${chunkId}`, data);
+        // await request.patch(`/plugin/kd/${kdId}/${chunkId}`, data);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
     },
 
     // 8. Delete Chunk
     deleteChunk: async (kdId: string, chunkId: string): Promise<void> => {
         // Backend API: DELETE /plugin/kd/{kdId}/{chunkId}
-        await request.delete(`/plugin/kd/${kdId}/${chunkId}`);
+        // await request.delete(`/plugin/kd/${kdId}/${chunkId}`);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Knowledge Base Service API is deprecated. Please migrate to Plugin Operation.");
     }
 };

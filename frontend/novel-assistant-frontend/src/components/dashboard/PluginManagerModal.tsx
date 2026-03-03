@@ -11,7 +11,8 @@ import { logger } from '@/lib/logger';
 
 import { ConfigRenderer } from './plugin-renderers/ConfigRenderer';
 import { ProjectAgentRenderer } from './plugin-renderers/ProjectAgentRenderer';
-import { ListItem, ConfigField, PluginInstance, StandardDataResponse, CardPayload, CardItem, ConfigPayload, RenderType } from '@/types/plugin';
+import { ComponentRenderer } from './plugin-renderers/ComponentRenderer';
+import { ListItem, ConfigField, PluginInstance, StandardDataResponse, CardPayload, CardItem, ConfigPayload, RenderType, ComponentPayload } from '@/types/plugin';
 import { invokePluginOperation } from '@/services/pluginService';
 
 export type PluginType = 'memory' | 'knowledge' | 'agent' | 'doc_agent' | 'project_agent';
@@ -54,6 +55,7 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, plugin, o
   const [dynamicItems, setDynamicItems] = useState<CardItem[]>([]);
   const [currentView, setCurrentView] = useState<RenderType>('CARD');
   const [dynamicConfig, setDynamicConfig] = useState<ConfigPayload | null>(null);
+  const [dynamicComponent, setDynamicComponent] = useState<ComponentPayload | null>(null);
 
   const [dynamicConfigValues, setDynamicConfigValues] = useState<Record<string, any>>({});
   
@@ -302,6 +304,10 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, plugin, o
                     metadata: []
                 })));
                 setCurrentView('CARD');
+            } else if (standardData.render_type === 'COMPONENT') {
+                const payload = standardData.payload as unknown as ComponentPayload;
+                setDynamicComponent(payload);
+                setCurrentView('COMPONENT');
             }
           } catch (e) {
               console.error('Failed to load dynamic plugin data:', e);
@@ -598,7 +604,7 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, plugin, o
                                      <ChevronRight className="w-4 h-4 rotate-180" />
                                  </button>
                              )}
-                             <span>{type === 'project_agent' ? '区域列表' : (currentView === 'CONFIG' ? '配置详情' : '插件内容')}</span>
+                             <span>{currentView === 'CONFIG' ? '配置详情' : '插件内容'}</span>
                         </div>
                         <span className="text-xs text-text-tertiary">{isLoading ? '加载中...' : (currentView === 'CARD' ? `共 ${items.length} 项` : '')}</span>
                     </div>
@@ -608,6 +614,8 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ type, plugin, o
                         <Loader2 className="w-10 h-10 animate-spin mb-4 text-accent-primary" />
                         <p className="text-lg">正在获取数据...</p>
                         </div>
+                    ) : currentView === 'COMPONENT' && dynamicComponent ? (
+                        <ComponentRenderer schema={dynamicComponent.root} onRefresh={loadData} defaultPluginId={plugin?.id} />
                     ) : currentView === 'CONFIG' && dynamicConfig ? (
                          <ConfigRenderer 
                              fields={dynamicConfig.fields}

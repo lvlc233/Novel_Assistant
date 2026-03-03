@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, X, RotateCcw, Save, Loader2, Package, Tag, Globe, Server } from 'lucide-react';
 import { logger } from '@/lib/logger';
-import { getSystemPlugins, updatePlugin, getInternalPlugins, registerInternalPlugin } from '@/services/pluginService';
+import { updatePlugin, getShopPlugins, registerInternalPlugin } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 import AgentConfigEditor from './AgentConfigEditor';
 import WorkTypeConfigEditor from './WorkTypeConfigEditor';
@@ -41,30 +41,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const loadPlugins = async () => {
-    try {
-      setLoading(true);
-      const [systemPlugins, internalPlugins] = await Promise.all([
-        getSystemPlugins(),
-        getInternalPlugins()
-      ]);
-      const systemInternalIds = internalPlugins
-        .filter((plugin) => plugin.from_type === 'system')
-        .map((plugin) => plugin.id);
-      const missingIds = systemInternalIds.filter(
-        (id) => !systemPlugins.some((plugin) => plugin.id === id)
-      );
-      const data = missingIds.length > 0
-        ? await Promise.allSettled(missingIds.map((id) => registerInternalPlugin(id))).then(() => getSystemPlugins())
-        : systemPlugins;
-      setPlugins(data);
-      if (data.length > 0 && (!activePluginId || !data.some((plugin) => plugin.id === activePluginId))) {
-        setActivePluginId(data[0].id);
-      }
-    } catch (error) {
-      logger.error('Failed to load system plugins', error);
-    } finally {
-      setLoading(false);
-    }
+    // try {
+    //   setLoading(true);
+    //   const [systemPlugins, internalPlugins] = await Promise.all([
+    //     // getSystemPlugins(),
+    //     getInternalPlugins()
+    //   ]);
+    //   // const systemInternalIds = internalPlugins
+    //   //   .filter((plugin) => plugin.from_type === 'system')
+    //   //   .map((plugin) => plugin.id);
+    //   // const missingIds = systemInternalIds.filter(
+    //   //   (id) => !systemPlugins.some((plugin) => plugin.id === id)
+    //   // );
+    //   // const data = missingIds.length > 0
+    //   //   ? await Promise.allSettled(missingIds.map((id) => registerInternalPlugin(id))).then(() => getSystemPlugins())
+    //   //   : systemPlugins;
+    //   setPlugins(data);
+    //   if (data.length > 0 && (!activePluginId || !data.some((plugin) => plugin.id === activePluginId))) {
+    //     setActivePluginId(data[0].id);
+    //   }
+    // } catch (error) {
+    //   logger.error('Failed to load system plugins', error);
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const activePlugin = plugins.find(p => p.id === activePluginId);

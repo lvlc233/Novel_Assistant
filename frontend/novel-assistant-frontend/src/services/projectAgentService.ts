@@ -54,7 +54,10 @@ export const projectAgentService = {
             return { ...mockConfig };
         }
         try {
-            return await request.get<ProjectConfig>('/plugin/agent/project_helper/config');
+            // return await request.get<ProjectConfig>('/plugin/agent/project_helper/config');
+            // TODO: Migrate to new Plugin Operation API
+            console.warn("Project Agent Service API is deprecated. Please migrate to Plugin Operation.");
+            return { ...mockConfig }; // Fallback to mock for now
         } catch (error) {
             console.error('Failed to get project config', error);
             // Fallback to mock/empty on error during dev
@@ -71,7 +74,9 @@ export const projectAgentService = {
             Object.assign(mockConfig, config);
             return;
         }
-        await request.post('/plugin/agent/project_helper/config', config);
+        // await request.post('/plugin/agent/project_helper/config', config);
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Project Agent Service API is deprecated. Please migrate to Plugin Operation.");
     },
 
     /**
@@ -85,16 +90,19 @@ export const projectAgentService = {
         try {
             // The backend returns List[ProjectHelperResourcesResponse]
             // where each item has { resource_name: string[], enabled: boolean }
-            const response = await request.get<ResourceStatus[]>('/plugin/agent/project_helper/resources');
+            // const response = await request.get<ResourceStatus[]>('/plugin/agent/project_helper/resources');
             
             // Flatten the list of enabled resources
-            const enabledResources: string[] = [];
-            response.forEach(item => {
-                if (item.enabled) {
-                    enabledResources.push(...item.resource_name);
-                }
-            });
-            return enabledResources;
+            // const enabledResources: string[] = [];
+            // response.forEach(item => {
+            //     if (item.enabled) {
+            //         enabledResources.push(...item.resource_name);
+            //     }
+            // });
+            // return enabledResources;
+            // TODO: Migrate to new Plugin Operation API
+            console.warn("Project Agent Service API is deprecated. Please migrate to Plugin Operation.");
+            return [];
         } catch (error) {
             console.error('Failed to get enabled resources', error);
             return [];
@@ -118,10 +126,12 @@ export const projectAgentService = {
             return;
         }
         
-        await request.post('/plugin/agent/project_helper/resources', {
-            resource_name: [resourceId],
-            enabled: enabled
-        });
+        // await request.post('/plugin/agent/project_helper/resources', {
+        //     resource_name: [resourceId],
+        //     enabled: enabled
+        // });
+        // TODO: Migrate to new Plugin Operation API
+        console.warn("Project Agent Service API is deprecated. Please migrate to Plugin Operation.");
     },
 
     /**

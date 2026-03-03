@@ -27,7 +27,18 @@ export type PluginStatus = 'enabled' | 'disabled' | 'not_installed';
  * - 'DETAIL': 详情视图
  * - 'DASHBOARD': 仪表盘视图
  */
-export type RenderType = 'CONFIG' | 'AGENT_MESSAGES' | 'CARD' | 'LIST' | 'DETAIL' | 'DASHBOARD';
+export type RenderType = 'CONFIG' | 'AGENT_MESSAGES' | 'CARD' | 'LIST' | 'DETAIL' | 'DASHBOARD' | 'COMPONENT';
+
+export interface ComponentSchema {
+  type: string;
+  props: Record<string, any>;
+  children?: ComponentSchema[];
+}
+
+export interface ComponentPayload {
+  root: ComponentSchema;
+}
+
 
 /**
  * 标准数据项
@@ -137,7 +148,8 @@ export type RenderPayload =
   | CardPayload
   | ListPayload
   | DetailPayload
-  | DashboardPayload;
+  | DashboardPayload
+  | ComponentPayload;
 
 export interface StandardDataResponse {
   plugin_id: string;

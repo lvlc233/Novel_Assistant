@@ -7,7 +7,7 @@ import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
 import PluginManagerModal, { PluginType } from './PluginManagerModal';
 import { logger } from '@/lib/logger';
-import { getShopPlugins, registerShopPlugin, unregisterShopPlugin, PluginShopItem, subscribePluginFeatureFlagsChanged, getInternalPlugins } from '@/services/pluginService';
+import { getShopPlugins, registerShopPlugin, unregisterShopPlugin, PluginShopItem, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 
 /**
@@ -97,7 +97,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
               description: item.description || '',
               author: 'System',
               type: 'system',
-              render_type: item.render_type,
               capabilities: {
                   sidebar: true,
                   editor: true,
@@ -125,9 +124,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       try {
           setIsLoadingShop(true);
           setShopError(null);
-          const [shopData, internalData] = await Promise.all([getShopPlugins(), getInternalPlugins()]);
+          const [shopData, internalData] = await Promise.all([getShopPlugins(), getShopPlugins()]);
           const systemIds = new Set(
-            internalData.filter((plugin) => plugin.from_type === 'system').map((plugin) => plugin.id)
+            internalData.filter((plugin) => plugin).map((plugin) => plugin.id)
           );
           setShopPlugins(shopData);
           setSystemPluginIds(systemIds);

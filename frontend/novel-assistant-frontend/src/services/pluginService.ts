@@ -33,7 +33,6 @@ export interface InternalPluginItem {
   from_type: 'system' | 'custom' | 'official';
   scope_type: 'global' | 'work' | 'document';
   loader_type: 'internal' | 'url' | 'json';
-  render_type: RenderType;
   tags: string[];
   config_schema: Record<string, unknown>;
   plugin_operation_schema: Record<string, unknown>;
@@ -45,7 +44,6 @@ export interface PluginShopItem {
   version: string;
   description?: string | null;
   enabled: boolean;
-  render_type: RenderType;
   installed: boolean;
   installed_version?: string | null;
   latest_version?: string | null;
@@ -56,7 +54,6 @@ export interface PluginShopItem {
 export interface PluginOperationInvokeResponse {
   plugin_id: string;
   operation: string;
-  render_type: RenderType;
   payload: Record<string, unknown>;
 }
 
@@ -131,30 +128,30 @@ const mapResponseToInstance = (data: PluginResponse): PluginInstance => {
   };
 };
 
-export async function getPlugins(): Promise<PluginInstance[]> {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve([...MOCK_PLUGINS]), 500);
-    });
-  }
-  const response = await request.get<PluginMetaResponse[]>('/plugin/expand');
-  return response.map(mapMetaToInstance);
-}
+// export async function getPlugins(): Promise<PluginInstance[]> {
+//   if (USE_MOCK) {
+//     return new Promise((resolve) => {
+//       setTimeout(() => resolve([...MOCK_PLUGINS]), 500);
+//     });
+//   }
+//   const response = await request.get<PluginMetaResponse[]>('/plugin/expand');
+//   return response.map(mapMetaToInstance);
+// }
 
-export async function getSystemPlugins(): Promise<PluginInstance[]> {
-  if (USE_MOCK) {
-    return []; 
-  }
-  const response = await request.get<PluginResponse[]>('/plugin/system');
-  return response.map(mapResponseToInstance);
-}
+// export async function getSystemPlugins(): Promise<PluginInstance[]> {
+//   if (USE_MOCK) {
+//     return []; 
+//   }
+//   const response = await request.get<PluginResponse[]>('/plugin/system');
+//   return response.map(mapResponseToInstance);
+// }
 
-export async function getInternalPlugins(): Promise<InternalPluginItem[]> {
-  if (USE_MOCK) {
-    return [];
-  }
-  return request.get<InternalPluginItem[]>('/plugin/internal');
-}
+// export async function getInternalPlugins(): Promise<InternalPluginItem[]> {
+//   if (USE_MOCK) {
+//     return [];
+//   }
+//   return request.get<InternalPluginItem[]>('/plugin/internal');
+// }
 
 export async function registerInternalPlugin(pluginId: string): Promise<string> {
   if (USE_MOCK) {
