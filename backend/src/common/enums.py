@@ -43,6 +43,7 @@ class UIParamSourceEnum(str, Enum):
 class UITrigger(str, Enum):
     CLICK = "click"  #点击 
     MOUNT = "mount"  #挂载
+    ENTER = "enter"  #发送  
 
 class LoaderType(str, Enum):
     """插件数据源类型."""

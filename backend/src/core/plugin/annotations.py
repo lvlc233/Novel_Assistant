@@ -14,6 +14,7 @@ from common.enums import LoaderType, PluginFromTypeEnum, UIParamSourceEnum,UITri
 from core.plugin.base.models import PluginDefinition
 from core.plugin.utils import build_plugin_id
 from core.ui.base import UIBinding, UINode
+from core.plugin.di import DependencyInfo
 
 """构建流程
 类定义开始
@@ -126,6 +127,7 @@ class PluginWrapper:
     metadata: Dict[str, Any]
     config_schema: Dict[str, Any]
     operations: Dict[str, OperationInfo]
+    injections: Dict[str, Any] = field(default_factory=dict) # key是参数名,value是 DependencyInfo(注入函数)
 
     def build_definition(self) -> PluginDefinition:
         operations_schema = {
@@ -220,6 +222,10 @@ def plugin_meta(
             schema=config_schema,
             init_func=cls.__init__
         )
+        
+        # 收集依赖注入信息
+        injections = getattr(cls.__init__, "__plugin_injections__", {})
+        
         operations = _collect_operations(cls)
         cls.__plugin_operations__ = operations
         cls.__plugin_wrapper__ = PluginWrapper(
@@ -227,6 +233,7 @@ def plugin_meta(
             metadata=cls.__plugin_metadata__,
             config_schema=config_schema,
             operations=operations,
+            injections=injections,
         )
         return cls
     
@@ -247,9 +254,15 @@ def runtime_config(init_func: Callable):
     # 获取函数签名
     sig = signature(init_func)
     config_schema = {}
+    injections = {}
     
     for param_name, param in sig.parameters.items():
         if param_name == 'self':
+            continue
+        
+        # 识别依赖注入
+        if isinstance(param.default, DependencyInfo):
+            injections[param_name] = param.default
             continue
             
         # 获取参数类型
@@ -269,6 +282,7 @@ def runtime_config(init_func: Callable):
     
     # 存储配置信息到函数属性
     init_func.__plugin_config_schema__ = config_schema
+    init_func.__plugin_injections__ = injections
     
     return init_func
 
@@ -277,7 +291,7 @@ def operation(
     name: Union[str, Callable, None] = None, 
     description: Optional[str] = None,
     with_ui: List[UIBinding] = None,
-    ui_target: Optional[Type[UINode]] = None,
+    ui_target: Union[Type[UINode], UIBinding, None] = None,
     trigger: UITrigger = UITrigger.CLICK
 ):
     """
@@ -325,6 +339,23 @@ def operation(
         is_stream = inspect.isasyncgenfunction(func)
 
         # 3. 创建增强的操作信息 (包含路径生成能力)
+        # 处理 ui_target 的兼容性
+        target_path = None
+        target_props = []
+        
+        if ui_target:
+            if isinstance(ui_target, UIBinding):
+                # 如果是 UIBinding 实例（例如 .filter() 的结果）
+                target_path = ".".join(ui_target.path_list)
+                # UIBinding 不一定能拿到 prop_schema，因为它是实例，但我们可以尝试
+                # 这里可能需要根据 path_list 反推类，或者暂且置空
+                # 如果需要属性契约，可能得要求传入类本身，或者 UIBinding 携带类引用
+                target_props = [] 
+            elif hasattr(ui_target, 'get_path'):
+                # 如果是 UINode 类
+                target_path = ui_target.get_path()
+                target_props = ui_target.get_prop_schema()
+                
         op_info = OperationInfo(
             name=real_name,
             description=real_desc,
@@ -333,9 +364,9 @@ def operation(
             output_schema={"type": _map_python_type_to_json(type_hints.get('return', Any))},
             func=func,
             with_ui=with_ui or [],
-            ui_target=ui_target.get_path() if ui_target else None,
+            ui_target=target_path,
             # 自动提取目标组件的“入参契约”
-            target_props=ui_target.get_prop_schema() if ui_target else [],
+            target_props=target_props,
             is_stream=is_stream,
             trigger=trigger
         )

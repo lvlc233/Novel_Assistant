@@ -20,8 +20,10 @@ from common.utils.utils import get_now_time
 from common.enums import LoaderType, PluginFromTypeEnum
 import importlib.util
 import inspect
-from pathlib import Path
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from core.plugin.annotations import PluginWrapper
 
 @dataclass
 class ValidationResult:
@@ -63,11 +65,9 @@ class PluginManager:
             "version": plugin_def.get("version", "1.0.0"),
             "description": plugin_def.get("description"),
             "from_type": plugin_def["from_type"].value,
-            # "scope_type": plugin_def["scope_type"].value,
             "loader_type": plugin_def["loader_type"].value,
             "config_schema": plugin_def.get("config_schema", {}),
             "plugin_operation_schema": plugin_def.get("plugin_operation_schema", {}),
-            # "render_type": plugin_def["render_type"].value,
             "tags": plugin_def.get("tags", []),
         }
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -174,12 +174,12 @@ class PluginInternalRegistry(BaseModel):
     在插件管理器中,负责对系统的内部定义的插件进行扫描并注册到插件内部注册器中。
     """
     plugins: List[PluginDefinition] = []
-    _plugin_wrappers: Dict[UUID, Any] = PrivateAttr(default_factory=dict)
+    _plugin_wrappers: Dict[UUID, "PluginWrapper"] = PrivateAttr(default_factory=dict)
     def get_plugin_list(self) -> List[PluginDefinition]:
-        """根据ID获取插件定义"""
+        """获取所有内部插件"""
         return self.plugins
 
-    def get_plugin_wrapper(self, plugin_id: UUID) -> Any | None:
+    def get_plugin_wrapper(self, plugin_id: UUID) -> "PluginWrapper":
         return self._plugin_wrappers.get(plugin_id)
     
     def discover_plugins(self, plugins_dir: str) -> List[PluginDefinition]:
