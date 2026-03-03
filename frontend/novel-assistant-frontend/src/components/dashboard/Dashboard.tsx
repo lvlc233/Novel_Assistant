@@ -46,35 +46,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
     };
   }, [isShopOpen]);
 
-  // const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
-  //     return {
-  //         id: item.id,
-  //         status: item.enabled ? 'enabled' : 'disabled',
-  //         config: { items: [] },
-  //         installedAt: new Date().toISOString(),
-  //         manifest: {
-  //             id: item.id,
-  //             name: item.name,
-  //             version: item.version,
-  //             description: item.description || '',
-  //             // author: 'System',
-  //             // type: 'system',
-  //             capabilities: {
-  //                 sidebar: true,
-  //                 editor: true,
-  //                 header: false
-  //             },
-  //             data_source_entry_point: item.data_source_entry_point
-  //         }
-  //     };
-  // };
 
-  const fetchPlugins = async () => {
+
+  const fetchRegistedPlugins = async () => {
       try {
           setIsLoadingPlugins(true);
-          const data = await getPluginsFromShop();
-          const enabledPlugins = data.filter((plugin) => plugin.installed && plugin.enabled);
-          setPlugins(enabledPlugins.map(mapShopItemToPlugin));
+          // TODO: 这里以后或许可以改为,项目启动的时候就搜索市场信息,然后进行一次加载,或者本地化?也行?后面再说吧
+          const pluginsFromShop = await getPluginsFromShop();
+          const installedPlugins = pluginsFromShop.filter((plugin) => plugin.installed);
+          // setPlugins(installedPlugins.map(mapShopItemToPlugin));
       } catch (error) {
           logger.error('Failed to fetch plugins:', error);
       } finally {
@@ -118,7 +98,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
           setRegisteringShopId(pluginId);
           await registerShopPlugin(pluginId);
           await fetchShopPlugins();
-          await fetchPlugins();
+          // await fetchPlugins();
       } catch (error) {
           logger.error('Failed to register shop plugin:', error);
           setShopError('插件注册失败');
@@ -132,7 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
           setRemovingShopId(pluginId);
           await unregisterShopPlugin(pluginId);
           await fetchShopPlugins();
-          await fetchPlugins();
+          // await fetchPlugins();
       } catch (error) {
           logger.error('Failed to unregister shop plugin:', error);
           setShopError('插件移除失败');
@@ -145,7 +125,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
     const nextState = !isPluginsExpanded;
     setIsPluginsExpanded(nextState);
     if (nextState && plugins.length === 0) {
-        fetchPlugins();
+        // fetchPlugins();
     }
   };
 
@@ -160,22 +140,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   //     };
   // }, [isPluginsExpanded]);
   
-  // const handlePluginCardClick = (plugin: PluginInstance) => {
-  //     logger.debug('Dashboard handlePluginCardClick:', plugin);
-  //     // 尝试匹配系统插件类型
-  //     const systemMap = SYSTEM_PLUGIN_MAP[plugin.manifest.name] || SYSTEM_PLUGIN_MAP[plugin.id];
-      
-  //     if (plugin.manifest.data_source_entry_point) {
-  //         logger.debug('Dashboard: Opening dynamic plugin:', plugin.manifest.name);
-  //         setSelectedPlugin(plugin);
-  //     } else if (systemMap) {
-  //         logger.debug('Dashboard: Opening system plugin:', systemMap.type);
-  //         setSelectedPlugin(systemMap.type);
-  //     } else {
-  //         // 对于非系统内置的插件，暂时跳转到插件详情或列表页
-  //         router.push('/plugins');
-  //     }
-  // };
 
   // Horizontal scroll wheel handler
   const handleWheel = (e: React.WheelEvent) => {

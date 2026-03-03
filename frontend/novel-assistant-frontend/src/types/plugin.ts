@@ -16,18 +16,11 @@ export type PluginType = 'system' | 'user';
 /**
  * 插件状态
  * - 'enabled': 已启用，功能生效中
- * - 'disabled': 已禁用，已安装但不生效
- * - 'not_installed': 未安装，仅在注册表中可见
+ * - 'disabled': 已禁用，
+ * - `或许可以可以再加个异常的枚举`
  */
-export type PluginStatus = 'enabled' | 'disabled' | 'not_installed';
+export type PluginStatus = 'enabled' | 'disabled' 
 
-/**
- * UI 渲染类型
- * - 'LIST': 列表视图
- * - 'DETAIL': 详情视图
- * - 'DASHBOARD': 仪表盘视图
- */
-export type RenderType = 'CONFIG' | 'AGENT_MESSAGES' | 'CARD' | 'LIST' | 'DETAIL' | 'DASHBOARD' | 'COMPONENT';
 
 export interface ComponentSchema {
   type: string;
@@ -153,8 +146,6 @@ export type RenderPayload =
 
 export interface StandardDataResponse {
   plugin_id: string;
-  render_type: RenderType;
-  payload: RenderPayload;
   total?: number;
 }
 
@@ -178,8 +169,6 @@ export interface PluginManifest {
   /** 插件类型 (系统/用户) */
   // type: PluginType;
   
-  /** 渲染类型 */
-  render_type?: RenderType;
   
   /** 
    * 作用域类型 (可选)
@@ -217,8 +206,8 @@ export interface PluginManifest {
 export interface PluginInstance {
   /** 实例 ID (通常与 Manifest ID 相同，除非支持多实例) */
   id: string;
-  /** 关联的插件信息清单 */
-  manifest: PluginManifest;
+  // /** 关联的插件信息清单 */
+  // manifest: PluginManifest;
   /** 当前运行状态 */
   status: PluginStatus;
   /** 
@@ -226,8 +215,6 @@ export interface PluginInstance {
    * 键值对形式，具体结构由插件自身定义
    */
   config: PluginConfig;
-  /** 安装时间 (ISO 8601 格式字符串) */
-  installedAt?: string;
 }
 
 /**

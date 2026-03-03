@@ -252,20 +252,20 @@ export interface RelationshipResponse {
   relationship: EdgeDTO[];
 }
 
-/**
- * 作品插件元数据响应
- * 简略的插件信息
- */
-export interface WorkPluginMetaResponse {
-  /** 插件 ID */
-  id: string;
-  /** 插件名称 */
-  name: string;
-  /** 是否启用 */
-  enabled: boolean;
-  /** 插件描述 */
-  description: string;
-}
+// /**
+//  * 作品插件元数据响应
+//  * 简略的插件信息
+//  */
+// export interface WorkPluginMetaResponse {
+//   /** 插件 ID */
+//   id: string;
+//   /** 插件名称 */
+//   name: string;
+//   /** 是否启用 */
+//   enabled: boolean;
+//   /** 插件描述 */
+//   description: string;
+// }
 
 /**
  * 作品插件详情响应

@@ -1,8 +1,6 @@
 import { request } from '@/lib/request';
-import { PluginConfig, PluginInstance, StandardDataResponse, RenderType } from '@/types/plugin';
+import { PluginConfig, PluginInstance, StandardDataResponse } from '@/types/plugin';
 
-// Feature flag for using mock data
-const MOCK_PLUGINS: PluginInstance[] = [];
 
 // Backend DTOs
 interface PluginMetaResponse {
@@ -11,17 +9,14 @@ interface PluginMetaResponse {
   version: string;
   description?: string | null;
   enabled: boolean;
-  render_type: RenderType;
 }
 
 interface PluginResponse extends PluginMetaResponse {
   description?: string;
   config: PluginConfig;
-  render_type: RenderType;
   from_type: 'system' | 'custom' | 'official';
   scope_type: 'global' | 'work' | 'document';
   tags: string[];
-  data_source_entry_point?: string;
 }
 
 export interface InternalPluginItem {
@@ -82,53 +77,7 @@ let featureFlagsCache: PluginFeatureFlags | null = null;
 let featureFlagsPromise: Promise<PluginFeatureFlags> | null = null;
 
 
-// Mapper
-const mapMetaToInstance = (meta: PluginMetaResponse): PluginInstance => {
-  return {
-    id: meta.id,
-    status: meta.enabled ? 'enabled' : 'disabled',
-    config: { items: [] }, 
-    installedAt: new Date().toISOString(), 
-    manifest: {
-      id: meta.id,
-      name: meta.name,
-      version: meta.version,
-      description: meta.description || '', 
-      // author: 'System', 
-      // type: 'system', 
-      render_type: meta.render_type,
-      capabilities: { 
-        sidebar: true,
-        editor: true,
-        header: false
-      }
-    }
-  };
-};
 
-const mapResponseToInstance = (data: PluginResponse): PluginInstance => {
-  return {
-    id: data.id,
-    status: data.enabled ? 'enabled' : 'disabled',
-    config: data.config,
-    installedAt: new Date().toISOString(),
-    manifest: {
-      id: data.id,
-      name: data.name,
-      version: '1.0.0',
-      description: data.description || '',
-      // author: data.from_type === 'system' ? 'System' : 'Official',
-      // type: 'system', 
-      render_type: data.render_type,
-      capabilities: {
-        sidebar: true,
-        editor: true,
-        header: false
-      },
-      data_source_entry_point: data.data_source_entry_point
-    }
-  };
-};
 
 
 /**
