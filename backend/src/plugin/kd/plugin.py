@@ -6,18 +6,16 @@ from common.errors import ResourceNotFoundError
 from infrastructure.pg.pg_models import KnowledgeBaseSQLEntity, KnowledgeChunkSQLEntity
 from plugin.kd.schema import KDCreateRequest, KDDescriptionCreateRequest, KDDescriptionResponse, KDDescriptionUpdateRequest, KDMetaResponse, KDUpdateRequest
 from core.plugin.annotations import plugin_meta, runtime_config, operation
-from common.enums import PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
+from common.enums import PluginFromTypeEnum
 from sqlalchemy import delete, select
 from sqlalchemy import desc
 
 @plugin_meta(
     name="kd",
     space="official", 
-    version="0.0.2",
+    version="0.0.1",
     description="知识库插件",
-    render_type=RenderType.CARD,
     from_type=PluginFromTypeEnum.OFFICIAL,
-    scope_type=PluginScopeTypeEnum.WORK,
     tags=["agent"]
 )
 class KDPlugin:

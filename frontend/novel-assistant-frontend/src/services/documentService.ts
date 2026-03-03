@@ -81,7 +81,7 @@ export async function createDocument(data: CreateDocumentDto): Promise<NodeDTO> 
       type: 'document',
       from_node_id: response.from_node_id || null,
       now_version: response.now_version,
-      current_version_id: response.current_version_id
+      now_version_id: response.now_version_id
     };
 }
 

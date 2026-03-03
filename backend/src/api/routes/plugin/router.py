@@ -20,10 +20,7 @@ from api.routes.plugin.schema import (
     PluginResponse,
     PluginShopMetaResponse,
     PluginUpdateRequest,
-    PluginOperationInvokeRequest,
-    PluginOperationInvokeResponse
 )
-from core.plugin.base.models import PluginDefinition
 from core.plugin.runtime import PluginInternalRegistry, PluginManager
 from infrastructure.pg.pg_client import get_session
 from infrastructure.pg.pg_models import PluginSQLEntity
@@ -46,7 +43,7 @@ async def get_shop_plugins(
     session: AsyncSession = Depends(get_session),
 ) -> Response[List[PluginShopMetaResponse]]:
     """
-    获取商店插件列表 (OFFICIAL).
+    获取商店插件列表.
     逻辑：从 Registry 获取定义，从 DB 获取安装状态，合并返回。
     """
     
@@ -76,20 +73,15 @@ async def get_shop_plugins(
             PluginShopMetaResponse(
                 id=pid,
                 name=p_def["name"],
-                description=p_def.get("description"),
-                data_source_entry_point=p_def.get("data_source_entry_point"),
-                # 状态逻辑
-                installed=db_plugin is not None,
-                enabled=db_plugin.enabled if db_plugin else False,
-                version=latest_v,
+                # 当前版本
+                version=inst_v,
                 latest_version=latest_v,
-                installed_version=inst_v,
-                upgrade_available=bool(db_plugin and inst_v != latest_v)
+                description=p_def.get("description", ""),
+                from_type=p_def["from_type"],
+                installed=db_plugin is not None,
             )
         )
     return Response.ok(data=data)
-
-
 
 @router.post("/shop/{plugin_id}/register", response_model=Response[UUID])
 async def register_shop_plugin(
@@ -155,10 +147,10 @@ async def update_plugin(
 新增代理接口
 """
 
-@router.post("/proxy/{plugin_id}/{operation}", response_model=Any)
+@router.post("/proxy/{plugin_id}/{operation_name}", response_model=Any)
 async def proxy_plugin_operation(
     plugin_id: UUID,
-    operation: str,
+    operation_name: str,
     body: Dict[str, Any],
     service: PluginService = Depends(get_plugin_service),
     registry: PluginInternalRegistry = Depends(get_internal_plugin_registry),
@@ -173,7 +165,7 @@ async def proxy_plugin_operation(
         
         result = await service.invoke_plugin_operation(
             plugin_id=plugin_id,
-            operation_name=operation,
+            operation_name=operation_name,
             params=params,
             # runtime_config=None, # 不再接受外部传入的临时配置
             registry=registry

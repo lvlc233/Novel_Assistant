@@ -3,7 +3,7 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import DocumentEditor from '@/components/editor/DocumentEditor';
 import AIAssistant from '@/components/editor/AIAssistant';
-import { getPluginFeatureFlags, PluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
+import {  PluginFeatureFlags } from '@/services/pluginService';
 import { logger } from '@/lib/logger';
 
 // Wrap content in Suspense for useSearchParams
@@ -20,36 +20,36 @@ function EditorContent() {
    * 时间: 2026-02-23 21:44:00
    * 说明: 在何处使用: 编辑器文档助手侧栏；如何使用: 根据插件加载结果决定渲染；实现概述: 拉取插件市场状态并控制文档助手可见性。
    */
-  useEffect(() => {
-    let isActive = true;
-    const loadFlags = (force = false) => {
-      getPluginFeatureFlags({ force })
-        .then((flags) => {
-          if (!isActive) return;
-          setFeatureFlags(flags);
-          if (!flags.docAssistant) {
-            setIsAiExpanded(false);
-          }
-        })
-        .catch((error) => {
-          logger.error('EditorPage plugin flags load failed', error);
-          if (!isActive) return;
-          setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
-          setIsAiExpanded(false);
-        });
-    };
-    loadFlags();
-    /**
-     * 注释者: FrontendAgent(react)
-     * 时间: 2026-02-23 22:05:00
-     * 说明: 在何处使用: 编辑器插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新文档助手显示。
-     */
-    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
-    return () => {
-      isActive = false;
-      unsubscribe();
-    };
-  }, []);
+  // useEffect(() => {
+  //   let isActive = true;
+  //   const loadFlags = (force = false) => {
+  //     getPluginFeatureFlags({ force })
+  //       .then((flags) => {
+  //         if (!isActive) return;
+  //         setFeatureFlags(flags);
+  //         if (!flags.docAssistant) {
+  //           setIsAiExpanded(false);
+  //         }
+  //       })
+  //       .catch((error) => {
+  //         logger.error('EditorPage plugin flags load failed', error);
+  //         if (!isActive) return;
+  //         setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
+  //         setIsAiExpanded(false);
+  //       });
+  //   };
+  //   loadFlags();
+  //   /**
+  //    * 注释者: FrontendAgent(react)
+  //    * 时间: 2026-02-23 22:05:00
+  //    * 说明: 在何处使用: 编辑器插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新文档助手显示。
+  //    */
+  //   const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+  //   return () => {
+  //     isActive = false;
+  //     unsubscribe();
+  //   };
+  // }, []);
 
   const isDocAssistantEnabled = featureFlags?.docAssistant ?? false;
 

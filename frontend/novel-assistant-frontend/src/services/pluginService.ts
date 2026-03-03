@@ -2,7 +2,6 @@ import { request } from '@/lib/request';
 import { PluginConfig, PluginInstance, StandardDataResponse, RenderType } from '@/types/plugin';
 
 // Feature flag for using mock data
-const USE_MOCK = false;
 const MOCK_PLUGINS: PluginInstance[] = [];
 
 // Backend DTOs
@@ -41,14 +40,17 @@ export interface InternalPluginItem {
 export interface PluginShopItem {
   id: string;
   name: string;
+  // 当前版本
   version: string;
+  // 最新版本
+  latest_version: string;
   description?: string | null;
-  enabled: boolean;
+  // 插件来源:分为系统的和非系统的,系统的总是启动且不可卸载
+  from_type:string
+  // 是否已安装
   installed: boolean;
-  installed_version?: string | null;
-  latest_version?: string | null;
-  upgrade_available?: boolean;
-  data_source_entry_point?: string;
+
+
 }
 
 export interface PluginOperationInvokeResponse {
@@ -68,13 +70,13 @@ export interface PluginFeatureFlags {
   docAssistant: boolean;
 }
 
-const PLUGIN_FEATURE_FLAGS_EVENT = 'plugin-feature-flags-changed';
+// const PLUGIN_FEATURE_FLAGS_EVENT = 'plugin-feature-flags-changed';
 
-const FEATURE_PLUGIN_KEYS: Record<keyof PluginFeatureFlags, string[]> = {
-  quickInput: ['project_helper', '项目助手', 'project_agent'],
-  mail: ['agent_manager', 'Agent管理插件', '邮箱系统', 'mail'],
-  docAssistant: ['document_helper', 'doc_agent', '文档创作助手', '文档助手']
-};
+// const FEATURE_PLUGIN_KEYS: Record<keyof PluginFeatureFlags, string[]> = {
+//   quickInput: ['project_helper', '项目助手', 'project_agent'],
+//   mail: ['agent_manager', 'Agent管理插件', '邮箱系统', 'mail'],
+//   docAssistant: ['document_helper', 'doc_agent', '文档创作助手', '文档助手']
+// };
 
 let featureFlagsCache: PluginFeatureFlags | null = null;
 let featureFlagsPromise: Promise<PluginFeatureFlags> | null = null;
@@ -92,8 +94,8 @@ const mapMetaToInstance = (meta: PluginMetaResponse): PluginInstance => {
       name: meta.name,
       version: meta.version,
       description: meta.description || '', 
-      author: 'System', 
-      type: 'system', 
+      // author: 'System', 
+      // type: 'system', 
       render_type: meta.render_type,
       capabilities: { 
         sidebar: true,
@@ -115,8 +117,8 @@ const mapResponseToInstance = (data: PluginResponse): PluginInstance => {
       name: data.name,
       version: '1.0.0',
       description: data.description || '',
-      author: data.from_type === 'system' ? 'System' : 'Official',
-      type: 'system', 
+      // author: data.from_type === 'system' ? 'System' : 'Official',
+      // type: 'system', 
       render_type: data.render_type,
       capabilities: {
         sidebar: true,
@@ -128,40 +130,6 @@ const mapResponseToInstance = (data: PluginResponse): PluginInstance => {
   };
 };
 
-// export async function getPlugins(): Promise<PluginInstance[]> {
-//   if (USE_MOCK) {
-//     return new Promise((resolve) => {
-//       setTimeout(() => resolve([...MOCK_PLUGINS]), 500);
-//     });
-//   }
-//   const response = await request.get<PluginMetaResponse[]>('/plugin/expand');
-//   return response.map(mapMetaToInstance);
-// }
-
-// export async function getSystemPlugins(): Promise<PluginInstance[]> {
-//   if (USE_MOCK) {
-//     return []; 
-//   }
-//   const response = await request.get<PluginResponse[]>('/plugin/system');
-//   return response.map(mapResponseToInstance);
-// }
-
-// export async function getInternalPlugins(): Promise<InternalPluginItem[]> {
-//   if (USE_MOCK) {
-//     return [];
-//   }
-//   return request.get<InternalPluginItem[]>('/plugin/internal');
-// }
-
-export async function registerInternalPlugin(pluginId: string): Promise<string> {
-  if (USE_MOCK) {
-    return pluginId;
-  }
-  await request.post(`/plugin/internal/${pluginId}/register`);
-  invalidatePluginFeatureFlags();
-  notifyPluginFeatureFlagsChanged();
-  return pluginId;
-}
 
 /**
  * 获取插件市场列表
@@ -169,10 +137,7 @@ export async function registerInternalPlugin(pluginId: string): Promise<string> 
  * 时间: 2026-02-18 20:20
  * 说明: 在仪表盘插件市场弹窗中使用，获取插件注册状态与版本差异信息。
  */
-export async function getShopPlugins(): Promise<PluginShopItem[]> {
-  if (USE_MOCK) {
-    return []; 
-  }
+export async function getPluginsFromShop(): Promise<PluginShopItem[]> {
   return request.get<PluginShopItem[]>('/plugin/shop');
 }
 
@@ -183,12 +148,9 @@ export async function getShopPlugins(): Promise<PluginShopItem[]> {
  * 说明: 在插件市场卡片点击“注册插件”时调用，触发后端注册流程。
  */
 export async function registerShopPlugin(pluginId: string): Promise<string> {
-  if (USE_MOCK) {
-    return pluginId;
-  }
   await request.post(`/plugin/shop/${pluginId}/register`);
-  invalidatePluginFeatureFlags();
-  notifyPluginFeatureFlagsChanged();
+  // invalidatePluginFeatureFlags();
+  // notifyPluginFeatureFlagsChanged();
   return pluginId;
 }
 
@@ -199,99 +161,53 @@ export async function registerShopPlugin(pluginId: string): Promise<string> {
  * 说明: 在插件市场卡片点击“移除”时调用，删除后端注册记录。
  */
 export async function unregisterShopPlugin(pluginId: string): Promise<string> {
-  if (USE_MOCK) {
-    return pluginId;
-  }
   await request.post(`/plugin/shop/${pluginId}/unregister`);
-  invalidatePluginFeatureFlags();
-  notifyPluginFeatureFlagsChanged();
+  // invalidatePluginFeatureFlags();
+  // notifyPluginFeatureFlagsChanged();
   return pluginId;
 }
-
 /**
- * 获取插件数据 (BFF Proxy)
- * 注释者: FrontendAgent(react)
- * 时间: 2026-02-12 10:00:00
- * 说明: 通过后端代理获取插件数据，无需直接请求第三方接口。
- *      后端会自动处理鉴权和配置注入。
+ * 获取指定插件的详情
+ * 注释者: ;xz
+ * 时间: 2026-03-04
+ * 说明: 获取指定插件的详细信息
  */
-export async function getPluginData(
-  pluginId: string,
-  params?: Record<string, any>
-): Promise<StandardDataResponse> {
-  // if (USE_MOCK) { ... }
-  return request.get<StandardDataResponse>(`/plugin/proxy/${pluginId}/data`, { params });
+export async function getPluginDetail(pluginId:string) {
+  return request.get<PluginResponse>(`/plugin/${pluginId}`);
 }
 
-export async function invokePluginOperation(
-  pluginId: string,
-  operation: string,
-  params?: Record<string, any>,
-  runtimeConfig?: Record<string, any>
-): Promise<PluginOperationInvokeResponse> {
-  if (USE_MOCK) {
-    return {
-      plugin_id: pluginId,
-      operation,
-      render_type: 'CARD',
-      payload: {}
-    };
-  }
-  return request.post<PluginOperationInvokeResponse>(`/plugin/${pluginId}/operation/${operation}`, {
-    params,
-    runtime_config: runtimeConfig
-  });
-}
 
+
+// 更新相关
 export async function togglePluginStatus(id: string, enable: boolean): Promise<void> {
-  if (USE_MOCK) {
-    const plugin = MOCK_PLUGINS.find(p => p.id === id);
-    if (plugin) {
-        plugin.status = enable ? 'enabled' : 'disabled';
-    }
-    return new Promise((resolve) => setTimeout(resolve, 300));
-  }
+
   await request.patch(`/plugin/${id}`, {
     enabled: enable
   });
-  invalidatePluginFeatureFlags();
-  notifyPluginFeatureFlagsChanged();
+  // invalidatePluginFeatureFlags();
+  // notifyPluginFeatureFlagsChanged();
 }
 
 export async function updatePlugin(id: string, data: { enabled?: boolean; config?: PluginConfig }): Promise<void> {
-  if (USE_MOCK) {
-    const plugin = MOCK_PLUGINS.find(p => p.id === id);
-    if (plugin) {
-        if (data.enabled !== undefined) plugin.status = data.enabled ? 'enabled' : 'disabled';
-        if (data.config) plugin.config = { ...plugin.config, ...data.config };
-    }
-    return new Promise((resolve) => setTimeout(resolve, 300));
-  }
   await request.patch(`/plugin/${id}`, data);
   if (data.enabled !== undefined) {
-    invalidatePluginFeatureFlags();
-    notifyPluginFeatureFlagsChanged();
+    // invalidatePluginFeatureFlags();
+    // notifyPluginFeatureFlagsChanged();
   }
 }
 
-/**
- * 卸载插件
- * 注释者: FrontendAgent(react)
- * 时间: 2026-02-19 01:39
- * 说明: 在插件管理页卸载插件时使用，改用插件市场移除接口。
- */
-export async function uninstallPlugin(pluginId: string): Promise<void> {
-  if (USE_MOCK) {
-    const index = MOCK_PLUGINS.findIndex(p => p.id === pluginId);
-    if (index > -1) {
-        MOCK_PLUGINS.splice(index, 1);
-    }
-    return new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  await request.post(`/plugin/shop/${pluginId}/unregister`);
-  invalidatePluginFeatureFlags();
-  notifyPluginFeatureFlagsChanged();
+// 调度接口代理
+export async function invokePlugin(
+  pluginId: string,
+  operationName: string,
+  body: Map<string, any>
+): Promise<PluginOperationInvokeResponse> {
+  return request.post<any>(`/plugin/proxy/${pluginId}/${operationName}`, {
+    body: body
+  });
 }
+
+// 常量申明
 
 const normalizePluginKey = (value: string) => value.trim().toLowerCase();
 
@@ -304,49 +220,49 @@ const matchPluginKey = (plugin: PluginShopItem, keys: string[]) => {
   });
 };
 
-const resolveFeatureEnabled = (plugins: PluginShopItem[], keys: string[]) => {
-  return plugins.some((plugin) => matchPluginKey(plugin, keys) && plugin.installed && plugin.enabled);
-};
+// const resolveFeatureEnabled = (plugins: PluginShopItem[], keys: string[]) => {
+//   return plugins.some((plugin) => matchPluginKey(plugin, keys) && plugin.installed && plugin.enabled);
+// };
 
 /**
  * 注释者: FrontendAgent(react)
  * 时间: 2026-02-23 22:12:00
  * 说明: 在何处使用: 插件状态自动刷新；如何使用: 订阅事件并强制重新拉取；实现概述: 提供缓存失效与变更事件，支持 UI 即时刷新。
  */
-export const invalidatePluginFeatureFlags = () => {
-  featureFlagsCache = null;
-};
+// export const invalidatePluginFeatureFlags = () => {
+//   featureFlagsCache = null;
+// };
 
-export const notifyPluginFeatureFlagsChanged = () => {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(PLUGIN_FEATURE_FLAGS_EVENT));
-};
+// export const notifyPluginFeatureFlagsChanged = () => {
+//   if (typeof window === 'undefined') return;
+//   window.dispatchEvent(new CustomEvent(PLUGIN_FEATURE_FLAGS_EVENT));
+// };
 
-export const subscribePluginFeatureFlagsChanged = (listener: () => void) => {
-  if (typeof window === 'undefined') return () => {};
-  window.addEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
-  return () => window.removeEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
-};
+// export const subscribePluginFeatureFlagsChanged = (listener: () => void) => {
+//   if (typeof window === 'undefined') return () => {};
+//   window.addEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
+//   return () => window.removeEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
+// };
 
-export async function getPluginFeatureFlags(options?: { force?: boolean }): Promise<PluginFeatureFlags> {
-  if (!options?.force && featureFlagsCache) {
-    return featureFlagsCache;
-  }
-  if (!options?.force && featureFlagsPromise) {
-    return featureFlagsPromise;
-  }
-  featureFlagsPromise = getShopPlugins()
-    .then((plugins) => {
-      const flags: PluginFeatureFlags = {
-        quickInput: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.quickInput),
-        mail: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.mail),
-        docAssistant: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.docAssistant)
-      };
-      featureFlagsCache = flags;
-      return flags;
-    })
-    .finally(() => {
-      featureFlagsPromise = null;
-    });
-  return featureFlagsPromise;
-}
+// export async function getPluginFeatureFlags(options?: { force?: boolean }): Promise<PluginFeatureFlags> {
+//   if (!options?.force && featureFlagsCache) {
+//     return featureFlagsCache;
+//   }
+//   if (!options?.force && featureFlagsPromise) {
+//     return featureFlagsPromise;
+//   }
+//   featureFlagsPromise = getShopPlugins()
+//     .then((plugins) => {
+//       const flags: PluginFeatureFlags = {
+//         quickInput: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.quickInput),
+//         mail: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.mail),
+//         docAssistant: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.docAssistant)
+//       };
+//       featureFlagsCache = flags;
+//       return flags;
+//     })
+//     .finally(() => {
+//       featureFlagsPromise = null;
+//     });
+//   return featureFlagsPromise;
+// }

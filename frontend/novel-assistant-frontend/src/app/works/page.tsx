@@ -7,11 +7,11 @@ import { Work, Novel, KnowledgeBase } from '@/types/work';
 import { getWorkList, createWork, deleteWork, updateWork, CreateWorkDto } from '@/services/workService';
 import { knowledgeBaseService } from '@/services/knowledgeBaseService';
 import { logger } from '@/lib/logger';
-import { getPluginFeatureFlags, PluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
+import { PluginFeatureFlags } from '@/services/pluginService';
 
-import { WorkCreationData } from '@/components/work-manager/CreateWorkCard';
-import DocumentCarousel from '@/components/work-manager/DocumentCarousel';
-import WorkPluginConfigModal from '@/components/work-manager/WorkPluginConfigModal';
+// import { WorkCreationData } from '@/components/work-manager/CreateWorkCard';
+// import DocumentCarousel from '@/components/work-manager/DocumentCarousel';
+// import WorkPluginConfigModal from '@/components/work-manager/WorkPluginConfigModal';
 import BottomInput from '@/components/common/BottomInput';
 
 // userId is no longer needed for backend API but kept for function signature compatibility
@@ -74,32 +74,32 @@ export default function DocumentsPage() {
     fetchData();
   }, []);
 
-  useEffect(() => {
-    let isActive = true;
-    const loadFlags = (force = false) => {
-      getPluginFeatureFlags({ force })
-        .then((flags) => {
-          if (!isActive) return;
-          setFeatureFlags(flags);
-        })
-        .catch((err) => {
-          logger.error('DocumentsPage plugin flags load failed', err);
-          if (!isActive) return;
-          setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
-        });
-    };
-    loadFlags();
-    /**
-     * 注释者: FrontendAgent(react)
-     * 时间: 2026-02-23 22:12:00
-     * 说明: 在何处使用: 作品列表页插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新快捷输入框显示。
-     */
-    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
-    return () => {
-      isActive = false;
-      unsubscribe();
-    };
-  }, []);
+  // useEffect(() => {
+  //   let isActive = true;
+  //   const loadFlags = (force = false) => {
+  //     getPluginFeatureFlags({ force })
+  //       .then((flags) => {
+  //         if (!isActive) return;
+  //         setFeatureFlags(flags);
+  //       })
+  //       .catch((err) => {
+  //         logger.error('DocumentsPage plugin flags load failed', err);
+  //         if (!isActive) return;
+  //         setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
+  //       });
+  //   };
+  //   loadFlags();
+  //   /**
+  //    * 注释者: FrontendAgent(react)
+  //    * 时间: 2026-02-23 22:12:00
+  //    * 说明: 在何处使用: 作品列表页插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新快捷输入框显示。
+  //    */
+  //   const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+  //   return () => {
+  //     isActive = false;
+  //     unsubscribe();
+  //   };
+  // }, []);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
@@ -162,34 +162,34 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleCreateWork = async (data: WorkCreationData) => {
-      try {
-        logger.debug('Creating work with data:', data);
+  // const handleCreateWork = async (data: WorkCreationData) => {
+  //     try {
+  //       logger.debug('Creating work with data:', data);
         
-        // 构造 DTO
-        const createDto: CreateWorkDto = {
-          user_id: userId,
-          work_name: data.title,
-          work_summary: data.synopsis,
-          work_cover_image_url: data.cover || undefined,
-          kd_id_list: data.selectedKbIds,
-          work_type: data.type,
-          work_genre: data.genre,
-          plugins: data.plugins
-        };
+  //       // 构造 DTO
+  //       const createDto: CreateWorkDto = {
+  //         user_id: userId,
+  //         work_name: data.title,
+  //         work_summary: data.synopsis,
+  //         work_cover_image_url: data.cover || undefined,
+  //         kd_id_list: data.selectedKbIds,
+  //         work_type: data.type,
+  //         work_genre: data.genre,
+  //         plugins: data.plugins
+  //       };
 
-        const newWork = await createWork(createDto);
+  //       const newWork = await createWork(createDto);
         
-        setWorks(prev => [...prev, newWork]);
-        setIsCreating(false);
-        // Navigate to the new work page
-        router.push(`/works/${newWork.id}`);
-      } catch (err: unknown) {
-        logger.error('Failed to create work:', err);
-        const message = err instanceof Error ? err.message : '创建失败';
-        setError(`创建失败: ${message}`);
-      }
-  };
+  //       setWorks(prev => [...prev, newWork]);
+  //       setIsCreating(false);
+  //       // Navigate to the new work page
+  //       router.push(`/works/${newWork.id}`);
+  //     } catch (err: unknown) {
+  //       logger.error('Failed to create work:', err);
+  //       const message = err instanceof Error ? err.message : '创建失败';
+  //       setError(`创建失败: ${message}`);
+  //     }
+  // };
 
   const handleOpenPluginConfig = (work: Novel) => {
     setPluginConfigWork(work);
@@ -239,10 +239,10 @@ export default function DocumentsPage() {
               </div>
           ) : (
           <>
-            <DocumentCarousel 
+            {/* <DocumentCarousel 
                 works={works}
                 onSelectWork={handleSelectWork}
-                onCreateWork={handleCreateWork}
+                // onCreateWork={handleCreateWork}
                 onDeleteWork={handleDeleteWork}
                 onEditWork={handleEditWork}
                 onOpenPluginConfig={handleOpenPluginConfig}
@@ -251,15 +251,15 @@ export default function DocumentsPage() {
                 isCreating={isCreating}
                 onToggleCreating={setIsCreating}
                 existingKnowledgeBases={knowledgeBases}
-            />
+            /> */}
             
-            {pluginConfigWork && (
-              <WorkPluginConfigModal 
-                work={pluginConfigWork}
-                onClose={() => setPluginConfigWork(null)}
-                onSave={handleSavePluginConfig}
-              />
-            )}
+            {/* {pluginConfigWork && (
+              // <WorkPluginConfigModal 
+              //   work={pluginConfigWork}
+              //   onClose={() => setPluginConfigWork(null)}
+              //   onSave={handleSavePluginConfig}
+              // />
+            )} */}
           </>
           )}
         </div>

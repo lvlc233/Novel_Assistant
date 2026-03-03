@@ -44,13 +44,14 @@ export interface NodeDTO {
   /** 节点描述 */
   description?: string | null;
   /** 节点类型: document(文档/章节), folder(文件夹/卷) */
-  type: "document" | "folder";
+  type: string
   /** 父节点 ID (用于构建树状结构) */
   from_node_id?: string | null;
-  /** 当前版本号 */
-  now_version?: string | null;
   /** 当前版本 ID */
-  current_version_id?: string | null;
+  now_version_id?: string;
+  /** 当前版本号 */
+  now_version?: string;
+
 }
 
 /**
@@ -115,7 +116,7 @@ export interface DocumentResponse {
   /** 当前版本号 */
   now_version?: string;
   /** 当前版本 ID */
-  current_version_id?: string;
+  now_version_id?: string;
 }
 
 /**
@@ -157,10 +158,11 @@ export interface DocumentDetailResponse {
   from_node_id?: string;
   /** 当前版本的全文内容 */
   full_text?: string;
-  /** 当前版本号 */
-  now_version?: string;
   /** 当前版本 ID */
-  current_version_id?: string;
+  now_version_id: string;
+  /** 当前版本号 */
+  now_version: string;
+
 }
 
 /**

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { logger } from '@/lib/logger';
 import { agentService } from '@/services/agentService';
-import { getPluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
+// import {subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
 
 // --- Types ---
 
@@ -61,32 +61,32 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isMailEnabled, setIsMailEnabled] = useState(false);
 
   // Load Agents on Mount
-  useEffect(() => {
-    let isActive = true;
-    const loadFlags = (force = false) => {
-      getPluginFeatureFlags({ force })
-        .then((flags) => {
-          if (!isActive) return;
-          setIsMailEnabled(flags.mail);
-        })
-        .catch((error) => {
-          logger.error('MailContext plugin flags load failed', error);
-          if (!isActive) return;
-          setIsMailEnabled(false);
-        });
-    };
-    loadFlags();
-    /**
-     * 注释者: FrontendAgent(react)
-     * 时间: 2026-02-23 22:12:00
-     * 说明: 在何处使用: 邮箱上下文插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新邮箱可用状态。
-     */
-    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
-    return () => {
-      isActive = false;
-      unsubscribe();
-    };
-  }, []);
+  // useEffect(() => {
+  //   let isActive = true;
+  //   const loadFlags = (force = false) => {
+  //     getPluginFeatureFlags({ force })
+  //       .then((flags) => {
+  //         if (!isActive) return;
+  //         setIsMailEnabled(flags.mail);
+  //       })
+  //       .catch((error) => {
+  //         logger.error('MailContext plugin flags load failed', error);
+  //         if (!isActive) return;
+  //         setIsMailEnabled(false);
+  //       });
+  //   };
+  //   loadFlags();
+  //   /**
+  //    * 注释者: FrontendAgent(react)
+  //    * 时间: 2026-02-23 22:12:00
+  //    * 说明: 在何处使用: 邮箱上下文插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新邮箱可用状态。
+  //    */
+  //   const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+  //   return () => {
+  //     isActive = false;
+  //     unsubscribe();
+  //   };
+  // }, []);
 
   /**
    * 注释者: FrontendAgent(react)

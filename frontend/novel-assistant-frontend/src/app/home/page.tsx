@@ -4,7 +4,7 @@ import Dashboard from '@/components/dashboard/Dashboard';
 import BottomInput from '@/components/common/BottomInput';
 import SystemIntroduction from '@/components/dashboard/SystemIntroduction';
 import SettingsModal from '@/components/settings/SettingsModal';
-import { getPluginFeatureFlags, PluginFeatureFlags, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
+import { PluginFeatureFlags } from '@/services/pluginService';
 import { logger } from '@/lib/logger';
 
 /**
@@ -17,32 +17,32 @@ export default function HomePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
 
-  useEffect(() => {
-    let isActive = true;
-    const loadFlags = (force = false) => {
-      getPluginFeatureFlags({ force })
-        .then((flags) => {
-          if (!isActive) return;
-          setFeatureFlags(flags);
-        })
-        .catch((error) => {
-          logger.error('HomePage plugin flags load failed', error);
-          if (!isActive) return;
-          setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
-        });
-    };
-    loadFlags();
+  // useEffect(() => {
+  //   let isActive = true;
+  //   const loadFlags = (force = false) => {
+    //   getPluginFeatureFlags({ force })
+    //     .then((flags) => {
+    //       if (!isActive) return;
+    //       setFeatureFlags(flags);
+    //     })
+    //     .catch((error) => {
+    //       logger.error('HomePage plugin flags load failed', error);
+    //       if (!isActive) return;
+    //       setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
+    //     });
+    // };
+    // loadFlags();
     /**
      * 注释者: FrontendAgent(react)
      * 时间: 2026-02-23 22:12:00
      * 说明: 在何处使用: 首页插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新快捷输入框显示。
      */
-    const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
-    return () => {
-      isActive = false;
-      unsubscribe();
-    };
-  }, []);
+    // const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
+    // return () => {
+    //   // isActive = false;
+    //   unsubscribe();
+    // };
+  // }, []);
 
   const isQuickInputEnabled = featureFlags?.quickInput ?? false;
 

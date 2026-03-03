@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, X, RotateCcw, Save, Loader2, Package, Tag, Globe, Server } from 'lucide-react';
 import { logger } from '@/lib/logger';
-import { updatePlugin, getShopPlugins, registerInternalPlugin } from '@/services/pluginService';
+import { updatePlugin } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 import AgentConfigEditor from './AgentConfigEditor';
 import WorkTypeConfigEditor from './WorkTypeConfigEditor';

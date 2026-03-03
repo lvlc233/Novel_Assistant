@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { getShopPlugins, PluginShopItem, togglePluginStatus, uninstallPlugin } from '@/services/pluginService';
+import { getPluginsFromShop, PluginShopItem, togglePluginStatus, unregisterShopPlugin} from '@/services/pluginService';
 import { PluginConfig, PluginInstance } from '@/types/plugin';
 import { logger } from '@/lib/logger';
 import { Power, Trash2, Settings, Puzzle } from 'lucide-react';
@@ -24,7 +24,7 @@ export default function PluginsPage() {
   const loadPlugins = async () => {
     try {
       setIsLoading(true);
-      const data = await getShopPlugins();
+      const data = await getPluginsFromShop();
       setPlugins(data);
     } catch (err) {
       logger.error('Failed to load plugins', err);

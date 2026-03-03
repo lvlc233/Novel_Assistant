@@ -29,14 +29,14 @@ class DocumentVersionUploadRequest(BaseModel):
     full_text: str
 
 class DocumentDetailResponse(BaseModel):
-    id: UUID | None = None
-    work_id: UUID | None = None
+    id: UUID
+    work_id:UUID
     title: str
     description: str | None = None
     from_node_id: UUID | None = None
     full_text: str | None = None
+    now_version_id: UUID
     now_version: str | None = None # 当前版本名称
-    current_version: str | None = None # 当前版本ID
 
 class DocumentVersionCreateRequest(BaseModel):
     version_name: str | None = None

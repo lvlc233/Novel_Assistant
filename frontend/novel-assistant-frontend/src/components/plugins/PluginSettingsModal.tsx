@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { PluginConfig, PluginInstance, StandardDataResponse, ConfigField, RenderType } from '@/types/plugin';
-import { getPluginData, invokePluginOperation, PluginOperationInvokeResponse } from '@/services/pluginService';
+import { getPluginDetail, invokePlugin, PluginOperationInvokeResponse } from '@/services/pluginService';
 
 interface PluginSettingsModalProps {
   isOpen: boolean;
@@ -27,13 +27,13 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
   }, [plugin.id, plugin.config]);
 
   const normalizeOperationResponse = (response: PluginOperationInvokeResponse): StandardDataResponse => {
-    if (response.render_type !== 'CARD') {
-      return {
-        plugin_id: response.plugin_id,
-        render_type: response.render_type,
-        payload: response.payload
-      };
-    }
+    // if (response.render_type !== 'CARD') {
+    //   return {
+    //     plugin_id: response.plugin_id,
+    //     render_type: response.render_type,
+    //     payload: response.payload
+    //   };
+    // }
     const payload = response.payload as {
       total?: number;
       items?: Array<{
@@ -77,8 +77,8 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
       || plugin.manifest.name.includes('Agent管理')
       || plugin.id === 'agent_manager';
     const fetchData = isAgentManager
-      ? invokePluginOperation(plugin.id, 'list_agent_plugins', { limit: 50, offset: 0 }).then(normalizeOperationResponse)
-      : getPluginData(plugin.id);
+      ? invokePlugin(plugin.id, 'list_agent_plugins', { limit: 50, offset: 0 }).then(normalizeOperationResponse)
+      : getPluginDetail(plugin.id);
     fetchData
       .then((response) => {
         if (active) setData(response);

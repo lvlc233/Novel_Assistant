@@ -172,11 +172,11 @@ export interface PluginManifest {
   /** 插件功能描述 */
   description: string;
   /** 插件作者/开发团队 */
-  author: string;
+  // author: string;
   /** 插件图标 (URL 或图标名称) */
   icon?: string;
   /** 插件类型 (系统/用户) */
-  type: PluginType;
+  // type: PluginType;
   
   /** 渲染类型 */
   render_type?: RenderType;
@@ -217,7 +217,7 @@ export interface PluginManifest {
 export interface PluginInstance {
   /** 实例 ID (通常与 Manifest ID 相同，除非支持多实例) */
   id: string;
-  /** 关联的插件清单 */
+  /** 关联的插件信息清单 */
   manifest: PluginManifest;
   /** 当前运行状态 */
   status: PluginStatus;

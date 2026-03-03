@@ -2,62 +2,24 @@
 // 仪表盘
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Settings, LayoutGrid, Sparkles, Database, Brain, Bot, FileEdit, Briefcase, Puzzle, X, Loader2 } from 'lucide-react';
+// 后面或者可以多加一个图标库的映射,先放着吧
+import { FileText, Settings, LayoutGrid, Sparkles, Puzzle, X, Loader2 } from 'lucide-react';
 import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
-import PluginManagerModal, { PluginType } from './PluginManagerModal';
 import { logger } from '@/lib/logger';
-import { getShopPlugins, registerShopPlugin, unregisterShopPlugin, PluginShopItem, subscribePluginFeatureFlagsChanged } from '@/services/pluginService';
+import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, PluginShopItem } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 
-/**
- * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260218-06
- * 创建时间: 2026-01-20 22:35
- * 更新时间: 2026-02-18 20:20
- * 更新记录:
- * - [2026-01-20 22:35:FE-REF-20260120-03: 在何处使用: 首页仪表盘；如何使用: 点击插件卡片展开扇形选择区；实现概述: 重构布局为 Fan Interaction，移除知识库入口以匹配设计稿。]
- * - [2026-01-25 15:30:FE-REF-20260125-01: 更新插件列表为实际业务模块（记忆、知识库、Agent）；添加点击跳转逻辑。]
- * - [2026-01-25 15:45:FE-REF-20260125-02: 修复滚动方向为横向；移除卡片旋转以修复渲染问题；点击卡片弹出模态框而非跳转。]
- * - [2026-01-25 16:30:FE-REF-20260125-03: 拆分 Agent 为文档助手和项目助手。]
- * - [2026-01-26 21:40:FE-REF-20260126-04: 对接后端插件列表接口 (GET /plugin)。]
- * - [2026-02-18 18:21:FE-REF-20260218-01: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘卡片区; 如何使用: 点击“插件市场”跳转插件页面; 实现概述: 在插件扩展区右侧新增插件市场卡片。]
- * - [2026-02-18 18:31:FE-REF-20260218-02: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 点击“插件市场”弹出卡片列表并注册; 实现概述: 新增插件市场弹窗与注册操作。]
- * - [2026-02-18 20:05:FE-REF-20260218-03: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 打开弹窗后保持内容不透明且不溢出窗口; 实现概述: 调整遮罩层和弹窗尺寸样式。]
- * - [2026-02-18 20:08:FE-REF-20260218-04: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 保持遮罩透明但拦截交互; 实现概述: 移除黑色遮罩背景。]
- * - [2026-02-18 20:20:FE-REF-20260218-06: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 根据注册状态与版本差异显示加入/更新按钮; 实现概述: 增加注册状态与升级提示。]
- * - [2026-02-19 01:39:FE-REF-20260219-01: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 已加入插件可点击“移除”完成卸载; 实现概述: 新增插件移除操作与接口调用。]
- * - [2026-02-23 19:13:FE-REF-20260223-01: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 未加入插件显示更明显的加入按钮; 实现概述: 强化未安装插件的主操作按钮样式。]
- * - [2026-02-23 19:20:FE-REF-20260223-02: 注释者: FrontendAgent(react); 在何处使用: 首页仪表盘插件市场弹窗; 如何使用: 未加入按钮文字清晰可见; 实现概述: 调整未安装按钮的颜色与边框。]
- */
 
 interface DashboardProps {
   onOpenSettings?: () => void;
 }
 
-// 默认系统插件映射（如果后端未返回或作为Fallback）
-const SYSTEM_PLUGIN_MAP: Record<string, { icon: React.ReactNode, type: PluginType }> = {
-    'memory_plugin': { icon: <Brain />, type: 'memory' },
-    'knowledge_plugin': { icon: <Database />, type: 'knowledge' },
-    'Agent管理插件': { icon: <Bot />, type: 'agent' }, 
-    // Chinese Names Mapping
-    '记忆': { icon: <Brain />, type: 'memory' },
-    '知识库': { icon: <Database />, type: 'knowledge' },
-    '项目助手': { icon: <Briefcase />, type: 'project_agent' },
-    '文档创作助手': { icon: <FileEdit />, type: 'doc_agent' },
-    // Fallback/Legacy mappings
-    'agent_manager': { icon: <Bot />, type: 'agent' },
-    'knowledge_base': { icon: <Database />, type: 'knowledge' },
-    'doc_agent': { icon: <FileEdit />, type: 'doc_agent' },
-    'project_agent': { icon: <Briefcase />, type: 'project_agent' },
-    'project_helper': { icon: <Briefcase />, type: 'project_agent' },
-};
-
 const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const router = useRouter();
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isPluginsExpanded, setIsPluginsExpanded] = useState(false);
-  const [selectedPlugin, setSelectedPlugin] = useState<PluginType | PluginInstance | null>(null);
+  const [selectedPlugin, setSelectedPlugin] = useState< PluginInstance | null>(null);
   const [plugins, setPlugins] = useState<PluginInstance[]>([]);
   const [isLoadingPlugins, setIsLoadingPlugins] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(false);
@@ -69,11 +31,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const [systemPluginIds, setSystemPluginIds] = useState<Set<string>>(new Set());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleCreateSelect = (type: 'blank' | 'template' | 'import') => {
-    logger.debug('Dashboard selected create type:', type);
-    setIsCreateMenuOpen(false);
-    router.push('/editor');
-  };
+  // const handleCreateSelect = (type: 'blank' | 'template' | 'import') => {
+  //   logger.debug('Dashboard selected create type:', type);
+  //   setIsCreateMenuOpen(false);
+  //   router.push('/editor');
+  // };
 
   useEffect(() => {
     if (!isShopOpen) return;
@@ -84,33 +46,33 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
     };
   }, [isShopOpen]);
 
-  const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
-      return {
-          id: item.id,
-          status: item.enabled ? 'enabled' : 'disabled',
-          config: { items: [] },
-          installedAt: new Date().toISOString(),
-          manifest: {
-              id: item.id,
-              name: item.name,
-              version: item.version,
-              description: item.description || '',
-              author: 'System',
-              type: 'system',
-              capabilities: {
-                  sidebar: true,
-                  editor: true,
-                  header: false
-              },
-              data_source_entry_point: item.data_source_entry_point
-          }
-      };
-  };
+  // const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
+  //     return {
+  //         id: item.id,
+  //         status: item.enabled ? 'enabled' : 'disabled',
+  //         config: { items: [] },
+  //         installedAt: new Date().toISOString(),
+  //         manifest: {
+  //             id: item.id,
+  //             name: item.name,
+  //             version: item.version,
+  //             description: item.description || '',
+  //             // author: 'System',
+  //             // type: 'system',
+  //             capabilities: {
+  //                 sidebar: true,
+  //                 editor: true,
+  //                 header: false
+  //             },
+  //             data_source_entry_point: item.data_source_entry_point
+  //         }
+  //     };
+  // };
 
   const fetchPlugins = async () => {
       try {
           setIsLoadingPlugins(true);
-          const data = await getShopPlugins();
+          const data = await getPluginsFromShop();
           const enabledPlugins = data.filter((plugin) => plugin.installed && plugin.enabled);
           setPlugins(enabledPlugins.map(mapShopItemToPlugin));
       } catch (error) {
@@ -122,14 +84,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
 
   const fetchShopPlugins = async () => {
       try {
+        // 开启加载动画
           setIsLoadingShop(true);
+          // 开启异常动画
           setShopError(null);
-          const [shopData, internalData] = await Promise.all([getShopPlugins(), getShopPlugins()]);
-          const systemIds = new Set(
-            internalData.filter((plugin) => plugin).map((plugin) => plugin.id)
-          );
-          setShopPlugins(shopData);
-          setSystemPluginIds(systemIds);
+          // 获取市场插件
+          const pluginsFromShop = await getPluginsFromShop();
+          setShopPlugins(pluginsFromShop);
+          const systemPluginIds = pluginsFromShop.
+              filter(item => item.from_type === 'system'). // 1. 先过滤出系统插件
+              map(item => item.id);                       // 2. 再从中提取 ID
+          setSystemPluginIds(new Set(systemPluginIds));//这里后续或可以换为枚举
       } catch (error) {
           logger.error('Failed to fetch shop plugins:', error);
           setShopError('插件市场加载失败');
@@ -139,9 +104,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       }
   };
 
+  // 打开插件市场的激活函数
   const handleOpenShop = () => {
       setIsShopOpen(true);
       if (shopPlugins.length === 0) {
+        // 获取市场的插件
           fetchShopPlugins();
       }
   };
@@ -182,33 +149,33 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
     }
   };
 
-  useEffect(() => {
-      const unsubscribe = subscribePluginFeatureFlagsChanged(() => {
-          if (isPluginsExpanded) {
-              fetchPlugins();
-          }
-      });
-      return () => {
-          unsubscribe();
-      };
-  }, [isPluginsExpanded]);
+  // useEffect(() => {
+  //     const unsubscribe = subscribePluginFeatureFlagsChanged(() => {
+  //         if (isPluginsExpanded) {
+  //             fetchPlugins();
+  //         }
+  //     });
+  //     return () => {
+  //         unsubscribe();
+  //     };
+  // }, [isPluginsExpanded]);
   
-  const handlePluginCardClick = (plugin: PluginInstance) => {
-      logger.debug('Dashboard handlePluginCardClick:', plugin);
-      // 尝试匹配系统插件类型
-      const systemMap = SYSTEM_PLUGIN_MAP[plugin.manifest.name] || SYSTEM_PLUGIN_MAP[plugin.id];
+  // const handlePluginCardClick = (plugin: PluginInstance) => {
+  //     logger.debug('Dashboard handlePluginCardClick:', plugin);
+  //     // 尝试匹配系统插件类型
+  //     const systemMap = SYSTEM_PLUGIN_MAP[plugin.manifest.name] || SYSTEM_PLUGIN_MAP[plugin.id];
       
-      if (plugin.manifest.data_source_entry_point) {
-          logger.debug('Dashboard: Opening dynamic plugin:', plugin.manifest.name);
-          setSelectedPlugin(plugin);
-      } else if (systemMap) {
-          logger.debug('Dashboard: Opening system plugin:', systemMap.type);
-          setSelectedPlugin(systemMap.type);
-      } else {
-          // 对于非系统内置的插件，暂时跳转到插件详情或列表页
-          router.push('/plugins');
-      }
-  };
+  //     if (plugin.manifest.data_source_entry_point) {
+  //         logger.debug('Dashboard: Opening dynamic plugin:', plugin.manifest.name);
+  //         setSelectedPlugin(plugin);
+  //     } else if (systemMap) {
+  //         logger.debug('Dashboard: Opening system plugin:', systemMap.type);
+  //         setSelectedPlugin(systemMap.type);
+  //     } else {
+  //         // 对于非系统内置的插件，暂时跳转到插件详情或列表页
+  //         router.push('/plugins');
+  //     }
+  // };
 
   // Horizontal scroll wheel handler
   const handleWheel = (e: React.WheelEvent) => {
@@ -312,19 +279,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                     >
                          {/* Plugin Cards */}
                          {plugins.map((plugin) => {
-                             const systemMap = SYSTEM_PLUGIN_MAP[plugin.manifest.name] || SYSTEM_PLUGIN_MAP[plugin.id];
-                             const icon = systemMap ? systemMap.icon : <Puzzle />;
+                            //  const systemMap = SYSTEM_PLUGIN_MAP[plugin.manifest.name] || SYSTEM_PLUGIN_MAP[plugin.id];
+                            //  const icon = systemMap ? systemMap.icon : <Puzzle />;
                              
                              return (
                                  <div key={plugin.id} className="snap-center shrink-0 py-4">
-                                    <FeatureCard
+                                    {/* <FeatureCard
                                         title={plugin.manifest.name}
-                                        icon={icon}
+                                        // icon={icon}
                                         color="bg-white"
                                         // Remove rotation to fix rendering issues and improve clarity
                                         rotation="rotate-0"
                                         onClick={() => handlePluginCardClick(plugin)}
-                                    />
+                                    /> */}
                                  </div>
                              );
                          })}
@@ -355,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
 
       </div>
 
-      <QuickCreateMenu isOpen={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} onSelect={handleCreateSelect} />
+      {/* <QuickCreateMenu isOpen={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} onSelect={handleCreateSelect} /> */}
 
       {isShopOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-transparent animate-fade-in">
@@ -396,7 +363,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {shopPlugins.map((plugin) => {
                     const isRegistering = registeringShopId === plugin.id;
-                    const hasUpgrade = Boolean(plugin.upgrade_available);
+                    const hasUpgrade = Boolean(plugin.version!=plugin.latest_version);
                     const isInstalled = Boolean(plugin.installed);
                     const canUpgrade = isInstalled && hasUpgrade;
                     const isRemoving = removingShopId === plugin.id;
@@ -418,12 +385,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                           <div>
                             <h3 className="text-base font-bold text-text-primary">{plugin.name}</h3>
                             <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-                              <span>最新 v{plugin.latest_version || plugin.version}</span>
-                              {isInstalled && plugin.installed_version && (
+                              <span>最新: {plugin.latest_version || plugin.version}</span>
+                              {isInstalled && plugin.latest_version && (
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] ${
                                   canUpgrade ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'
                                 }`}>
-                                  当前 v{plugin.installed_version}
+                                  当前: {plugin.version}
                                 </span>
                               )}
                             </div>
@@ -482,14 +449,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
           </div>
         </div>
       )}
-      
+{/*       
       {selectedPlugin && (
-          <PluginManagerModal 
-            type={typeof selectedPlugin === 'string' ? selectedPlugin : 'agent'} 
-            plugin={typeof selectedPlugin === 'object' ? selectedPlugin : undefined}
-            onClose={() => setSelectedPlugin(null)} 
-          />
-      )}
+          // <PluginManagerModal 
+          //   type={typeof selectedPlugin === 'string' ? selectedPlugin : 'agent'} 
+          //   plugin={typeof selectedPlugin === 'object' ? selectedPlugin : undefined}
+          //   onClose={() => setSelectedPlugin(null)} 
+          // />
+      )} */}
 
     </div>
   );

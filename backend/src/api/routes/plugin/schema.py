@@ -19,14 +19,15 @@ class PluginMetaResponse(BaseModel):
 class PluginShopMetaResponse(BaseModel):
     id: UUID
     name: str
+    # 当前版本
     version: str
+    # 最新版本
+    latest_version: str 
     description: str | None = None
-    enabled: bool
-    installed: bool = False
-    installed_version: str | None = None
-    latest_version: str | None = None
-    upgrade_available: bool = False
-    data_source_entry_point: str | None = None
+    # 插件来源:分为系统的和非系统的,系统的总是启动且不可卸载
+    from_type: PluginFromTypeEnum
+    # 是否已安装
+    installed:bool
 
 class PluginResponse(BaseModel):
     id: UUID

@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { X, Puzzle, Save } from 'lucide-react';
-import { PluginInstance } from '@/types/plugin';
-import { getShopPlugins, PluginShopItem } from '@/services/pluginService';
+import { PluginInstance} from '@/types/plugin';
+import { PluginShopItem,getPluginsFromShop } from '@/services/pluginService';
 
 interface WorkPluginSettingsModalProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export default function WorkPluginSettingsModal({ isOpen, onClose, workId }: Wor
   useEffect(() => {
     if (isOpen) {
         // Load global plugins
-        getShopPlugins().then(setPlugins);
+        getPluginsFromShop().then(setPlugins);
         // TODO: Load work specific configuration
         // For now, assume all global enabled plugins are enabled here
     }
