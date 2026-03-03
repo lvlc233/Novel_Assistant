@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from common.enums import (
     NodeTypeEnum,
     PluginFromTypeEnum,
-    PluginScopeTypeEnum,
     WorkStateCNEnum,
     WorkTypeEnum,
 )
@@ -70,7 +69,6 @@ class WorkPluginDetailResponse(BaseModel):
     enabled: bool
     config: Dict
     from_type: PluginFromTypeEnum
-    scope_type: PluginScopeTypeEnum
     tags: List[str]
 
 class UpdateWorkPluginRequest(BaseModel):

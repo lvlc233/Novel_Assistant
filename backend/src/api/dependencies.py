@@ -1,5 +1,8 @@
-from fastapi import Request
+"""
+这里是存储在fastapi的state的注入
+"""
 
+from fastapi import Request
 from core.plugin.runtime import PluginInternalRegistry
 
 

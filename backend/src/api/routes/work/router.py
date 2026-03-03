@@ -10,9 +10,6 @@ from api.routes.work.schema import (
     WorkDetailResponse,
     WorkMetaResponse,
     WorkMetaUpdateRequest,
-    # UpdateWorkPluginRequest,
-    # WorkPluginDetailResponse,
-    # WorkPluginMetaResponse,
 )
 from infrastructure.pg.pg_client import get_session
 from services.work.service import WorkService

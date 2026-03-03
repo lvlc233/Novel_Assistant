@@ -20,7 +20,6 @@ from api.routes.work.schema import (
 )
 from common.enums import (
     NodeTypeEnum,
-    PluginScopeTypeEnum,
     WorkStateCNEnum,
     WorkStateEnum,
     WorkTypeEnum,
@@ -241,7 +240,6 @@ class WorkService:
                     plugin_id=p.id,
                     name=p.name,
                     enabled=m.enabled,
-                    scope_type=PluginScopeTypeEnum(p.scope_type),
                     tags=p.tags
                 ))
         return response
@@ -284,7 +282,6 @@ class WorkService:
             enabled=mapping.enabled,
             config=mapping.config,
             default_config=plugin.default_config,
-            scope_type=PluginScopeTypeEnum(plugin.scope_type),
             config_schema=plugin.config_schema
         )
 
@@ -313,7 +310,6 @@ class WorkService:
             enabled=mapping.enabled,
             config=mapping.config,
             default_config=plugin.default_config,
-            scope_type=PluginScopeTypeEnum(plugin.scope_type),
             config_schema=plugin.config_schema
         )
 

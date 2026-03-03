@@ -9,24 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.plugin.schema import (
-    AgentMessagesPayload,
-    CardPayload,
-    ConfigPayload,
-    DataSourceConfig,
-    InternalDataSourceConfig,
-    JsonDataSourceConfig,
-    PluginConfig,
-    PluginConfigItem,
     PluginMetaResponse,
     PluginOperationInvokeResponse,
     PluginResponse,
     PluginUpdateRequest,
-    StandardDataResponse,
-    UrlDataSourceConfig,
 )
-from common.enums import LoaderType, PluginFromTypeEnum, PluginScopeTypeEnum, RenderType
+from common.enums import LoaderType, PluginFromTypeEnum
 from common.errors import ResourceNotFoundError
 from core.plugin.runtime import PluginInternalRegistry
+from core.plugin.di import DependencyInfo
 from infrastructure.pg.pg_models import PluginSQLEntity
 
 
@@ -35,41 +26,6 @@ class PluginService:
     def __init__(self, session: AsyncSession):
         """Initialize PluginService."""
         self.session = session
-
-    @staticmethod
-    def _to_plugin_config(config: Dict[str, Any] | None) -> PluginConfig:
-        if not config:
-            return PluginConfig()
-        items = []
-        for key, value in config.items():
-            if isinstance(value, (str, int, float, bool)) or value is None:
-                items.append(PluginConfigItem(key=str(key), value=value))
-            else:
-                items.append(PluginConfigItem(key=str(key), value=str(value)))
-        return PluginConfig(items=items)
-
-    @staticmethod
-    def _to_config_dict(config: PluginConfig | None) -> Dict[str, Any]:
-        if not config:
-            return {}
-        return {item.key: item.value for item in config.items}
-
-    @staticmethod
-    def _to_data_source_config(plugin: PluginSQLEntity) -> DataSourceConfig | None:
-        if plugin.data_source_config:
-            adapter = TypeAdapter(DataSourceConfig)
-            return adapter.validate_python(plugin.data_source_config)
-        return None
-
-    @staticmethod
-    def _empty_payload(render_type: RenderType):
-        if render_type == RenderType.CONFIG:
-            return ConfigPayload(fields=[])
-        if render_type == RenderType.AGENT_MESSAGES:
-            return AgentMessagesPayload(sessions=[])
-        if render_type == RenderType.CARD:
-            return CardPayload(cards=[])
-        return CardPayload(cards=[])
 
     async def get_plugin_list(self) -> List[PluginMetaResponse]:
         """获取所有插件列表."""
@@ -84,7 +40,6 @@ class PluginService:
                 version=plugin.version,
                 description=plugin.description,
                 enabled=plugin.enabled,
-                render_type=RenderType(plugin.render_type)
             ) for plugin in plugins
         ]
 
@@ -103,13 +58,11 @@ class PluginService:
                 name=plugin.name,
                 description=plugin.description,
                 enabled=plugin.enabled,
-                config=self._to_plugin_config(plugin.default_config),
+                config=plugin.default_config, # self._to_plugin_config(plugin.default_config),
                 data_source_type=LoaderType(plugin.data_source_type) if plugin.data_source_type else None,
-                data_source_config=self._to_data_source_config(plugin),
-                render_type=RenderType(plugin.render_type),
-                auth_config=self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
+                data_source_config=plugin.data_source_config, # self._to_data_source_config(plugin),
+                auth_config=plugin.auth_config, # self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
                 from_type=PluginFromTypeEnum(plugin.from_type),
-                scope_type=PluginScopeTypeEnum(plugin.scope_type),
                 tags=plugin.tags
             ) for plugin in plugins
         ]
@@ -133,11 +86,10 @@ class PluginService:
                 version=plugin.version,
                 description=plugin.description,
                 enabled=plugin.enabled,
-                render_type=RenderType(plugin.render_type)
             ) for plugin in plugins
         ]
 
-    async def get_plugin_detail(self, plugin_id: UUID) -> PluginResponse:
+    async def get_plugin_detail(self, plugin_id: UUID):
         """获取插件详情."""
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
         result = await self.session.execute(stmt)
@@ -151,13 +103,12 @@ class PluginService:
             name=plugin.name,
             description=plugin.description,
             enabled=plugin.enabled,
-            config=self._to_plugin_config(plugin.default_config),
+            config=plugin.default_config, # self._to_plugin_config(plugin.default_config),
             data_source_type=LoaderType(plugin.data_source_type) if plugin.data_source_type else None,
-            data_source_config=self._to_data_source_config(plugin),
-            render_type=RenderType(plugin.render_type),
-            auth_config=self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
+            data_source_config=plugin.data_source_config, # self._to_data_source_config(plugin),
+            auth_config=plugin.auth_config, # self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
             from_type=PluginFromTypeEnum(plugin.from_type),
-            scope_type=PluginScopeTypeEnum(plugin.scope_type),
+
             tags=plugin.tags
         )
 
@@ -177,29 +128,32 @@ class PluginService:
             plugin.enabled = request.enabled
             
         if request.config is not None:
-            plugin.default_config = self._to_config_dict(request.config)
+            plugin.default_config = request.config # self._to_config_dict(request.config)
 
         if request.data_source_type is not None:
             plugin.data_source_type = request.data_source_type.value
 
         if request.data_source_config is not None:
-            plugin.data_source_config = request.data_source_config.model_dump()
+            plugin.data_source_config = request.data_source_config # request.data_source_config.model_dump()
             if request.data_source_type is None:
-                plugin.data_source_type = request.data_source_config.type.value
+                # 尝试推断 data_source_type, 如果 dict 中有 type 字段
+                if isinstance(request.data_source_config, dict) and "type" in request.data_source_config:
+                     plugin.data_source_type = request.data_source_config["type"]
             
         if request.auth_config is not None:
-            plugin.auth_config = self._to_config_dict(request.auth_config)
+            plugin.auth_config = request.auth_config # self._to_config_dict(request.auth_config)
             
         await self.session.commit()
 
-    async def _invoke_plugin_operation(
+    async def invoke_plugin_operation(
         self,
         plugin_id: UUID,
         operation_name: str,
         params: Dict[str, Any],
-        runtime_config: Dict[str, Any] | None,
+        # runtime_config: Dict[str, Any] | None,
         registry: PluginInternalRegistry
-    ) -> PluginOperationInvokeResponse:
+    ) -> Any:
+        # 从数据库中获取插件的信息(用于获取运行时配置)
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
         result = await self.session.execute(stmt)
         plugin = result.scalar_one_or_none()
@@ -208,29 +162,64 @@ class PluginService:
         if not plugin.enabled:
             raise ValueError(f"Plugin {plugin.name} is disabled")
 
+        # 获取该插件的包装器(也就是配置信息到实际内存映射)
         wrapper = registry.get_plugin_wrapper(plugin_id)
         if wrapper is None:
             raise ResourceNotFoundError(f"Plugin {plugin_id} not found in internal registry")
-
-        merged_config: Dict[str, Any] = {}
-        if isinstance(plugin.default_config, dict):
-            merged_config.update(plugin.default_config)
-        if runtime_config:
-            merged_config.update(runtime_config)
-
+        # 读取运行时配置
+        merged_config = plugin.default_config or {}
+    
+        # 获取插件的__init__配置签名
         signature = inspect.signature(wrapper.plugin_cls.__init__)
         runtime_kwargs: Dict[str, Any] = {}
+        # 获取基于注入的参数列表
+        injections = getattr(wrapper, "injections", {})
+        
+        # 处理初始化函数的来源信息
         for name in signature.parameters:
+            # 跳过首个参数
             if name == "self":
                 continue
-            if name == "session":
-                runtime_kwargs[name] = self.session
+            
+            # Dependency Injection
+            if name in injections:
+                dep_info = injections[name]
+                if dep_info.dependency: # 获取注入函数
+                    try:
+                        # 直接调用依赖函数，不传递任何参数
+                        # 依赖函数内部负责获取所需资源（如通过 contextvars 或全局配置）
+                        dep_instance = dep_info.dependency()
+                        
+                        # 处理异步生成器 (如 get_session)
+                        if inspect.isasyncgen(dep_instance):
+                            # 取第一个值
+                            dep_instance = await dep_instance.__anext__()
+                        # 处理普通生成器
+                        elif inspect.isgenerator(dep_instance):
+                            dep_instance = next(dep_instance)
+                        # 处理协程
+                        elif inspect.iscoroutine(dep_instance):
+                            dep_instance = await dep_instance
+                        # 将注入的信息注入到运行时的参数中
+                        runtime_kwargs[name] = dep_instance
+                    except Exception as e:
+                        # Fallback or re-raise
+                        print(f"Warning: Failed to inject dependency '{name}': {e}")
                 continue
+            
+            # 将一般的插件配置信息注入到运行时参数中
             if name in merged_config:
                 runtime_kwargs[name] = merged_config[name]
 
+        # 创建插件实例
         instance = wrapper.create_instance(**runtime_kwargs)
+        # 调度插件的指定操作(并传递参数)
         result_value = wrapper.invoke(instance, operation_name, **(params or {}))
+        
+        # 如果是异步生成器，直接返回，交给 Router 处理 StreamingResponse
+        if inspect.isasyncgen(result_value):
+            return result_value
+
         if inspect.iscoroutine(result_value):
             result_value = await result_value
 
@@ -247,70 +236,69 @@ class PluginService:
         return PluginOperationInvokeResponse(
             plugin_id=plugin_id,
             operation=operation_name,
-            render_type=RenderType(plugin.render_type),
             payload=payload
         )
 
-    async def proxy_plugin_data(self, plugin_id: UUID, params: Dict[str, Any]) -> StandardDataResponse:
-        """BFF Proxy for plugin data."""
-        # 1. Get Plugin Config
-        stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
-        result = await self.session.execute(stmt)
-        plugin = result.scalar_one_or_none()
+    # async def proxy_plugin_data(self, plugin_id: UUID, params: Dict[str, Any]):
+        # """BFF Proxy for plugin data."""
+        # # 1. Get Plugin Config
+        # stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
+        # result = await self.session.execute(stmt)
+        # plugin = result.scalar_one_or_none()
         
-        if not plugin:
-            raise ResourceNotFoundError(f"Plugin {plugin_id} not found")
+        # if not plugin:
+        #     raise ResourceNotFoundError(f"Plugin {plugin_id} not found")
             
-        if not plugin.enabled:
-             raise ValueError(f"Plugin {plugin.name} is disabled")
+        # if not plugin.enabled:
+        #      raise ValueError(f"Plugin {plugin.name} is disabled")
 
-        data_source_type = plugin.data_source_type
-        data_source_config = self._to_data_source_config(plugin)
+        # data_source_type = plugin.data_source_type
+        # data_source_config = self._to_data_source_config(plugin)
 
-        if data_source_type is None or data_source_config is None:
-            return StandardDataResponse(
-                plugin_id=plugin_id,
-                render_type=plugin.render_type,
-                payload=self._empty_payload(plugin.render_type),
-                total=0
-            )
+        # if data_source_type is None or data_source_config is None:
+        #     return StandardDataResponse(
+        #         plugin_id=plugin_id,
+        #         render_type=plugin.render_type,
+        #         payload=self._empty_payload(plugin.render_type),
+        #         total=0
+        #     )
 
-        if isinstance(data_source_config, JsonDataSourceConfig):
-            return StandardDataResponse(
-                plugin_id=plugin_id,
-                render_type=plugin.render_type,
-                payload=data_source_config.payload,
-                total=None
-            )
+        # if isinstance(data_source_config, JsonDataSourceConfig):
+        #     return StandardDataResponse(
+        #         plugin_id=plugin_id,
+        #         render_type=plugin.render_type,
+        #         payload=data_source_config.payload,
+        #         total=None
+        #     )
 
 
 
-        url = None
-        if isinstance(data_source_config, UrlDataSourceConfig):
-            url = data_source_config.url
-        if isinstance(data_source_config, InternalDataSourceConfig):
-            url = data_source_config.endpoint
-        if not url:
-            return StandardDataResponse(
-                plugin_id=plugin_id,
-                render_type=plugin.render_type,
-                payload=self._empty_payload(plugin.render_type),
-                total=0
-            )
+        # url = None
+        # if isinstance(data_source_config, UrlDataSourceConfig):
+        #     url = data_source_config.url
+        # if isinstance(data_source_config, InternalDataSourceConfig):
+        #     url = data_source_config.endpoint
+        # if not url:
+        #     return StandardDataResponse(
+        #         plugin_id=plugin_id,
+        #         render_type=plugin.render_type,
+        #         payload=self._empty_payload(plugin.render_type),
+        #         total=0
+        #     )
 
-        headers: Dict[str, str] = {}
-        if plugin.auth_config:
-            if isinstance(plugin.auth_config, dict):
-                key = plugin.auth_config.get("header_key", "Authorization")
-                value = plugin.auth_config.get("api_key", "")
-                if key and value:
-                    headers[key] = value
+        # headers: Dict[str, str] = {}
+        # if plugin.auth_config:
+        #     if isinstance(plugin.auth_config, dict):
+        #         key = plugin.auth_config.get("header_key", "Authorization")
+        #         value = plugin.auth_config.get("api_key", "")
+        #         if key and value:
+        #             headers[key] = value
 
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(url, params=params, headers=headers, timeout=10.0)
-                response.raise_for_status()
-                data = response.json()
-                return StandardDataResponse.model_validate(data)
-            except httpx.HTTPError as e:
-                raise ValueError(f"Upstream service error: {str(e)}")
+        # async with httpx.AsyncClient() as client:
+        #     try:
+        #         response = await client.get(url, params=params, headers=headers, timeout=10.0)
+        #         response.raise_for_status()
+        #         data = response.json()
+        #         return StandardDataResponse.model_validate(data)
+        #     except httpx.HTTPError as e:
+        #         raise ValueError(f"Upstream service error: {str(e)}")

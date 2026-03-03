@@ -10,11 +10,9 @@ from sqlmodel import Field, Relationship, SQLModel
 from common.enums import (
     NodeTypeEnum,
     PluginFromTypeEnum,
-    PluginScopeTypeEnum,
     WorkTypeEnum,
     WorkStateEnum,
     MemoryTypeEnum,
-    RenderType,
     LoaderType
 )
 from common.utils.utils import create_uuid, get_now_time
@@ -31,7 +29,6 @@ class PluginSQLEntity(SQLModel, table=True):
     
     # 插件类型与作用域
     from_type: str = Field(default=PluginFromTypeEnum.SYSTEM.value, sa_column=Column(String), description="来源: system(系统内置), custom(用户自定义)")
-    scope_type: str = Field(default=PluginScopeTypeEnum.WORK.value, sa_column=Column(String), description="作用域: global(全局), work(作品级), document(文档级)")
     
     # 全局开关
     enabled: bool = Field(default=True, description="全局启用状态")
@@ -47,11 +44,9 @@ class PluginSQLEntity(SQLModel, table=True):
     runtime_config: Dict = Field(default={}, sa_column=Column(JSON), description="运行时配置") 
     default_config: Dict = Field(default={}, sa_column=Column(JSON), description="默认配置值")
     plugin_operation_schema: Dict = Field(default={}, sa_column=Column(JSON), description="插件操作定义")
-    auth_config: Dict = Field(default={}, sa_column=Column(JSON), description="鉴权配置")
     # BFF 代理配置
 
    
-    render_type: str = Field(default=RenderType.CARD.value, sa_column=Column(String), description="UI渲染类型")
     tags: List[str] = Field(default=[], sa_column=Column(JSON), description="标签列表")
 
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
