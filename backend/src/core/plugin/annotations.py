@@ -82,7 +82,7 @@ class OperationInfo:
     trigger: 接口的触发模式
     """
     # UI 绑定属性
-    with_ui: List[UIBinding]= field(default_factory=list)
+    with_ui: List[Union[UIBinding, str]] = field(default_factory=list)
     ui_target: Optional[str] = None
     target_props: List[str] = field(default_factory=list)# 组件的“入参契约”,前端拿到后，会自动做一个过滤（Pick）：只把后端返回中匹配 target_props 的字段传给组件，多余的字段存入缓存，缺少的字段给默认值。
     # 交互属性
@@ -101,16 +101,20 @@ class OperationInfo:
         op_suffix = f"/{self.name}"
         
         for binding in self.with_ui:
-            # 基础路径
-            path = "/" + "/".join([p.lower() for p in binding.path_list])
-            full_path = f"{path}{op_suffix}"
-            
-            # 拼接参数
-            if binding.predicates:
-                query_string = urlencode(binding.predicates)
-                routes.append(f"{full_path}?{query_string}")
-            else:
-                routes.append(full_path)
+            if isinstance(binding, UIBinding):
+                # 基础路径
+                path = "/" + "/".join([p.lower() for p in binding.path_list])
+                full_path = f"{path}{op_suffix}"
+                
+                # 拼接参数
+                if binding.predicates:
+                    query_string = urlencode(binding.predicates)
+                    routes.append(f"{full_path}?{query_string}")
+                else:
+                    routes.append(full_path)
+            elif isinstance(binding, str):
+                # 如果是字符串，直接使用
+                routes.append(f"{binding}{op_suffix}")
                 
         return routes
 
@@ -135,7 +139,10 @@ class PluginWrapper:
                 "description": info.description,
                 "input_schema": info.input_schema,
                 "output_schema": info.output_schema,
-                "with_ui": [b.generate_base_url() for b in info.with_ui],
+                "with_ui": [
+                    b.generate_base_url() if isinstance(b, UIBinding) else b 
+                    for b in info.with_ui
+                ],
                 "ui_target": info.ui_target,
                 "trigger": info.trigger.value if info.trigger else None,
                 "is_stream": info.is_stream,

@@ -197,12 +197,19 @@ class PluginInternalRegistry(BaseModel):
         try:
             for item in os.scandir(plugins_dir):
                 if item.is_dir():
+                    # 优先检查是否存在 plugin.py
                     plugin_file = os.path.join(item.path, "plugin.py")
                     if os.path.exists(plugin_file):
                         plugin_def = self._parse_plugin_file(plugin_file)
                         if plugin_def:
                             plugins.append(plugin_def)
+                            # 如果找到了 plugin.py，通常不需要再扫描子目录，除非是 monorepo 结构
+                            # 这里假设每个目录只包含一个主插件，或者子目录是独立的
+                            # 但为了支持嵌套结构，我们继续递归，但需要注意避免重复
+                            pass
 
+                    # 无论是否找到 plugin.py，都继续扫描子目录
+                    # 因为可能存在 src/plugin/group/plugin_a/plugin.py 的结构
                     subplugins = self.discover_plugins(item.path)
                     plugins.extend(subplugins)
         except OSError as e:
@@ -212,6 +219,7 @@ class PluginInternalRegistry(BaseModel):
                 self._discovering = False
 
         if is_root:
+            # 去重：基于 ID
             unique_plugins = {plugin["id"]: plugin for plugin in plugins}
             self.plugins = list(unique_plugins.values())
             return self.plugins
@@ -231,9 +239,10 @@ class PluginInternalRegistry(BaseModel):
         """
         try:
             # 动态导入插件模块
-  
+            # 使用文件路径生成唯一的模块名，避免冲突
+            module_name = f"plugin_module_{hashlib.md5(plugin_file_path.encode()).hexdigest()}"
             spec = importlib.util.spec_from_file_location(
-                "plugin_module", 
+                module_name, 
                 plugin_file_path
             )
             if spec is None or spec.loader is None:
