@@ -22,10 +22,18 @@ export const PluginCard: React.FC<PluginCardProps> = ({ name, pluginId, operatio
     setLoading(true);
     try {
       const result = await invokePluginOperation(pluginId, operationName || 'get_agent_info_in_card', {});
-      if (result && result.payload) {
-          setDetailsData(result.payload);
+      
+      // Handle response structure: backend returns the data directly
+      if (result) {
+          // If result has payload (from some other structure), use it
+          if ('payload' in result) {
+              setDetailsData((result as any).payload);
+          } else {
+              // Otherwise use result directly
+              setDetailsData(result);
+          }
       } else {
-          logger.warn("invokePluginOperation returned empty payload");
+          logger.warn("invokePluginOperation returned empty result");
       }
     } catch (error: any) {
       logger.error('Failed to fetch agent details:', error);

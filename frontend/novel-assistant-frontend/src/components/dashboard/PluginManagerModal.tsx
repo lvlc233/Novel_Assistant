@@ -6,6 +6,9 @@ import { getPluginDetail, updatePlugin } from '@/services/pluginService';
 import { ConfigRenderer } from './plugin-renderers/ConfigRenderer';
 import { logger } from '@/lib/logger';
 
+import { PluginDetailsInfo } from '../plugins/agent-manager/PluginDetailsInfo';
+import { invokePluginOperation } from '@/services/pluginService';
+
 interface PluginManagerModalProps {
   plugin: PluginInstance;
   onClose: () => void;
@@ -16,35 +19,64 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ plugin, onClose
   const [configFields, setConfigFields] = useState<ConfigField[]>([]);
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
   const [error, setError] = useState<string | null>(null);
+  const [agentData, setAgentData] = useState<any>(null);
+
+  const isAgentManager = plugin.name === 'agent_manager' || plugin.name.includes('Agent管理') || plugin.id === 'agent_manager';
 
   useEffect(() => {
     if (plugin) {
         setIsLoading(true);
         setError(null);
-        getPluginDetail(plugin.id).then(detail => {
-            if (detail && Array.isArray(detail.config)) {
-                setConfigFields(detail.config);
-                
-                // Initialize values from config schema
-                // Assuming detail.config has current values or defaults
-                const initialValues: Record<string, any> = {};
-                detail.config.forEach(field => {
-                    initialValues[field.key] = field.value !== undefined ? field.value : '';
+
+        if (isAgentManager) {
+            // Load Agent Manager specific data
+            invokePluginOperation(plugin.id, 'get_agent_info_in_card', {})
+                .then(result => {
+                    if (result) {
+                        if ('payload' in result) {
+                             // Assuming payload is { name:..., data: { agents: ... }, ... }
+                             setAgentData((result as any).payload);
+                        } else {
+                             setAgentData(result);
+                        }
+                    } else {
+                        setError('未获取到 Agent 数据');
+                    }
+                })
+                .catch(err => {
+                    logger.error('Failed to load agent data', err);
+                    setError('加载 Agent 数据失败');
+                })
+                .finally(() => {
+                    setIsLoading(false);
                 });
-                setConfigValues(initialValues);
-            } else {
-                // If config is null or undefined or not an array, just set empty
-                setConfigFields([]);
-                setConfigValues({});
-            }
-        }).catch(err => {
-            logger.error('Failed to load plugin details', err);
-            setError('加载插件配置失败');
-        }).finally(() => {
-            setIsLoading(false);
-        });
+        } else {
+            // Standard Config Loading
+            getPluginDetail(plugin.id).then(detail => {
+                if (detail && Array.isArray(detail.config)) {
+                    setConfigFields(detail.config);
+                    
+                    // Initialize values from config schema
+                    // Assuming detail.config has current values or defaults
+                    const initialValues: Record<string, any> = {};
+                    detail.config.forEach(field => {
+                        initialValues[field.key] = field.value !== undefined ? field.value : '';
+                    });
+                    setConfigValues(initialValues);
+                } else {
+                    // If config is null or undefined or not an array, just set empty
+                    setConfigFields([]);
+                    setConfigValues({});
+                }
+            }).catch(err => {
+                logger.error('Failed to load plugin details', err);
+                setError('加载插件配置失败');
+            }).finally(() => {
+                setIsLoading(false);
+            });
+        }
     }
-  }, [plugin]);
+  }, [plugin, isAgentManager]);
 
   const handleConfigChange = (key: string, value: any) => {
     setConfigValues(prev => ({
@@ -72,6 +104,15 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ plugin, onClose
         setIsLoading(false);
     }
   };
+
+  const configNode = (
+      <ConfigRenderer
+          fields={configFields}
+          configValues={configValues}
+          onConfigChange={handleConfigChange}
+          onSave={handleSave}
+      />
+  );
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-fade-in">
@@ -107,12 +148,17 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ plugin, onClose
                     {error}
                 </div>
             ) : (
-                <ConfigRenderer
-                    fields={configFields}
-                    configValues={configValues}
-                    onConfigChange={handleConfigChange}
-                    onSave={handleSave}
-                />
+                isAgentManager ? (
+                    <div className="h-full p-6 bg-gray-50/50">
+                        <PluginDetailsInfo 
+                            data={agentData ? agentData.data : null} 
+                            pluginId={plugin.id}
+                            configNode={configNode}
+                        />
+                    </div>
+                ) : (
+                    configNode
+                )
             )}
         </div>
       </div>
