@@ -51,11 +51,22 @@ export class Home extends Page {
   }
 }
 
+export class Mailbox extends Page {
+  static Sidebar = class Sidebar extends Slot {
+    static id = p('Mailbox', 'Sidebar');
+    
+    static AgentItem = class AgentItem extends Component {
+        static id = p('Mailbox', 'Sidebar', 'AgentItem');
+    }
+  }
+}
+
 // 导出扁平化的 Slot ID 供组件使用
 export const SLOT_IDS = {
     HEADER_BREADCRUMB: AppLayout.Header.Breadcrumb.id,
     HEADER_ACTIONS: AppLayout.Header.Actions.id,
     EDITOR_SIDEBAR: Editor.Sidebar.id,
     WORK_DETAIL_BOTTOM: WorkDetail.Bottom.id,
-    HOME_MAIN: Home.Main.id
+    HOME_MAIN: Home.Main.id,
+    MAILBOX_SIDEBAR: Mailbox.Sidebar.id
 };

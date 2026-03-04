@@ -46,6 +46,7 @@ interface MailContextType {
   // For Toast Notification
   latestNotification: MailMessage | null;
   clearNotification: () => void;
+  sendNotification: (message: MailMessage) => void;
 }
 
 // --- Context ---
@@ -218,6 +219,12 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLatestNotification(null);
   };
 
+  const sendNotification = (message: MailMessage) => {
+    setLatestNotification(message);
+    // Also add to messages list if needed, or keep it separate
+    // For now, just show toast
+  };
+
   return (
     <MailContext.Provider value={{
       isOpen,
@@ -234,7 +241,8 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       markAsRead,
       markAllAsRead,
       latestNotification,
-      clearNotification
+      clearNotification,
+      sendNotification
     }}>
       {children}
     </MailContext.Provider>

@@ -203,9 +203,8 @@ export async function invokePlugin(
   operationName: string,
   body: Map<string, any>
 ): Promise<PluginOperationInvokeResponse> {
-  return request.post<any>(`/plugin/proxy/${pluginId}/${operationName}`, {
-    body: body
-  });
+  const bodyObj = Object.fromEntries(body);
+  return request.post<any>(`/plugin/proxy/${pluginId}/${operationName}`, bodyObj);
 }
 
 // 事件总线: 插件变更通知

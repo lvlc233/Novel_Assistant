@@ -7,7 +7,7 @@ import { FileText, Settings, LayoutGrid, Sparkles, Puzzle, X, Loader2 } from 'lu
 import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
 import { logger } from '@/lib/logger';
-import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, PluginShopItem } from '@/services/pluginService';
+import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, PluginShopItem, subscribeToPluginChanges } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 
 
@@ -91,6 +91,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
 
   useEffect(() => {
     fetchRegistedPlugins();
+    
+    // Subscribe to plugin changes
+    const unsubscribe = subscribeToPluginChanges(() => {
+        fetchRegistedPlugins();
+    });
+    return unsubscribe;
   }, []);
 
   const fetchShopPlugins = async () => {

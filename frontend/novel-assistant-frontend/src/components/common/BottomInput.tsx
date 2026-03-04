@@ -48,11 +48,19 @@ const BottomInput: React.FC<BottomInputProps> = ({
 
   const handleSubmit = () => {
     if (value.trim()) {
-      onSubmit(value);
-      setValue('');
-      // Reset height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = '44px';
+      try {
+        onSubmit(value);
+        setValue('');
+        // Reset height
+        if (textareaRef.current) {
+          textareaRef.current.style.height = '44px';
+        }
+      } catch (error) {
+        // Allow parent to handle, but don't clear input if failed? 
+        // Actually ProjectChatInput catches the error, so this is fine.
+        // But if onSubmit throws, we might want to keep the value.
+        // However, onSubmit is void returning usually.
+        console.error("BottomInput submit error", error);
       }
     }
   };

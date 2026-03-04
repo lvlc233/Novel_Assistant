@@ -15,11 +15,13 @@ const formatTime = (timestamp: number) => {
 
 // --- Sub-components ---
 
+import { SLOT_IDS } from '@/core/ui/schema';
+import { SlotRenderer } from '@/contexts/SlotContext';
+
 const AgentSidebar: React.FC<{ 
-  agents: Agent[], 
   currentFilter: string | 'all', 
   onSelect: (id: string | 'all') => void 
-}> = ({ agents, currentFilter, onSelect }) => (
+}> = ({ currentFilter, onSelect }) => (
   <div className="w-[72px] h-full bg-surface-secondary border-r border-border-primary flex flex-col items-center py-6 gap-3 shrink-0 z-10">
     <button
       onClick={() => onSelect('all')}
@@ -35,33 +37,10 @@ const AgentSidebar: React.FC<{
     
     <div className="w-8 h-[1px] bg-border-primary my-2" />
     
-    {agents.map((agent) => (
-      <button
-        key={agent.id}
-        onClick={() => onSelect(agent.id)}
-        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 relative group ${
-          currentFilter === agent.id 
-            ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-surface-secondary' 
-            : 'hover:scale-105 opacity-80 hover:opacity-100'
-        }`}
-        title={agent.name}
-      >
-        {agent.avatar ? (
-           <img src={agent.avatar} alt={agent.name} className="w-full h-full rounded-xl object-cover shadow-sm" />
-        ) : (
-           <div className={`w-full h-full rounded-xl flex items-center justify-center text-surface-white font-bold text-sm shadow-sm
-             ${agent.id === 'system' ? 'bg-accent-primary' : 'bg-gray-400'}
-           `}>
-             {agent.name.substring(0, 1).toUpperCase()}
-           </div>
-        )}
-        
-        {/* Tooltip */}
-        <span className="absolute left-full ml-3 px-2 py-1 bg-accent-primary text-surface-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50 shadow-lg">
-          {agent.name}
-        </span>
-      </button>
-    ))}
+    <SlotRenderer 
+        slotId={SLOT_IDS.MAILBOX_SIDEBAR} 
+        itemClassName="mb-3"
+    />
   </div>
 );
 
@@ -267,7 +246,6 @@ export const MailboxDrawer: React.FC = () => {
       >
         {/* Left Sidebar (Agents) */}
         <AgentSidebar 
-          agents={agents} 
           currentFilter={currentFilter} 
           onSelect={(id) => {
             setFilter(id);
