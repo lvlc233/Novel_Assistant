@@ -25,15 +25,15 @@ class AgentManagerPlugin:
         """邮箱入口"""
         pass
 
-    # @operation(
-    #     name="agent_sidebar_item",
-    #     description="邮箱侧边栏入口",
-    #     ui_target=Mailbox.Sidebar.filter(),
-    #     with_ui=["AgentSidebarItem"]
-    # )
-    # async def agent_sidebar_item(self, name: str = "Agent Manager", role: str = "System"):
-    #     """邮箱侧边栏入口"""
-    #     pass
+    @operation(
+        name="agent_sidebar_item",
+        description="邮箱侧边栏入口",
+        ui_target=Mailbox.Sidebar.filter(),
+        with_ui=["AgentSidebarItem"]
+    )
+    async def agent_sidebar_item(self, name: str = "Agent Manager", role: str = "System"):
+        """邮箱侧边栏入口"""
+        pass
 
 #     @runtime_config
 #     def __init__(

@@ -25,6 +25,11 @@ class Home(Page):
     class EmailBox(Slot):
         class AgentBox(Component):
             def __init__(self, agent_name: str): pass
+
+    class Bottom(Slot):
+        class QuickInput(Component):
+            def __init__(self): pass
+
             
             
     # class PluginDetails(Slot):

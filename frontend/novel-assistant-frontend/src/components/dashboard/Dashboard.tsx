@@ -12,11 +12,16 @@ import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, PluginSho
 import { PluginInstance } from '@/types/plugin';
 
 
+import { SLOT_IDS } from '@/core/ui/schema';
+import { SlotRenderer } from '@/contexts/SlotContext';
+
 interface DashboardProps {
   onOpenSettings?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
+
+
   const router = useRouter();
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isPluginsExpanded, setIsPluginsExpanded] = useState(false);
@@ -307,6 +312,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
             />
         </div>
 
+      </div>
+      
+      {/* Bottom Slot */}
+      <div className="w-full max-w-4xl mt-12 animate-fade-in-up delay-200">
+         <SlotRenderer slotId={SLOT_IDS.HOME_BOTTOM} />
       </div>
 
       {/* <QuickCreateMenu isOpen={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} onSelect={handleCreateSelect} /> */}

@@ -49,6 +49,18 @@ export class Home extends Page {
         static id = p('Home', 'Main', 'ProjectChatInput');
     }
   }
+
+  static Bottom = class Bottom extends Slot {
+    static id = p('Home', 'Bottom');
+
+    static QuickInput = class QuickInput extends Component {
+        static id = p('Home', 'Bottom', 'QuickInput');
+    }
+  }
+
+  static PluginExpand = class PluginExpand extends Slot {
+    static id = p('Home', 'PluginExpand');
+  }
 }
 
 export class Mailbox extends Page {
@@ -68,5 +80,6 @@ export const SLOT_IDS = {
     EDITOR_SIDEBAR: Editor.Sidebar.id,
     WORK_DETAIL_BOTTOM: WorkDetail.Bottom.id,
     HOME_MAIN: Home.Main.id,
+    HOME_BOTTOM: Home.Bottom.id,
     MAILBOX_SIDEBAR: Mailbox.Sidebar.id
 };
