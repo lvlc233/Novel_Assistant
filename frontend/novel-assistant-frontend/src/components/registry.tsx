@@ -18,7 +18,12 @@ export const ComponentRegistry: Record<string, React.ComponentType<any>> = {
   // 底部快速输入框
   'BottomInput': dynamic(() => import('@/components/common/BottomInput'), {
     loading: () => <div className="w-full h-12 bg-gray-100 rounded-xl animate-pulse" />
-  })
+  }),
+  
+  // 兼容小写 Key (如果后端返回的是全小写路径)
+  'mailbutton': dynamic(() => import('@/components/mail/MailButton').then(mod => mod.MailButton)),
+  'aiassistant': dynamic(() => import('@/components/editor/AIAssistant')),
+  'bottominput': dynamic(() => import('@/components/common/BottomInput')),
   
   // 快速创建菜单入口 (如果有的话，暂时保留占位)
   // 'QuickCreateEntry': dynamic(() => import('@/components/dashboard/QuickCreateMenu').then(mod => mod.QuickCreateEntry))

@@ -14,6 +14,7 @@ import { MemoryMeta, MemoryCreateRequest } from '@/types/memory';
 import { CreateMemoryModal } from '@/components/memory/CreateMemoryModal';
 import { SlotInjector } from '@/components/common/SlotInjector';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SLOT_IDS } from '@/core/ui/schema';
 
 export default function MemoriesPage() {
   const [memories, setMemories] = useState<MemoryMeta[]>([]);
@@ -62,7 +63,7 @@ export default function MemoriesPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-       <SlotInjector slotId="header-breadcrumb">
+       <SlotInjector slotId={SLOT_IDS.HEADER_BREADCRUMB}>
           <div className="flex items-center gap-2 text-sm text-text-secondary">
             <Link href="/home" className="hover:text-text-primary">Home</Link>
             <span>/</span>

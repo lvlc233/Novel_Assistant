@@ -204,7 +204,7 @@ export const MailboxDrawer: React.FC = () => {
     };
   }, []);
 
-  const isMailEnabled = featureFlags?.mail ?? false;
+  const isMailEnabled = true; // featureFlags?.mail ?? false;
 
   if (!isMailEnabled) {
     return null;

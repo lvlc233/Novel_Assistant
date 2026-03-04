@@ -3,6 +3,7 @@ import React, { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import DocumentEditor from '@/components/editor/DocumentEditor';
 import { SlotRenderer, useSlot } from '@/contexts/SlotContext';
+import { SLOT_IDS } from '@/core/ui/schema';
 
 // Wrap content in Suspense for useSearchParams
 function EditorContent() {
@@ -14,7 +15,7 @@ function EditorContent() {
   const { getSlotItems } = useSlot();
 
   // Check if we have any assistant plugins in the sidebar slot
-  const hasSidebarPlugins = getSlotItems('editor-sidebar').length > 0;
+  const hasSidebarPlugins = getSlotItems(SLOT_IDS.EDITOR_SIDEBAR).length > 0;
 
   return (
     <div className="flex w-full h-screen bg-white overflow-hidden relative">
@@ -29,7 +30,7 @@ function EditorContent() {
           >
               <div className="w-[400px] h-full">
                   <SlotRenderer 
-                    slotId="editor-sidebar" 
+                    slotId={SLOT_IDS.EDITOR_SIDEBAR}
                     isExpanded={isAiExpanded} 
                     onToggle={() => setIsAiExpanded(!isAiExpanded)} 
                   />

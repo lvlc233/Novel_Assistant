@@ -3,6 +3,7 @@ import React from 'react';
 import { useGlobalStore } from '@/store/useGlobalStore';
 import { SlotRenderer } from '@/contexts/SlotContext';
 import { Bell } from 'lucide-react';
+import { SLOT_IDS } from '@/core/ui/schema';
 
 export function TopNav() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -16,7 +17,7 @@ export function TopNav() {
         {/* For now, relying on Sidebar's internal toggle or Global State */}
         
         {/* Breadcrumbs Slot */}
-        <SlotRenderer slotId="header-breadcrumb" className="flex items-center text-sm text-text-secondary" />
+        <SlotRenderer slotId={SLOT_IDS.HEADER_BREADCRUMB} className="flex items-center text-sm text-text-secondary" />
         
         {/* Default Title if no breadcrumb */}
         {/* <h1 className="font-serif font-bold text-lg text-text-primary">Workspace</h1> */}
@@ -25,7 +26,7 @@ export function TopNav() {
       {/* Right: Actions */}
       <div className="flex items-center gap-3">
         {/* Slot for Global Actions (e.g. Save status, Export) */}
-        <SlotRenderer slotId="header-actions" className="flex items-center gap-2 mr-2" />
+        <SlotRenderer slotId={SLOT_IDS.HEADER_ACTIONS} className="flex items-center gap-2 mr-2" />
 
         <div className="h-6 w-px bg-border-primary mx-2"></div>
 

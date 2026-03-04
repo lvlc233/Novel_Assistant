@@ -12,6 +12,7 @@ import { agentService } from '@/services/agentService';
 import { AgentMeta } from '@/types/agent';
 import { SlotInjector } from '@/components/common/SlotInjector';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SLOT_IDS } from '@/core/ui/schema';
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentMeta[]>([]);
@@ -40,7 +41,7 @@ export default function AgentsPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-       <SlotInjector slotId="header-breadcrumb">
+       <SlotInjector slotId={SLOT_IDS.HEADER_BREADCRUMB}>
           <div className="flex items-center gap-2 text-sm text-text-secondary">
             <Link href="/home" className="hover:text-text-primary">Home</Link>
             <span>/</span>

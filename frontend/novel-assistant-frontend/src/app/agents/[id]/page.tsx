@@ -15,6 +15,7 @@ import { agentService } from '@/services/agentService';
 import { AgentDetail, AgentMessage } from '@/types/agent';
 import { SlotInjector } from '@/components/common/SlotInjector';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SLOT_IDS } from '@/core/ui/schema';
 import ReactMarkdown from 'react-markdown';
 
 export default function AgentChatPage() {
@@ -140,7 +141,7 @@ export default function AgentChatPage() {
   return (
     <AppLayout>
       <div className="flex flex-col h-full bg-surface-secondary">
-       <SlotInjector slotId="header-breadcrumb">
+       <SlotInjector slotId={SLOT_IDS.HEADER_BREADCRUMB}>
           <div className="flex items-center gap-2 text-sm text-text-secondary">
             <Link href="/home" className="hover:text-text-primary">Home</Link>
             <span>/</span>

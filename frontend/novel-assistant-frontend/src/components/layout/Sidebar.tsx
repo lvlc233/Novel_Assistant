@@ -3,7 +3,6 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useGlobalStore } from '@/store/useGlobalStore';
-import { SlotRenderer } from '@/contexts/SlotContext';
 import { 
   LayoutDashboard, 
   BookOpen, 

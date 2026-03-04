@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SlotInjector } from '@/components/common/SlotInjector';
 import { SlotRenderer } from '@/contexts/SlotContext';
+import { SLOT_IDS } from '@/core/ui/schema';
 import WorkPluginSettingsModal from '@/components/work-detail/WorkPluginSettingsModal';
 import WorkSettingsModal from '@/components/work-detail/WorkSettingsModal';
 

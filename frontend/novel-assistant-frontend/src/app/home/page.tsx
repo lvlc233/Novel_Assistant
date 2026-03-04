@@ -4,8 +4,8 @@ import Dashboard from '@/components/dashboard/Dashboard';
 import BottomInput from '@/components/common/BottomInput';
 import SystemIntroduction from '@/components/dashboard/SystemIntroduction';
 import SettingsModal from '@/components/settings/SettingsModal';
-import { PluginFeatureFlags } from '@/services/pluginService';
-import { logger } from '@/lib/logger';
+import { SLOT_IDS } from '@/core/ui/schema';
+import { SlotRenderer } from '@/contexts/SlotContext';
 
 /**
  * 注释者: FrontendAgent(react)
@@ -15,36 +15,6 @@ import { logger } from '@/lib/logger';
 
 export default function HomePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
-
-  // useEffect(() => {
-  //   let isActive = true;
-  //   const loadFlags = (force = false) => {
-    //   getPluginFeatureFlags({ force })
-    //     .then((flags) => {
-    //       if (!isActive) return;
-    //       setFeatureFlags(flags);
-    //     })
-    //     .catch((error) => {
-    //       logger.error('HomePage plugin flags load failed', error);
-    //       if (!isActive) return;
-    //       setFeatureFlags({ quickInput: false, mail: false, docAssistant: false });
-    //     });
-    // };
-    // loadFlags();
-    /**
-     * 注释者: FrontendAgent(react)
-     * 时间: 2026-02-23 22:12:00
-     * 说明: 在何处使用: 首页插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新快捷输入框显示。
-     */
-    // const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
-    // return () => {
-    //   // isActive = false;
-    //   unsubscribe();
-    // };
-  // }, []);
-
-  const isQuickInputEnabled = featureFlags?.quickInput ?? false;
 
   return (
     // 整屏奶白背景，无滚动
@@ -68,13 +38,12 @@ export default function HomePage() {
           
           <div className="h-24 w-full shrink-0"></div> {/* Spacer for BottomInput */}
           
-          {isQuickInputEnabled && (
-            <BottomInput 
-              position="fixed"
-              placeholder="快速指令 / 询问 AI..."
-              onSubmit={(val) => console.log('Home Input:', val)}
-            />
-          )}
+          <SlotRenderer 
+            slotId={SLOT_IDS.HOME_MAIN}
+            position="fixed"
+            placeholder="快速指令 / 询问 AI..."
+            onSubmit={(val: string) => console.log('Home Input:', val)}
+          />
       </main>
     </div>
   );
