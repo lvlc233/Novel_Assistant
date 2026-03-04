@@ -31,7 +31,7 @@ export const ConfigRenderer: React.FC<ConfigRendererProps> = ({
                         <div className="w-2/3 pl-8 border-l border-border-primary relative py-1">
                             <div className="absolute left-0 top-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-border-primary group-hover:bg-accent-primary transition-colors ring-4 ring-white z-10" />
                             
-                            {field.value_type === 'boolean' ? (
+                            {field.valueType === 'boolean' ? (
                                 <div className="flex items-center gap-3">
                                     <button 
                                         onClick={() => onConfigChange(field.key, !configValues[field.key])}
@@ -43,7 +43,7 @@ export const ConfigRenderer: React.FC<ConfigRendererProps> = ({
                                         {configValues[field.key] ? '已开启' : '已关闭'}
                                     </span>
                                 </div>
-                            ) : field.value_type === 'textarea' ? (
+                            ) : field.valueType === 'textarea' ? (
                                 <textarea
                                     value={configValues[field.key] || ''}
                                     onChange={(e) => onConfigChange(field.key, e.target.value)}
@@ -53,7 +53,7 @@ export const ConfigRenderer: React.FC<ConfigRendererProps> = ({
                                 />
                             ) : (
                                 <input
-                                    type={field.value_type === 'password' ? 'password' : 'text'}
+                                    type={field.valueType === 'password' ? 'password' : 'text'}
                                     value={configValues[field.key] || ''}
                                     onChange={(e) => onConfigChange(field.key, e.target.value)}
                                     className="w-full bg-transparent border-b border-border-primary py-2 text-text-primary focus:outline-none focus:border-accent-primary transition-colors placeholder-text-tertiary/50"

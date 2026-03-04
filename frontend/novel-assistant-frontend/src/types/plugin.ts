@@ -36,7 +36,7 @@ export type PluginStatus = 'enabled' | 'disabled'
 //   value: string | number | boolean | null;
 // }
 
-// export type PluginConfig = { items: PluginConfigItem[] } | Record<string, unknown>;
+export type PluginConfig = Record<string, any>;
 
 // 插件配置信息(这里其实同时表示结构和数值)
 export interface ConfigField {
@@ -45,7 +45,7 @@ export interface ConfigField {
   description?: string | null; 
   valueType: string;
   value?: string | number | boolean | null;
-  // readOnly?: boolean;
+  readOnly?: boolean;
   children: ConfigField[];
 }
 

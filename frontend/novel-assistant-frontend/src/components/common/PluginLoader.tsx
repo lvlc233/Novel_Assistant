@@ -31,7 +31,7 @@ export function PluginLoader() {
           // 1. Mailbox Sidebar Injection (Request 2)
           // ----------------------------------------------------------------
           // 检查是否包含 'agent' 或 'Agent' 标签，或者是特定的 agent 插件
-          const isAgent = tags.includes('agent') || tags.includes('Agent') || pId.includes('agent') || pName.includes('项目助手') || pId === 'project_helper';
+          const isAgent = tags.includes('agent') || tags.includes('Agent') || pId.includes('agent') || pName.includes('项目助手');
           
           if (isAgent) {
              // 注入到邮箱侧边栏

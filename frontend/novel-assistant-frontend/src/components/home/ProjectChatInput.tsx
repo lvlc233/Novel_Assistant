@@ -46,19 +46,12 @@ export const ProjectChatInput: React.FC<ProjectChatInputProps> = ({
       await invokePlugin(pluginId, operationName, payload);
       
     } catch (error: any) {
-      // Don't log to console.error to avoid overlay
-      logger.warn('Failed to invoke project chat agent:', error);
-      
-      let errorMsg = error.message || '未知错误';
-      if (errorMsg.includes('missing') && errorMsg.includes('required positional arguments')) {
-          errorMsg = '插件未配置，请前往插件中心进行配置 (需设置 Model, BaseURL, API Key)';
-      }
-
+      logger.error('Failed to invoke project chat agent:', error);
       // Show user-friendly error notification
       sendNotification({
         id: Date.now().toString(),
         title: '插件调用失败',
-        content: errorMsg,
+        content: `调用 ${pluginId} 失败: ${error.message || '未知错误'}`,
         timestamp: Date.now(),
         senderId: 'system',
         isRead: false

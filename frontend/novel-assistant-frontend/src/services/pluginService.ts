@@ -1,5 +1,5 @@
 import { request } from '@/lib/request';
-import { ConfigField, Operation } from '@/types/plugin';
+import { ConfigField, Operation, PluginConfig } from '@/types/plugin';
 
 
 // Backend DTOs

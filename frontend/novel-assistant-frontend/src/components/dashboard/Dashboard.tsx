@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FileText, Settings, LayoutGrid, Sparkles, Puzzle, X, Loader2 } from 'lucide-react';
 import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
+import PluginManagerModal from './PluginManagerModal';
 import { logger } from '@/lib/logger';
 import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, PluginShopItem, subscribeToPluginChanges } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
@@ -309,6 +310,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       </div>
 
       {/* <QuickCreateMenu isOpen={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} onSelect={handleCreateSelect} /> */}
+      
+      {/* Plugin Manager Modal */}
+      {selectedPlugin && (
+        <PluginManagerModal
+          plugin={selectedPlugin}
+          onClose={() => setSelectedPlugin(null)}
+        />
+      )}
 
       {isShopOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-transparent animate-fade-in">
