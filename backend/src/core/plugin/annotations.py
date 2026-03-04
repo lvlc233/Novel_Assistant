@@ -350,14 +350,15 @@ def operation(
         if ui_target:
             if isinstance(ui_target, UIBinding):
                 # 如果是 UIBinding 实例（例如 .filter() 的结果）
-                target_path = ".".join(ui_target.path_list)
+                target_path = ui_target.generate_base_url()
                 # UIBinding 不一定能拿到 prop_schema，因为它是实例，但我们可以尝试
                 # 这里可能需要根据 path_list 反推类，或者暂且置空
                 # 如果需要属性契约，可能得要求传入类本身，或者 UIBinding 携带类引用
                 target_props = [] 
             elif hasattr(ui_target, 'get_path'):
                 # 如果是 UINode 类
-                target_path = ui_target.get_path()
+                parts = ui_target._get_hierarchy()
+                target_path = "/" + "/".join([p.lower() for p in parts])
                 target_props = ui_target.get_prop_schema()
                 
         op_info = OperationInfo(

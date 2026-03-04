@@ -1,106 +1,39 @@
-# from typing import List
-# from uuid import UUID
+from typing import List, Optional
+from uuid import UUID
 
-# import httpx
-# from pydantic import BaseModel, Field
-# from sqlalchemy import func, select
-# from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.dialects.postgresql import JSONB
-# from sqlalchemy import cast
+from core.plugin.annotations import plugin_meta, operation
+from common.enums import PluginFromTypeEnum
+from core.ui.layout import AppLayout, Mailbox
 
-# from api.routes.plugin.schema import (
-#     CardPayload, 
-#     CardItem, 
-#     Action, 
-#     ConfigPayload,
-#     ConfigField,
-#     ComponentPayload,
-#     ComponentSchema
-# )
-# from common.enums import PluginFromTypeEnum
-# from common.errors import ResourceNotFoundError
-# from core.plugin.annotations import plugin_meta, runtime_config, operation
-# from core.plugin.utils import build_plugin_id
-# from infrastructure.pg.pg_models import AgentsManagerSQLEntity, PluginSQLEntity
+@plugin_meta(
+    name="agent_manager",
+    space="official", 
+    version="0.0.1",
+    description="管理Agent的插件",
+    from_type=PluginFromTypeEnum.SYSTEM,
+    tags=["agent"]
+)
+class AgentManagerPlugin:
+    
+    @operation(
+        name="mail_entry",
+        description="邮箱入口",
+        ui_target=AppLayout.Header.Actions.filter(),
+        with_ui=["MailButton"]
+    )
+    async def mail_entry(self):
+        """邮箱入口"""
+        pass
 
-
-# class AgentPluginMeta(BaseModel):
-#     id: UUID
-#     name: str
-#     version: str
-#     description: str | None = None
-#     enabled: bool
-#     tags: List[str] = Field(default_factory=list)
-
-
-# class AgentPluginListResponse(BaseModel):
-#     total: int
-#     items: List[AgentPluginMeta] = Field(default_factory=list)
-
-
-# class AgentPluginUpdateRequest(BaseModel):
-#     plugin_id: UUID
-#     enabled: bool | None = None
-#     description: str | None = None
-#     tags: List[str] | None = None
-
-
-# class AgentPluginUpdateResponse(BaseModel):
-#     updated: bool
-#     plugin: AgentPluginMeta | None = None
-
-
-# class AgentConfigLink(BaseModel):
-#     agent_id: str
-#     url: str
-
-
-# class AgentMailMetaItem(BaseModel):
-#     key: str
-#     value: str
-
-
-# class AgentMailRequest(BaseModel):
-#     to_email: str
-#     subject: str
-#     content: str
-#     agent_id: str | None = None
-#     metadata: List[AgentMailMetaItem] = Field(default_factory=list)
-
-
-# class AgentMailResponse(BaseModel):
-#     accepted: bool
-#     status_code: int
-#     message: str | None = None
-
-
-# class AgentConversationSummary(BaseModel):
-#     agent_id: UUID
-#     session_ids: List[str] = Field(default_factory=list)
-#     session_count: int
-
-
-# class AgentConversationListResponse(BaseModel):
-#     total: int
-#     items: List[AgentConversationSummary] = Field(default_factory=list)
-
-
-
-# # Agent管理插件的作用如下：
-# # 1. 收集所有标记为[Agent]的已注册的插件,
-# # 2. 在管理插件则可以直接修改Agent的插件信息
-# # 3. 可以跳转到Agent的配置页面,进行详情查看
-# # 4. 代理发送消息到邮箱中
-# # 5. 收集所有Agent的插件的对话信息
-# @plugin_meta(
-#     name="agent_manager",
-#     space="official", 
-#     version="0.0.1",
-#     description="管理Agent的插件",
-#     from_type=PluginFromTypeEnum.SYSTEM,
-#     data_source_entry_point="get_card_view"
-# )
-# class AgentManagerPlugin:
+    # @operation(
+    #     name="agent_sidebar_item",
+    #     description="邮箱侧边栏入口",
+    #     ui_target=Mailbox.Sidebar.filter(),
+    #     with_ui=["AgentSidebarItem"]
+    # )
+    # async def agent_sidebar_item(self, name: str = "Agent Manager", role: str = "System"):
+    #     """邮箱侧边栏入口"""
+    #     pass
 
 #     @runtime_config
 #     def __init__(

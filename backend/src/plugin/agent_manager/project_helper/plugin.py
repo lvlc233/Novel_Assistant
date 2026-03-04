@@ -2,6 +2,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from common.enums import UITrigger
 from core.ui.home import Home
+from core.ui.layout import WorkDetail, Mailbox
 from common.config import settings
 from common.model.base_agent import build_agent
 from core.plugin.annotations import plugin_meta, runtime_config, operation
@@ -63,8 +64,29 @@ class ProjectHelperPlugin:
         self.checkpoint = checkpoint
         self.session = session
 
+    @operation(
+        name="quick_input_bottom",
+        description="底部快速输入",
+        ui_target=WorkDetail.Bottom.filter(),
+        with_ui=["BottomInput"]
+    )
+    async def quick_input_bottom(self):
+        """底部快速输入"""
+        pass
+
+    @operation(
+        name="agent_sidebar_item",
+        description="邮箱侧边栏入口",
+        ui_target=Mailbox.Sidebar.filter(),
+        with_ui=["AgentSidebarItem"]
+    )
+    async def agent_sidebar_item(self, name: str = "项目助手", role: str = "Writing Assistant"):
+        """邮箱侧边栏入口"""
+        pass
+
     # @operation(
     #     name="get_config",
+
     #     description="获取项目助手的配置",
     #     with_ui=[Home.PluginExpand.PluginCard.filter(name="project_helper")],
     #     ui_target=Home.PluginExpand.PluginCard.filter(name="project_helper"),

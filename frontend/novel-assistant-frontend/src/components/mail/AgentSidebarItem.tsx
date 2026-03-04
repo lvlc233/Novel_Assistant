@@ -3,23 +3,29 @@ import React from 'react';
 import { useMail } from '@/contexts/MailContext';
 
 interface AgentSidebarItemProps {
-  agentId: string;
-  name: string;
+  agentId?: string;
+  name?: string;
   avatar?: string;
   role?: string;
+  defaultPluginId?: string;
 }
 
 export const AgentSidebarItem: React.FC<AgentSidebarItemProps> = ({ 
   agentId, 
-  name, 
+  name = "Agent", 
   avatar,
-  role
+  role = "Assistant",
+  defaultPluginId
 }) => {
   const { currentFilter, setFilter, closeMailbox } = useMail();
-  const isSelected = currentFilter === agentId;
+  const id = agentId || defaultPluginId;
+  
+  if (!id) return null;
+
+  const isSelected = currentFilter === id;
 
   const handleClick = () => {
-    setFilter(agentId);
+    setFilter(id);
   };
 
   return (
@@ -36,9 +42,9 @@ export const AgentSidebarItem: React.FC<AgentSidebarItemProps> = ({
          <img src={avatar} alt={name} className="w-full h-full rounded-xl object-cover shadow-sm" />
       ) : (
          <div className={`w-full h-full rounded-xl flex items-center justify-center text-surface-white font-bold text-sm shadow-sm
-           ${agentId === 'system' ? 'bg-accent-primary' : 'bg-gray-400'}
+           ${id === 'system' ? 'bg-accent-primary' : 'bg-gray-400'}
          `}>
-           {name.substring(0, 1).toUpperCase()}
+           {name?.substring(0, 1).toUpperCase()}
          </div>
       )}
       
