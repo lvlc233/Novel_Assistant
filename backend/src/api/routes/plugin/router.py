@@ -20,6 +20,7 @@ from api.routes.plugin.schema import (
     PluginResponse,
     PluginShopMetaResponse,
     PluginUpdateRequest,
+    PluginOperation
 )
 from core.plugin.runtime import PluginInternalRegistry, PluginManager
 from infrastructure.pg.pg_client import get_session
@@ -74,11 +75,24 @@ async def get_shop_plugins(
                 id=pid,
                 name=p_def["name"],
                 # 当前版本
-                version=inst_v,
+                version=inst_v or "1.0.0",
                 latest_version=latest_v,
                 description=p_def.get("description", ""),
                 from_type=p_def["from_type"],
                 installed=db_plugin is not None,
+                operations=[
+                    PluginOperation(
+                        name=name,
+                        description=op.get("description"),
+                        input_schema=op.get("input_schema", {}),
+                        output_schema=op.get("output_schema"),
+                        with_ui=op.get("with_ui", []),
+                        ui_target=op.get("ui_target"),
+                        trigger=op.get("trigger"),
+                        is_stream=op.get("is_stream", False)
+                    )
+                    for name, op in (p_def.get("plugin_operation_schema") or {}).get("operations", {}).items()
+                ]
             )
         )
     return Response.ok(data=data)
@@ -143,7 +157,7 @@ async def update_plugin(
 
 
 """
-2026.03.06_human:
+2026.03.04_human:
 新增代理接口
 """
 
@@ -186,5 +200,4 @@ async def proxy_plugin_operation(
         return Response.ok(data=result)
     except Exception as e:
         return Response.fail(code=500, message=str(e))
-
 

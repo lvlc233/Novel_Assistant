@@ -4,7 +4,7 @@ from typing import Any, List, Dict
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
+from core.ui.base import UINode
 from common.enums import PluginFromTypeEnum, LoaderType
 
 # --- Plugin Models ---
@@ -27,16 +27,27 @@ class PluginShopMetaResponse(BaseModel):
     # 插件来源:分为系统的和非系统的,系统的总是启动且不可卸载
     from_type: PluginFromTypeEnum
     # 是否已安装
-    installed:bool
+    installed: bool
+    operations: List[PluginOperation] = Field(default_factory=list)
 
+class PluginOperation(BaseModel):
+    name: str
+    description: str | None = None
+    with_ui: List[str] = Field(default_factory=list) # 绑定的UI路径列表
+    ui_target: str | None = None # 渲染目标
+    trigger: str | None = None
+    is_stream: bool = False
+    input_schema: Dict[str, Any]
+    output_schema: Dict[str, Any] | None = None
+    
 class PluginResponse(BaseModel):
     id: UUID
     name: str
     description: str | None = None
     enabled: bool
-    data_source_type: LoaderType | None = None
-    auth_config: Dict[str, Any] | None = None
     from_type: PluginFromTypeEnum  # 插件来源类型
+    operations: List[PluginOperation]
+    config: Dict[str, Any] # 结合schema和default值
     tags: List[str] = Field(default_factory=list)
 
 class PluginUpdateRequest(BaseModel):
@@ -44,7 +55,6 @@ class PluginUpdateRequest(BaseModel):
     config: Dict[str, Any] | None = None
     data_source_type: LoaderType | None = None
     data_source_config: Dict[str, Any] | None = None
-    auth_config: Dict[str, Any] | None = None
 
 class PluginOperationInvokeRequest(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)

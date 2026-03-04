@@ -135,6 +135,10 @@ class PluginWrapper:
                 "description": info.description,
                 "input_schema": info.input_schema,
                 "output_schema": info.output_schema,
+                "with_ui": [b.generate_base_url() for b in info.with_ui],
+                "ui_target": info.ui_target,
+                "trigger": info.trigger.value if info.trigger else None,
+                "is_stream": info.is_stream,
             }
             for name, info in self.operations.items()
         }

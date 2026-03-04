@@ -33,7 +33,7 @@ async def base_error_handler(_: Request, exc: BaseError) -> JSONResponse:
     elif str(exc.code).startswith("4"): # Assuming 4xxxx codes are client errors
         status_code = 400
         
-    logger.warning(f"Business Error: {exc.message} (Code: {exc.code})")
+    logger.error(f"Business Error: {exc.message} (Code: {exc.code})")
     resp = Response[dict].fail(code=exc.code, data=exc.data, message=exc.message)
     content = jsonable_encoder(resp.model_dump(by_alias=True))
     return JSONResponse(status_code=status_code, content=content)
@@ -41,7 +41,7 @@ async def base_error_handler(_: Request, exc: BaseError) -> JSONResponse:
 
 async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
     """统一处理 HTTPException，兼容 FastAPI/Starlette 抛出的 HTTP 异常。."""
-    logger.warning(f"HTTP Exception: {exc.detail} (Status: {exc.status_code})")
+    logger.error(f"HTTP Exception: {exc.detail} (Status: {exc.status_code})")
     # 将 HTTP 状态码映射到业务失败枚举，保留原始 detail 作为消息
     resp = Response.fail(message=str(exc.detail), code=exc.status_code)
     content = jsonable_encoder(resp.model_dump(by_alias=True))

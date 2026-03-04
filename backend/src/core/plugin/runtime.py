@@ -107,7 +107,7 @@ class PluginManager:
                 name=plugin_def["name"],
                 description=plugin_def.get("description"),
                 from_type=plugin_def["from_type"].value,
-                scope_type=plugin_def["scope_type"].value,
+                # scope_type=plugin_def["scope_type"].value,
                 enabled=True,
                 version=plugin_def.get("version", "1.0.0"),
                 checksum=checksum,

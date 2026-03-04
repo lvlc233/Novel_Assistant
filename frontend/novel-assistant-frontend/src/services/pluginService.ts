@@ -1,5 +1,5 @@
 import { request } from '@/lib/request';
-import { PluginConfig, PluginInstance, StandardDataResponse } from '@/types/plugin';
+import { ConfigField, Operation } from '@/types/plugin';
 
 
 // Backend DTOs
@@ -11,12 +11,23 @@ interface PluginMetaResponse {
   enabled: boolean;
 }
 
+export interface PluginOperation {
+  name: string;
+  description?: string | null;
+  with_ui: string[];
+  ui_target?: string | null;
+  trigger?: string | null;
+  is_stream: boolean;
+  input_schema: Record<string, any>;
+  output_schema?: Record<string, any> | null;
+}
+
 interface PluginResponse extends PluginMetaResponse {
   description?: string;
-  config: PluginConfig;
+  config: ConfigField[];
   from_type: 'system' | 'custom' | 'official';
-  scope_type: 'global' | 'work' | 'document';
   tags: string[];
+  operations: PluginOperation[];
 }
 
 export interface InternalPluginItem {
@@ -25,10 +36,9 @@ export interface InternalPluginItem {
   version: string;
   description?: string | null;
   from_type: 'system' | 'custom' | 'official';
-  scope_type: 'global' | 'work' | 'document';
   loader_type: 'internal' | 'url' | 'json';
   tags: string[];
-  config_schema: Record<string, unknown>;
+  config_schema: ConfigField[];
   plugin_operation_schema: Record<string, unknown>;
 }
 
@@ -44,8 +54,7 @@ export interface PluginShopItem {
   from_type:string
   // 是否已安装
   installed: boolean;
-
-
+  operations?: PluginOperation[];
 }
 
 export interface PluginOperationInvokeResponse {
@@ -57,37 +66,78 @@ export interface PluginOperationInvokeResponse {
 /**
  * 注释者: FrontendAgent(react)
  * 时间: 2026-02-23 21:44:00
- * 说明: 在何处使用: 前端功能开关统一判断；如何使用: getPluginFeatureFlags 获取功能可用性；实现概述: 基于插件市场列表聚合核心功能的可见性状态。
+ * 说明: 已废弃
  */
-export interface PluginFeatureFlags {
-  quickInput: boolean;
-  mail: boolean;
-  docAssistant: boolean;
-}
-
-// const PLUGIN_FEATURE_FLAGS_EVENT = 'plugin-feature-flags-changed';
-
-// const FEATURE_PLUGIN_KEYS: Record<keyof PluginFeatureFlags, string[]> = {
-//   quickInput: ['project_helper', '项目助手', 'project_agent'],
-//   mail: ['agent_manager', 'Agent管理插件', '邮箱系统', 'mail'],
-//   docAssistant: ['document_helper', 'doc_agent', '文档创作助手', '文档助手']
-// };
-
-let featureFlagsCache: PluginFeatureFlags | null = null;
-let featureFlagsPromise: Promise<PluginFeatureFlags> | null = null;
+// export interface PluginFeatureFlags {}
 
 
 
 
+
+const PLUGIN_CACHE_KEY = 'plugin_shop_cache';
+let pluginCache: PluginShopItem[] | null = null;
+
+// 初始化缓存
+const initCache = () => {
+  if (typeof window === 'undefined') return;
+  const cached = localStorage.getItem(PLUGIN_CACHE_KEY);
+  if (cached) {
+    try {
+      pluginCache = JSON.parse(cached);
+    } catch (e) {
+      console.error('Failed to parse plugin cache', e);
+      localStorage.removeItem(PLUGIN_CACHE_KEY);
+    }
+  }
+};
+
+// 保存缓存
+const saveCache = (plugins: PluginShopItem[]) => {
+  pluginCache = plugins;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(PLUGIN_CACHE_KEY, JSON.stringify(plugins));
+  }
+};
 
 /**
- * 获取插件市场列表
+ * 获取插件市场列表 (支持缓存)
  * 注释者: FrontendAgent(react)
- * 时间: 2026-02-18 20:20
- * 说明: 在仪表盘插件市场弹窗中使用，获取插件注册状态与版本差异信息。
+ * 时间: 2026-03-04
+ * 说明: 优先读取内存/本地缓存，若无缓存或强制刷新则请求后端。
  */
-export async function getPluginsFromShop(): Promise<PluginShopItem[]> {
-  return request.get<PluginShopItem[]>('/plugin/shop');
+export async function getPluginsFromShop(forceRefresh = false): Promise<PluginShopItem[]> {
+  // 1. 如果不是强制刷新，且有缓存，直接返回缓存
+  if (!forceRefresh) {
+    if (!pluginCache) initCache();
+    if (pluginCache && pluginCache.length > 0) {
+      return pluginCache;
+    }
+  }
+
+  // 2. 请求后端
+  const plugins = await request.get<PluginShopItem[]>('/plugin/shop');
+  
+  // 3. 更新缓存
+  updateCacheAndNotify(plugins);
+  
+  return plugins;
+}
+
+/**
+ * 搜索已缓存的插件
+ */
+export function searchCachedPlugins(query: string): PluginShopItem[] {
+  if (!pluginCache) initCache();
+  if (!pluginCache) return [];
+  
+  const lowerQuery = query.toLowerCase().trim();
+  if (!lowerQuery) return pluginCache;
+
+  return pluginCache.filter(p => 
+    p.name.toLowerCase().includes(lowerQuery) || 
+    p.description?.toLowerCase().includes(lowerQuery) ||
+    p.from_type?.toLowerCase().includes(lowerQuery)
+  );
 }
 
 /**
@@ -98,8 +148,8 @@ export async function getPluginsFromShop(): Promise<PluginShopItem[]> {
  */
 export async function registerShopPlugin(pluginId: string): Promise<string> {
   await request.post(`/plugin/shop/${pluginId}/register`);
-  // invalidatePluginFeatureFlags();
-  // notifyPluginFeatureFlagsChanged();
+  // 注册成功后，强制刷新一次缓存以获取最新状态
+  await getPluginsFromShop(true);
   return pluginId;
 }
 
@@ -110,9 +160,11 @@ export async function registerShopPlugin(pluginId: string): Promise<string> {
  * 说明: 在插件市场卡片点击“移除”时调用，删除后端注册记录。
  */
 export async function unregisterShopPlugin(pluginId: string): Promise<string> {
+  console.log(pluginId)
   await request.post(`/plugin/shop/${pluginId}/unregister`);
-  // invalidatePluginFeatureFlags();
-  // notifyPluginFeatureFlagsChanged();
+  console.log("执行删除后")
+  // 移除成功后，强制刷新一次缓存以获取最新状态
+  await getPluginsFromShop(true);
   return pluginId;
 }
 /**
@@ -156,62 +208,25 @@ export async function invokePlugin(
   });
 }
 
-// 常量申明
+// 事件总线: 插件变更通知
+const PLUGIN_CHANGED_EVENT = 'plugin-changed';
 
-const normalizePluginKey = (value: string) => value.trim().toLowerCase();
-
-const matchPluginKey = (plugin: PluginShopItem, keys: string[]) => {
-  const pluginId = normalizePluginKey(plugin.id);
-  const pluginName = normalizePluginKey(plugin.name);
-  return keys.some((key) => {
-    const normalizedKey = normalizePluginKey(key);
-    return normalizedKey === pluginId || normalizedKey === pluginName;
-  });
+export const notifyPluginChanged = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(PLUGIN_CHANGED_EVENT));
+  }
 };
 
-// const resolveFeatureEnabled = (plugins: PluginShopItem[], keys: string[]) => {
-//   return plugins.some((plugin) => matchPluginKey(plugin, keys) && plugin.installed && plugin.enabled);
-// };
+export const subscribeToPluginChanges = (callback: () => void) => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener(PLUGIN_CHANGED_EVENT, callback);
+    return () => window.removeEventListener(PLUGIN_CHANGED_EVENT, callback);
+  }
+  return () => {};
+};
 
-/**
- * 注释者: FrontendAgent(react)
- * 时间: 2026-02-23 22:12:00
- * 说明: 在何处使用: 插件状态自动刷新；如何使用: 订阅事件并强制重新拉取；实现概述: 提供缓存失效与变更事件，支持 UI 即时刷新。
- */
-// export const invalidatePluginFeatureFlags = () => {
-//   featureFlagsCache = null;
-// };
-
-// export const notifyPluginFeatureFlagsChanged = () => {
-//   if (typeof window === 'undefined') return;
-//   window.dispatchEvent(new CustomEvent(PLUGIN_FEATURE_FLAGS_EVENT));
-// };
-
-// export const subscribePluginFeatureFlagsChanged = (listener: () => void) => {
-//   if (typeof window === 'undefined') return () => {};
-//   window.addEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
-//   return () => window.removeEventListener(PLUGIN_FEATURE_FLAGS_EVENT, listener);
-// };
-
-// export async function getPluginFeatureFlags(options?: { force?: boolean }): Promise<PluginFeatureFlags> {
-//   if (!options?.force && featureFlagsCache) {
-//     return featureFlagsCache;
-//   }
-//   if (!options?.force && featureFlagsPromise) {
-//     return featureFlagsPromise;
-//   }
-//   featureFlagsPromise = getShopPlugins()
-//     .then((plugins) => {
-//       const flags: PluginFeatureFlags = {
-//         quickInput: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.quickInput),
-//         mail: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.mail),
-//         docAssistant: resolveFeatureEnabled(plugins, FEATURE_PLUGIN_KEYS.docAssistant)
-//       };
-//       featureFlagsCache = flags;
-//       return flags;
-//     })
-//     .finally(() => {
-//       featureFlagsPromise = null;
-//     });
-//   return featureFlagsPromise;
-// }
+// 辅助函数: 保存缓存并通知变更
+const updateCacheAndNotify = (plugins: PluginShopItem[]) => {
+    saveCache(plugins);
+    notifyPluginChanged();
+};

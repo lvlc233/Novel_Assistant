@@ -11,7 +11,7 @@
  * - 'system': 系统内置插件，通常不可卸载，提供核心功能
  * - 'user': 用户自定义或第三方安装的插件
  */
-export type PluginType = 'system' | 'user';
+export type PluginFromType = 'system' | 'office' | 'custom';
 
 /**
  * 插件状态
@@ -22,132 +22,123 @@ export type PluginType = 'system' | 'user';
 export type PluginStatus = 'enabled' | 'disabled' 
 
 
-export interface ComponentSchema {
-  type: string;
-  props: Record<string, any>;
-  children?: ComponentSchema[];
-}
-
-export interface ComponentPayload {
-  root: ComponentSchema;
-}
-
-
 /**
  * 标准数据项
  * 用于插件数据的统一渲染
  */
-export interface KeyValueItem {
-  key: string;
-  value: string | number | boolean | null;
-}
+// export interface KeyValueItem {
+//   key: string;
+//   value: string | number | boolean | null;
+// }
 
-export interface PluginConfigItem {
-  key: string;
-  value: string | number | boolean | null;
-}
+// export interface PluginConfigItem {
+//   key: string;
+//   value: string | number | boolean | null;
+// }
 
-export type PluginConfig = { items: PluginConfigItem[] } | Record<string, unknown>;
+// export type PluginConfig = { items: PluginConfigItem[] } | Record<string, unknown>;
 
+// 插件配置信息(这里其实同时表示结构和数值)
 export interface ConfigField {
   key: string;
-  label?: string | null;
-  description?: string | null;
-  value_type: string;
-  value: string | number | boolean | null;
-  readOnly?: boolean;
+  label?: string | null;//对应defalut
+  description?: string | null; 
+  valueType: string;
+  value?: string | number | boolean | null;
+  // readOnly?: boolean;
   children: ConfigField[];
 }
 
-export interface ConfigPayload {
-  fields: ConfigField[];
-  actions?: Record<string, Action>;
+
+export interface InvokeURL{
+  // 组件的内部属性
+  internalComponentProperties?:Map<string,number|string|boolean>
+  // 基础路径
+  baseURL:string
 }
 
-export interface AgentSession {
-  session_id: string;
-  title?: string | null;
-  source?: string | null;
-  created_at?: string | null;
-  token_usage?: number | null;
+//插件操作信息 
+export interface Operation {
+  // 操作名称
+  name:string
+  description?: string | null;
+  // 绑定的UI组件
+  with_ui: string[];
+  // 调度操作后执行的组件
+  ui_target?: string | null;
+  // 调度使用的预制`url`(伪)
+  invokeURL?:InvokeURL;
+  // 输入的参数
+  input_schema: Record<string, any>;
+  // 触发方式
+  trigger?:  string;
+  is_stream: boolean;
+  output_schema?: Record<string, any> | null;
+
 }
 
-export interface AgentMessagesPayload {
-  sessions: AgentSession[];
-}
 
-export interface Action {
-  type: 'invoke_operation' | 'link' | 'router';
-  operation?: string;
-  url?: string;
-  params?: Record<string, any>;
-  label?: string;
-  danger?: boolean;
-  confirm?: string;
-}
+// export interface AgentSession {
+//   session_id: string;
+//   title?: string | null;
+//   source?: string | null;
+//   created_at?: string | null;
+//   token_usage?: number | null;
+// }
 
-export interface CardItem {
-  id: string;
-  title: string;
-  summary?: string | null;
-  tags: string[];
-  parent_id?: string | null;
-  actions?: Record<string, Action | Action[]>;
-}
 
-export interface CardPayload {
-  cards: CardItem[];
-}
+// export interface Action {
+//   type: 'invoke_operation' | 'link' | 'router';
+//   operation?: string;
+//   url?: string;
+//   params?: Record<string, any>;
+//   label?: string;
+//   danger?: boolean;
+//   confirm?: string;
+// }
 
-export interface ListItem {
-  id: string;
-  title: string;
-  subtitle?: string | null;
-  content?: string | null;
-  tags: string[];
-  metadata: KeyValueItem[];
-}
+// export interface CardItem {
+//   id: string;
+//   title: string;
+//   summary?: string | null;
+//   tags: string[];
+//   parent_id?: string | null;
+//   actions?: Record<string, Action | Action[]>;
+// }
 
-export interface ListPayload {
-  items: ListItem[];
-}
 
-export interface DetailItem {
-  id: string;
-  title: string;
-  content?: string | null;
-  fields: KeyValueItem[];
-}
+// export interface ListItem {
+//   id: string;
+//   title: string;
+//   subtitle?: string | null;
+//   content?: string | null;
+//   tags: string[];
+//   metadata: KeyValueItem[];
+// }
 
-export interface DetailPayload {
-  detail: DetailItem;
-}
 
-export interface DashboardWidget {
-  id: string;
-  title: string;
-  value: string | number | boolean | null;
-  unit?: string | null;
-  tags: string[];
-}
+// export interface DetailItem {
+//   id: string;
+//   title: string;
+//   content?: string | null;
+//   fields: KeyValueItem[];
+// }
 
-export interface DashboardPayload {
-  widgets: DashboardWidget[];
-}
 
-export type RenderPayload =
-  | ConfigPayload
-  | AgentMessagesPayload
-  | CardPayload
-  | ListPayload
-  | DetailPayload
-  | DashboardPayload
-  | ComponentPayload;
+// export interface DashboardWidget {
+//   id: string;
+//   title: string;
+//   value: string | number | boolean | null;
+//   unit?: string | null;
+//   tags: string[];
+// }
 
-export interface StandardDataResponse {
-  plugin_id: string;
-  total?: number;
-}
+
+
+// export interface StandardDataResponse {
+//   plugin_id: string;
+//   total?: number;
+// }
 
 /**
  * 插件清单 (Manifest)
@@ -204,26 +195,32 @@ export interface PluginManifest {
  * 表示一个已安装并可能带有特定配置的插件实体
  */
 export interface PluginInstance {
-  /** 实例 ID (通常与 Manifest ID 相同，除非支持多实例) */
+  /** 插件ID */
   id: string;
-  // /** 关联的插件信息清单 */
-  // manifest: PluginManifest;
-  /** 当前运行状态 */
+  /** 插件名 */
+  name: string;
+  /** 插件描述 */
+  description?: string;
+  /** 插件状态 */
   status: PluginStatus;
-  /** 
-   * 插件配置数据 
-   * 键值对形式，具体结构由插件自身定义
-   */
-  config: PluginConfig;
+  /** 插件来源 */
+  fromType: PluginFromType;
+  /** 插件配置 */
+  config: ConfigField[];
+  /** 插件的操作(扩展点) **/
+  operations: Operation[];
+  
+  installedAt?: string; // 临时补充,后续删除
+  manifest?: any; // 临时补充,后续删除
 }
 
-/**
- * 插件注册表项
- * 用于插件市场或已安装列表的展示
- */
-export interface PluginRegistryItem {
-  /** 插件清单信息 */
-  manifest: PluginManifest;
-  /** 当前环境是否已安装该插件 */
-  isInstalled: boolean;
-}
+// /**
+//  * 插件注册表项
+//  * 用于插件市场或已安装列表的展示
+//  */
+// export interface PluginRegistryItem {
+//   /** 插件清单信息 */
+//   manifest: PluginManifest;
+//   /** 当前环境是否已安装该插件 */
+//   isInstalled: boolean;
+// }

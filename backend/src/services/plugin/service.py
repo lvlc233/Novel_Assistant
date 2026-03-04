@@ -12,6 +12,7 @@ from api.routes.plugin.schema import (
     PluginMetaResponse,
     PluginOperationInvokeResponse,
     PluginResponse,
+    PluginOperation,
     PluginUpdateRequest,
 )
 from common.enums import LoaderType, PluginFromTypeEnum
@@ -58,12 +59,22 @@ class PluginService:
                 name=plugin.name,
                 description=plugin.description,
                 enabled=plugin.enabled,
-                config=plugin.default_config, # self._to_plugin_config(plugin.default_config),
-                data_source_type=LoaderType(plugin.data_source_type) if plugin.data_source_type else None,
-                data_source_config=plugin.data_source_config, # self._to_data_source_config(plugin),
-                auth_config=plugin.auth_config, # self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
+                config=plugin.default_config or {},
                 from_type=PluginFromTypeEnum(plugin.from_type),
-                tags=plugin.tags
+                tags=plugin.tags or [],
+                operations=[
+                    PluginOperation(
+                        name=name,
+                        description=op.get("description"),
+                        input_schema=op.get("input_schema", {}),
+                        output_schema=op.get("output_schema"),
+                        with_ui=op.get("with_ui", []),
+                        ui_target=op.get("ui_target"),
+                        trigger=op.get("trigger"),
+                        is_stream=op.get("is_stream", False)
+                    )
+                    for name, op in (plugin.plugin_operation_schema or {}).get("operations", {}).items()
+                ]
             ) for plugin in plugins
         ]
 
@@ -103,13 +114,22 @@ class PluginService:
             name=plugin.name,
             description=plugin.description,
             enabled=plugin.enabled,
-            config=plugin.default_config, # self._to_plugin_config(plugin.default_config),
-            data_source_type=LoaderType(plugin.data_source_type) if plugin.data_source_type else None,
-            data_source_config=plugin.data_source_config, # self._to_data_source_config(plugin),
-            auth_config=plugin.auth_config, # self._to_plugin_config(plugin.auth_config) if plugin.auth_config else None,
+            config=plugin.default_config or {},
             from_type=PluginFromTypeEnum(plugin.from_type),
-
-            tags=plugin.tags
+            tags=plugin.tags or [],
+            operations=[
+                PluginOperation(
+                    name=name,
+                    description=op.get("description"),
+                    input_schema=op.get("input_schema", {}),
+                    output_schema=op.get("output_schema"),
+                    with_ui=op.get("with_ui", []),
+                    ui_target=op.get("ui_target"),
+                    trigger=op.get("trigger"),
+                    is_stream=op.get("is_stream", False)
+                )
+                for name, op in (plugin.plugin_operation_schema or {}).get("operations", {}).items()
+            ]
         )
 
     async def update_plugin(self, plugin_id: UUID, request: PluginUpdateRequest) -> None:

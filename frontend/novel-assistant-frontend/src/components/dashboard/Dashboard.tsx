@@ -48,19 +48,50 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
 
 
 
+  const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
+      // 临时映射,后续应该直接使用 PluginInstance
+      return {
+          id: item.id,
+          name: item.name,
+          description: item.description || '',
+          status: item.installed ? 'enabled' : 'disabled',
+          fromType: item.from_type as any, // 临时类型断言
+          config: [],
+          operations: (item.operations || []).map(op => ({
+              ...op,
+              inputParams: new Map(Object.entries(op.input_schema)), // 临时兼容 Map
+          })) as any, // 临时断言，后续更新 Operation 类型定义
+          
+          // 兼容旧字段
+          installedAt: new Date().toISOString(),
+          manifest: {
+              id: item.id,
+              name: item.name,
+              version: item.version,
+              description: item.description || '',
+              from_type: item.from_type,
+          }
+      };
+  };
+
   const fetchRegistedPlugins = async () => {
       try {
           setIsLoadingPlugins(true);
-          // TODO: 这里以后或许可以改为,项目启动的时候就搜索市场信息,然后进行一次加载,或者本地化?也行?后面再说吧
+          // 使用带缓存的方法获取插件列表
           const pluginsFromShop = await getPluginsFromShop();
+          // 过滤出已安装的插件
           const installedPlugins = pluginsFromShop.filter((plugin) => plugin.installed);
-          // setPlugins(installedPlugins.map(mapShopItemToPlugin));
+          setPlugins(installedPlugins.map(mapShopItemToPlugin));
       } catch (error) {
           logger.error('Failed to fetch plugins:', error);
       } finally {
           setIsLoadingPlugins(false);
       }
   };
+
+  useEffect(() => {
+    fetchRegistedPlugins();
+  }, []);
 
   const fetchShopPlugins = async () => {
       try {
@@ -124,22 +155,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const handlePluginClick = () => {
     const nextState = !isPluginsExpanded;
     setIsPluginsExpanded(nextState);
-    if (nextState && plugins.length === 0) {
-        // fetchPlugins();
-    }
   };
 
-  // useEffect(() => {
-  //     const unsubscribe = subscribePluginFeatureFlagsChanged(() => {
-  //         if (isPluginsExpanded) {
-  //             fetchPlugins();
-  //         }
-  //     });
-  //     return () => {
-  //         unsubscribe();
-  //     };
-  // }, [isPluginsExpanded]);
-  
+  const handlePluginCardClick = (plugin: PluginInstance) => {
+      logger.debug('Dashboard handlePluginCardClick:', plugin);
+      setSelectedPlugin(plugin);
+      // TODO: 打开插件详情或配置
+  };
 
   // Horizontal scroll wheel handler
   const handleWheel = (e: React.WheelEvent) => {
@@ -242,23 +264,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                         className="flex-1 overflow-x-auto overflow-y-hidden flex items-center px-8 gap-8 scrollbar-hide cursor-grab active:cursor-grabbing snap-x"
                     >
                          {/* Plugin Cards */}
-                         {plugins.map((plugin) => {
-                            //  const systemMap = SYSTEM_PLUGIN_MAP[plugin.manifest.name] || SYSTEM_PLUGIN_MAP[plugin.id];
-                            //  const icon = systemMap ? systemMap.icon : <Puzzle />;
-                             
-                             return (
-                                 <div key={plugin.id} className="snap-center shrink-0 py-4">
-                                    {/* <FeatureCard
-                                        title={plugin.manifest.name}
-                                        // icon={icon}
-                                        color="bg-white"
-                                        // Remove rotation to fix rendering issues and improve clarity
-                                        rotation="rotate-0"
-                                        onClick={() => handlePluginCardClick(plugin)}
-                                    /> */}
-                                 </div>
-                             );
-                         })}
+                         {plugins.map((plugin) => (
+                             <div key={plugin.id} className="snap-center shrink-0 py-4">
+                                <FeatureCard
+                                    title={plugin.manifest.name}
+                                    icon={<Puzzle className="w-8 h-8 text-accent-primary" />}
+                                    color="bg-white"
+                                    rotation="rotate-0"
+                                    onClick={() => handlePluginCardClick(plugin)}
+                                />
+                             </div>
+                         ))}
                          
                          {plugins.length === 0 && !isLoadingPlugins && (
                              <div className="flex items-center justify-center w-full text-text-secondary">
