@@ -84,6 +84,16 @@ class ProjectHelperPlugin:
         """邮箱侧边栏入口"""
         pass
 
+    @operation(
+        name="chat_input",
+        description="项目助手输入框",
+        ui_target=Home.Main.filter(),
+        with_ui=["ProjectChatInput"]
+    )
+    async def chat_input(self):
+        """项目助手输入框"""
+        pass
+
     # @operation(
     #     name="get_config",
 
