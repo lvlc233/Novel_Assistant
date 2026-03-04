@@ -9,7 +9,7 @@ import QuickCreateMenu from './QuickCreateMenu';
 // import PluginManagerModal from './PluginManagerModal'; // Replaced by PluginSettingsModal
 import PluginSettingsModal from '../plugins/PluginSettingsModal';
 import { logger } from '@/lib/logger';
-import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, subscribeToPluginChanges, refreshPlugins, updatePlugin } from '@/services/pluginService';
+import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, subscribeToPluginChanges, refreshPlugins, updatePlugin, mapShopItemToPlugin } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 import { RefreshCw } from 'lucide-react';
 import { SLOT_IDS } from '@/core/ui/schema';
@@ -53,32 +53,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   }, [isShopOpen]);
 
 
-
-  const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
-      // 临时映射,后续应该直接使用 PluginInstance
-      return {
-          id: item.id,
-          name: item.name,
-          description: item.description || '',
-          status: item.installed ? 'enabled' : 'disabled',
-          fromType: item.from_type as any, // 临时类型断言
-          config: [],
-          operations: (item.operations || []).map(op => ({
-              ...op,
-              inputParams: new Map(Object.entries(op.input_schema)), // 临时兼容 Map
-          })) as any, // 临时断言，后续更新 Operation 类型定义
-          
-          // 兼容旧字段
-          installedAt: new Date().toISOString(),
-          manifest: {
-              id: item.id,
-              name: item.name,
-              version: item.version,
-              description: item.description || '',
-              from_type: item.from_type,
-          }
-      };
-  };
 
   const fetchRegistedPlugins = async () => {
       try {

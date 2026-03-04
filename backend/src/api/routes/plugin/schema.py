@@ -28,6 +28,8 @@ class PluginShopMetaResponse(BaseModel):
     from_type: PluginFromTypeEnum
     # 是否已安装
     installed: bool
+    config_schema: Dict[str, Any] = Field(default_factory=dict)
+    config: Dict[str, Any] = Field(default_factory=dict)
     operations: List[PluginOperation] = Field(default_factory=list)
 
 class PluginOperation(BaseModel):

@@ -80,6 +80,8 @@ async def get_shop_plugins(
                 description=p_def.get("description", ""),
                 from_type=p_def["from_type"],
                 installed=db_plugin is not None,
+                config_schema=db_plugin.runtime_config if db_plugin else p_def.get("config_schema", {}),
+                config=db_plugin.default_config if db_plugin else {},
                 operations=[
                     PluginOperation(
                         name=name,

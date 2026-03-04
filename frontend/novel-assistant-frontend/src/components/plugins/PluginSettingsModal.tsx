@@ -29,14 +29,16 @@ interface PluginSettingsModalProps {
 }
 
 export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }: PluginSettingsModalProps) {
+  console.log('PluginSettingsModal: Received plugin:', plugin);
   const [configValues, setConfigValues] = useState<Record<string, any>>(plugin.config || {});
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   
   // Convert configSchema to ConfigField[] for ConfigRenderer
   const configFields: ConfigField[] = useMemo(() => {
+    console.log('PluginSettingsModal: configSchema source:', plugin.configSchema, (plugin as any).config_schema);
     const schema = plugin.configSchema || (plugin as any).config_schema;
     if (!schema) return [];
-    return Object.entries(schema).map(([key, schema]: [string, any]) => ({
+    const fields = Object.entries(schema).map(([key, schema]: [string, any]) => ({
         key,
         label: schema.title || key,
         description: schema.description,
@@ -46,6 +48,8 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
         readOnly: false,
         children: []
     }));
+    console.log('PluginSettingsModal: Computed fields:', fields);
+    return fields;
   }, [plugin.configSchema, (plugin as any).config_schema]);
 
   const [data, setData] = useState<any | null>(null);
@@ -84,7 +88,7 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
     
     // Simplified data fetching logic for now
     const fetchData = isAgentManager
-      ? invokePlugin(plugin.id, 'list_agent_plugins', new Map([['limit', 50], ['offset', 0]]))
+      ? invokePlugin(plugin.id, 'get_agent_info_in_card', new Map())
       : isProjectHelper 
         ? invokePlugin(plugin.id, 'get_project_sessions', new Map())
         : isDocumentHelper
@@ -94,9 +98,30 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
     fetchData
       .then((response) => {
         if (active) {
-            setData(response);
-            if (response && typeof response === 'object' && 'ui_target' in response) {
-                setUiTarget(response.ui_target);
+            // FrontendAgent 2026-03-05: Map info_type to ui_target and unwrap data payload
+            
+            // 1. Determine UI Target
+            // Prioritize payload.ui_target/info_type as per new backend structure
+            const payload = response?.payload;
+            const uiTarget = payload?.ui_target || payload?.info_type || response?.ui_target || response?.info_type;
+            
+            if (uiTarget) {
+                setUiTarget(uiTarget);
+            }
+
+            // 2. Set Data Payload
+            // The component expects the inner data object
+            if (payload?.data) {
+                setData(payload.data);
+            } else if (payload) {
+                // Fallback: use payload itself if data property is missing
+                setData(payload);
+            } else if (response?.data) {
+                 // Old format fallback
+                setData(response.data);
+            } else {
+                 // Raw response fallback
+                setData(response);
             }
         }
       })
@@ -201,7 +226,7 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
                      ) : data ? (
                         uiTarget ? (
                            <div className="animate-in fade-in zoom-in-95 duration-300">
-                              <SDUIRenderer ui_target={uiTarget} props={data.payload || data} />
+                              <SDUIRenderer ui_target={uiTarget} props={data} />
                            </div>
                         ) : (
                            // Fallback when uiTarget is missing but data exists

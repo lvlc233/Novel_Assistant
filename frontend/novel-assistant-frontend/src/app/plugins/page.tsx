@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { getPluginsFromShop, PluginShopItem, togglePluginStatus, unregisterShopPlugin} from '@/services/pluginService';
+import { getPluginsFromShop, PluginShopItem, togglePluginStatus, unregisterShopPlugin, mapShopItemToPlugin } from '@/services/pluginService';
 import { PluginConfig, PluginInstance } from '@/types/plugin';
 import { logger } from '@/lib/logger';
 import { Power, Trash2, Settings, Puzzle } from 'lucide-react';
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import PluginSettingsModal from '@/components/plugins/PluginSettingsModal';
 
 export default function PluginsPage() {
-  const [plugins, setPlugins] = useState<PluginShopItem[]>([]);
+  const [plugins, setPlugins] = useState<PluginInstance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   
@@ -25,7 +25,11 @@ export default function PluginsPage() {
     try {
       setIsLoading(true);
       const data = await getPluginsFromShop();
-      setPlugins(data);
+      console.log('PluginsPage: Raw data from shop:', data);
+      // Filter only installed plugins and map them to PluginInstance
+      const installedPlugins = data.filter(p => p.installed).map(mapShopItemToPlugin);
+      console.log('PluginsPage: Mapped installed plugins:', installedPlugins);
+      setPlugins(installedPlugins);
     } catch (err) {
       logger.error('Failed to load plugins', err);
     } finally {
@@ -52,7 +56,7 @@ export default function PluginsPage() {
       if (!confirm('Are you sure you want to uninstall this plugin?')) return;
       try {
           setProcessingId(id);
-          await uninstallPlugin(id);
+          await unregisterShopPlugin(id);
           setPlugins(prev => prev.filter(p => p.id !== id));
           logger.info(`Plugin ${id} uninstalled`);
       } catch (err) {

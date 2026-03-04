@@ -1,5 +1,5 @@
 import { request } from '@/lib/request';
-import { ConfigField, Operation, PluginConfig } from '@/types/plugin';
+import { ConfigField, Operation, PluginConfig, PluginInstance } from '@/types/plugin';
 
 
 // Backend DTOs
@@ -56,7 +56,41 @@ export interface PluginShopItem {
   // 是否已安装
   installed: boolean;
   operations?: PluginOperation[];
+  config_schema?: Record<string, any>;
 }
+
+/**
+ * 将商店插件项映射为插件实例
+ * 注释者: FrontendAgent(react)
+ * 时间: 2026-03-05
+ * 说明: 用于统一插件数据结构转换
+ */
+export const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
+    // 临时映射,后续应该直接使用 PluginInstance
+    return {
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        status: item.installed ? 'enabled' : 'disabled',
+        fromType: item.from_type as any, // 临时类型断言
+        config: [],
+        configSchema: item.config_schema,
+        operations: (item.operations || []).map(op => ({
+            ...op,
+            inputParams: new Map(Object.entries(op.input_schema)), // 临时兼容 Map
+        })) as any, // 临时断言，后续更新 Operation 类型定义
+        
+        // 兼容旧字段
+        installedAt: new Date().toISOString(),
+        manifest: {
+            id: item.id,
+            name: item.name,
+            version: item.version,
+            description: item.description || '',
+            from_type: item.from_type,
+        }
+    };
+};
 
 export interface PluginOperationInvokeResponse {
   plugin_id: string;
@@ -111,12 +145,15 @@ export async function getPluginsFromShop(forceRefresh = false): Promise<PluginSh
   if (!forceRefresh) {
     if (!pluginCache) initCache();
     if (pluginCache && pluginCache.length > 0) {
+      console.log('getPluginsFromShop: Returning cached plugins', pluginCache);
       return pluginCache;
     }
   }
 
   // 2. 请求后端
+  console.log('getPluginsFromShop: Fetching from backend...');
   const plugins = await request.get<PluginShopItem[]>('/plugin/shop');
+  console.log('getPluginsFromShop: Fetched plugins:', plugins);
   
   // 3. 更新缓存
   updateCacheAndNotify(plugins);

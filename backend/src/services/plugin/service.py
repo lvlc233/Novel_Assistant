@@ -60,6 +60,7 @@ class PluginService:
                 description=plugin.description,
                 enabled=plugin.enabled,
                 config=plugin.default_config or {},
+                config_schema=plugin.runtime_config or {},
                 from_type=PluginFromTypeEnum(plugin.from_type),
                 tags=plugin.tags or [],
                 operations=[
