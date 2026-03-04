@@ -207,6 +207,14 @@ export async function invokePlugin(
   return request.post<any>(`/plugin/proxy/${pluginId}/${operationName}`, bodyObj);
 }
 
+export async function invokePluginOperation(
+  pluginId: string,
+  operationName: string,
+  params: Record<string, any>
+): Promise<PluginOperationInvokeResponse> {
+  return request.post<any>(`/plugin/proxy/${pluginId}/${operationName}`, params);
+}
+
 // 事件总线: 插件变更通知
 const PLUGIN_CHANGED_EVENT = 'plugin-changed';
 
@@ -223,6 +231,13 @@ export const subscribeToPluginChanges = (callback: () => void) => {
   }
   return () => {};
 };
+
+// 刷新插件列表
+export async function refreshPlugins(): Promise<PluginShopItem[]> {
+  const plugins = await request.post<PluginShopItem[]>('/plugin/refresh');
+  updateCacheAndNotify(plugins);
+  return plugins;
+}
 
 // 辅助函数: 保存缓存并通知变更
 const updateCacheAndNotify = (plugins: PluginShopItem[]) => {

@@ -1,10 +1,7 @@
 
 # 示例：前端系统定义的结构（通常放在一个 shared_ui.py 中）
-from ast import List
-from os import name
-from typing import TypedDict
+from typing import TypedDict, List
 
-from alembic.command import history
 from core.ui.base import Component, Page, Slot
 
 
@@ -34,6 +31,8 @@ registed={
 }
 
 class Home(Page):
+    class Main(Slot):
+        pass
     # 仪表盘的第三个卡片
     class PluginExpand(Slot):
         # 中的插件的卡片信息
@@ -55,7 +54,7 @@ class Home(Page):
     class EmailBox(Slot):
         # Agent块
         class AgentBox(Component):
-            def __init__(self, agent_name: str): pass
+            def __init__(self, agent_name: str, on_email: bool, history: List[AgentMessageHistoryItem]): pass
     
 
 

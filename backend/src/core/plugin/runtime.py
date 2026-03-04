@@ -162,6 +162,8 @@ class PluginDiscoveryError(Exception):
     """插件发现错误"""
     pass
 
+_global_registry = None
+
 class PluginInternalRegistry(BaseModel):
     """插件内部注册器
 
@@ -175,6 +177,16 @@ class PluginInternalRegistry(BaseModel):
     """
     plugins: List[PluginDefinition] = []
     _plugin_wrappers: Dict[UUID, "PluginWrapper"] = PrivateAttr(default_factory=dict)
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        global _global_registry
+        _global_registry = self
+
+    @classmethod
+    def get_global(cls) -> Optional["PluginInternalRegistry"]:
+        return _global_registry
+
     def get_plugin_list(self) -> List[PluginDefinition]:
         """获取所有内部插件"""
         return self.plugins
@@ -203,11 +215,9 @@ class PluginInternalRegistry(BaseModel):
                         plugin_def = self._parse_plugin_file(plugin_file)
                         if plugin_def:
                             plugins.append(plugin_def)
-                            # 如果找到了 plugin.py，通常不需要再扫描子目录，除非是 monorepo 结构
-                            # 这里假设每个目录只包含一个主插件，或者子目录是独立的
-                            # 但为了支持嵌套结构，我们继续递归，但需要注意避免重复
-                            pass
-
+                            # 即使找到了 plugin.py，也继续扫描子目录，以支持嵌套插件结构
+                            # 例如 agent_manager 包含 project_helper 等子插件
+                    
                     # 无论是否找到 plugin.py，都继续扫描子目录
                     # 因为可能存在 src/plugin/group/plugin_a/plugin.py 的结构
                     subplugins = self.discover_plugins(item.path)

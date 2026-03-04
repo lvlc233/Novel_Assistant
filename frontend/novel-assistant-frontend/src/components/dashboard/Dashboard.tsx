@@ -8,10 +8,9 @@ import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
 import PluginManagerModal from './PluginManagerModal';
 import { logger } from '@/lib/logger';
-import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, PluginShopItem, subscribeToPluginChanges } from '@/services/pluginService';
+import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, subscribeToPluginChanges, refreshPlugins } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
-
-
+import { RefreshCw } from 'lucide-react';
 import { SLOT_IDS } from '@/core/ui/schema';
 import { SlotRenderer } from '@/contexts/SlotContext';
 
@@ -133,6 +132,20 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       if (shopPlugins.length === 0) {
         // 获取市场的插件
           fetchShopPlugins();
+      }
+  };
+
+  const handleRefreshShop = async () => {
+      try {
+          setIsLoadingShop(true);
+          setShopError(null);
+          const plugins = await refreshPlugins();
+          setShopPlugins(plugins);
+      } catch (error) {
+          logger.error('Failed to refresh shop plugins:', error);
+          setShopError('刷新失败，请重试');
+      } finally {
+          setIsLoadingShop(false);
       }
   };
 
@@ -294,6 +307,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                              </div>
                          )}
 
+                         {/* SDUI Plugins */}
+                         <SlotRenderer slotId="/home/pluginexpand" itemClassName="snap-center shrink-0 py-4" />
+
                          {/* Spacer for end of list */}
                          <div className="min-w-[20px] h-full" />
                     </div>
@@ -342,12 +358,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
                   <p className="text-xs text-text-secondary">从商店注册插件并启用到系统</p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsShopOpen(false)}
-                className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefreshShop}
+                  className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors"
+                  title="刷新插件列表"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingShop ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  onClick={() => setIsShopOpen(false)}
+                  className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 bg-white">

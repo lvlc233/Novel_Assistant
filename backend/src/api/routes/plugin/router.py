@@ -161,6 +161,28 @@ async def update_plugin(
 新增代理接口
 """
 
+@router.post("/refresh", response_model=Response[List[PluginShopMetaResponse]])
+async def refresh_plugins(
+    registry: PluginInternalRegistry = Depends(get_internal_plugin_registry),
+    session: AsyncSession = Depends(get_session),
+) -> Response[List[PluginShopMetaResponse]]:
+    """
+    手动刷新内部插件列表
+    """
+    import os
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    plugins_dir = os.path.join(base_dir, "plugin")
+    
+    # 重新扫描
+    registry.discover_plugins(plugins_dir)
+    
+    # 自动注册新发现的插件
+    manager = PluginManager(session)
+    for plugin_def in registry.get_plugin_list():
+        await manager.add_plugin_with_register(plugin_def)
+    
+    # 返回最新列表（复用 get_shop_plugins 逻辑）
+    return await get_shop_plugins(registry, session)
 @router.post("/proxy/{plugin_id}/{operation_name}", response_model=Any)
 async def proxy_plugin_operation(
     plugin_id: UUID,
