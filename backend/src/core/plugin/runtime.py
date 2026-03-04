@@ -107,7 +107,6 @@ class PluginManager:
                 name=plugin_def["name"],
                 description=plugin_def.get("description"),
                 from_type=plugin_def["from_type"].value,
-                # scope_type=plugin_def["scope_type"].value,
                 enabled=True,
                 version=plugin_def.get("version", "1.0.0"),
                 checksum=checksum,
@@ -115,7 +114,6 @@ class PluginManager:
                 runtime_config=plugin_def.get("config_schema", {}),
                 default_config={},
                 plugin_operation_schema=plugin_def.get("plugin_operation_schema", {}),
-                # render_type=plugin_def["render_type"].value,
                 tags=plugin_def.get("tags", []),
                 update_at=get_now_time(),
             )
@@ -124,13 +122,11 @@ class PluginManager:
             plugin.name = plugin_def["name"]
             plugin.description = plugin_def.get("description")
             plugin.from_type = plugin_def["from_type"].value
-            # plugin.scope_type = plugin_def["scope_type"].value
             plugin.version = plugin_def.get("version", "1.0.0")
             plugin.checksum = checksum
             plugin.loader_type = plugin_def["loader_type"].value
             plugin.runtime_config = plugin_def.get("config_schema", {})
             plugin.plugin_operation_schema = plugin_def.get("plugin_operation_schema", {})
-            # plugin.render_type = plugin_def["render_type"].value
             plugin.tags = plugin_def.get("tags", [])
             plugin.update_at = get_now_time()
 

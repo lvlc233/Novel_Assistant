@@ -48,13 +48,12 @@ class PluginResponse(BaseModel):
     from_type: PluginFromTypeEnum  # 插件来源类型
     operations: List[PluginOperation]
     config: Dict[str, Any] # 结合schema和default值
+    config_schema: Dict[str, Any] = Field(default_factory=dict) # 配置的 Schema 定义
     tags: List[str] = Field(default_factory=list)
 
 class PluginUpdateRequest(BaseModel):
     enabled: bool | None = None
     config: Dict[str, Any] | None = None
-    data_source_type: LoaderType | None = None
-    data_source_config: Dict[str, Any] | None = None
 
 class PluginOperationInvokeRequest(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
@@ -63,6 +62,7 @@ class PluginOperationInvokeRequest(BaseModel):
 class PluginOperationInvokeResponse(BaseModel):
     plugin_id: UUID
     operation: str
+    payload: Any = None
 
 class InternalPluginResponse(BaseModel):
     id: UUID

@@ -10,10 +10,12 @@ interface Message {
 interface AIAssistantProps {
   isExpanded: boolean;
   onToggle: () => void;
+  documentId?: string | null;
+  workId?: string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function AIAssistant({ isExpanded, onToggle }: AIAssistantProps) {
+export default function AIAssistant({ isExpanded, onToggle, documentId, workId }: AIAssistantProps) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'assistant', content: '你好！我是你的小说助手。有什么我可以帮你的吗？比如帮你构思大纲，或者检查逻辑漏洞。' },

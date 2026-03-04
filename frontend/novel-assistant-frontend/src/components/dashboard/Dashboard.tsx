@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { FileText, Settings, LayoutGrid, Sparkles, Puzzle, X, Loader2 } from 'lucide-react';
 import FeatureCard from './FeatureCard';
 import QuickCreateMenu from './QuickCreateMenu';
-import PluginManagerModal from './PluginManagerModal';
+// import PluginManagerModal from './PluginManagerModal'; // Replaced by PluginSettingsModal
+import PluginSettingsModal from '../plugins/PluginSettingsModal';
 import { logger } from '@/lib/logger';
-import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, subscribeToPluginChanges, refreshPlugins } from '@/services/pluginService';
+import { getPluginsFromShop, registerShopPlugin, unregisterShopPlugin, subscribeToPluginChanges, refreshPlugins, updatePlugin } from '@/services/pluginService';
 import { PluginInstance } from '@/types/plugin';
 import { RefreshCw } from 'lucide-react';
 import { SLOT_IDS } from '@/core/ui/schema';
@@ -185,7 +186,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
   const handlePluginCardClick = (plugin: PluginInstance) => {
       logger.debug('Dashboard handlePluginCardClick:', plugin);
       setSelectedPlugin(plugin);
-      // TODO: 打开插件详情或配置
+  };
+
+  const handlePluginConfigSave = async (config: any) => {
+      if (!selectedPlugin) return;
+      try {
+          await updatePlugin(selectedPlugin.id, { config });
+          // Refresh list to update config view if needed
+          fetchRegistedPlugins();
+      } catch (error) {
+          logger.error('Failed to save plugin config:', error);
+      }
   };
 
   // Horizontal scroll wheel handler
@@ -339,9 +350,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenSettings }) => {
       
       {/* Plugin Manager Modal */}
       {selectedPlugin && (
-        <PluginManagerModal
+        <PluginSettingsModal
           plugin={selectedPlugin}
+          isOpen={!!selectedPlugin}
           onClose={() => setSelectedPlugin(null)}
+          onSave={handlePluginConfigSave}
         />
       )}
 

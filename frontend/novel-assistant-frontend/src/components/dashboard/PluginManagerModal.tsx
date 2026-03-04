@@ -53,15 +53,55 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ plugin, onClose
         } else {
             // Standard Config Loading
             getPluginDetail(plugin.id).then(detail => {
-                if (detail && Array.isArray(detail.config)) {
-                    setConfigFields(detail.config);
-                    
-                    // Initialize values from config schema
-                    // Assuming detail.config has current values or defaults
-                    const initialValues: Record<string, any> = {};
-                    detail.config.forEach(field => {
-                        initialValues[field.key] = field.value !== undefined ? field.value : '';
-                    });
+                if (detail) {
+                    let fields: ConfigField[] = [];
+                    let initialValues: Record<string, any> = {};
+
+                    // Handle new format: config is values (dict), config_schema is definitions (dict)
+                    if (detail.config_schema && Object.keys(detail.config_schema).length > 0) {
+                        const newFields: ConfigField[] = Object.entries(detail.config_schema).map(([key, schema]: [string, any]) => {
+                             let valueType = 'text';
+                             if (schema.type === 'boolean') valueType = 'boolean';
+                             else if (schema.type === 'integer' || schema.type === 'number') valueType = 'number';
+                             else if (schema.type === 'string') {
+                                 if (schema.maxLength && schema.maxLength > 100) valueType = 'textarea';
+                                 else if (key.includes('prompt') || key.includes('description')) valueType = 'textarea';
+                             }
+
+                             return {
+                                key: key,
+                                label: schema.title || key,
+                                description: schema.description,
+                                valueType: valueType,
+                                readOnly: false,
+                                children: []
+                             };
+                        });
+                        
+                        // Merge initial values
+                        initialValues = detail.config || {};
+                        // Ensure defaults if value is missing
+                        newFields.forEach(f => {
+                            if (initialValues[f.key] === undefined) {
+                                // Find default in schema
+                                const schema = detail.config_schema[f.key];
+                                if (schema && schema.default !== undefined) {
+                                    initialValues[f.key] = schema.default;
+                                }
+                            }
+                        });
+                        
+                        fields = newFields;
+
+                    } else if (Array.isArray(detail.config)) {
+                        // Fallback for old array format if any
+                        fields = detail.config as any;
+                        detail.config.forEach((field: any) => {
+                             initialValues[field.key] = field.value !== undefined ? field.value : '';
+                        });
+                    }
+
+                    setConfigFields(fields);
                     setConfigValues(initialValues);
                 } else {
                     // If config is null or undefined or not an array, just set empty

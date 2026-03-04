@@ -24,10 +24,46 @@ class Email(TypedDict):
     agent_name:str
     on_email:bool
     history: List[AgentMessageHistoryItem]
+
+# Project Session Structures
+class ProjectSessionItem(TypedDict):
+    id: str
+    title: str
+    create_time: str
+    message_count: int
+    tokens: int
+    messages: List[dict]
+
+class ProjectPageItem(TypedDict):
+    id: str
+    name: str
+    sessions: List[ProjectSessionItem]
+
+class ProjectSessionData(TypedDict):
+    pages: List[ProjectPageItem]
+
+# Document Session Structures
+class DocumentSessionItem(TypedDict):
+    id: str
+    title: str
+    create_time: str
+    message_count: int
+    tokens: int
+    messages: List[dict]
+
+class DocumentItem(TypedDict):
+    id: str
+    title: str
+    sessions: List[DocumentSessionItem]
+
+class DocumentSessionData(TypedDict):
+    documents: List[DocumentItem]
     
 registed={
     "AgentMessages":List[AgentMessageHistoryItem],
-    "Email":Email
+    "Email":Email,
+    "ProjectSessionManager": ProjectSessionData,
+    "DocumentSessionManager": DocumentSessionData
 }
 
 class Home(Page):

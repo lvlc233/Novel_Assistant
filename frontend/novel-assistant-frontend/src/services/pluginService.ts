@@ -24,7 +24,8 @@ export interface PluginOperation {
 
 interface PluginResponse extends PluginMetaResponse {
   description?: string;
-  config: ConfigField[];
+  config: Record<string, any>; // 配置值
+  config_schema?: Record<string, any>; // 配置定义
   from_type: 'system' | 'custom' | 'official';
   tags: string[];
   operations: PluginOperation[];
@@ -244,3 +245,39 @@ const updateCacheAndNotify = (plugins: PluginShopItem[]) => {
     saveCache(plugins);
     notifyPluginChanged();
 };
+
+/**
+ * 获取已注册/已安装的插件列表 (内部使用)
+ * 对应后端 /plugin/ 接口
+ */
+export async function getPlugins(): Promise<PluginResponse[]> {
+  // 这里直接请求已安装的插件列表
+  // 注意：后端可能没有直接返回 list 的接口，或者用 /plugin/shop 过滤 installed=true
+  // 假设后端有一个获取所有已安装插件详情的接口，或者我们从 /plugin/shop 获取后过滤
+  // 暂时复用 getPluginsFromShop 并转换类型，或者请求一个新的端点
+  // 既然 CreateWorkCard 需要 PluginInstance (即 PluginResponse)，我们这里请求后端
+  
+  // 方案 A: 使用 /plugin/shop 并过滤 installed
+  // const shopItems = await getPluginsFromShop();
+  // const installed = shopItems.filter(p => p.installed);
+  // // 需要 fetch detail 吗？ shopItem 缺少 config 等字段
+  // // 所以最好有一个批量获取详情的接口，或者单独获取
+  
+  // 方案 B: 假设后端 /plugin 返回已安装插件列表 (RESTful 风格)
+  // 如果后端没有实现 GET /plugin 列表，则需要补充。
+  // 查看后端代码，PluginController 有 list_plugins 吗？
+  // 如果没有，我们暂时用 /plugin/shop 替代，但类型不匹配。
+  
+  // 实际上，CreateWorkCard 需要的是简单的列表来让用户选择开启/关闭
+  // 我们先尝试请求 /plugin/shop，并只返回 installed 的
+  
+  const shopItems = await getPluginsFromShop();
+  const installedItems = shopItems.filter(p => p.installed);
+  
+  // 并行获取详情以获得 config schema 等信息 (如果需要)
+  // 为了性能，如果列表太长可能不合适。
+  // 但 CreateWorkCard 需要 config，所以必须获取详情。
+  
+  const details = await Promise.all(installedItems.map(item => getPluginDetail(item.id)));
+  return details as PluginResponse[];
+}

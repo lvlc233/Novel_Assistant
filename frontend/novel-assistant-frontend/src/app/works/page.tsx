@@ -9,8 +9,8 @@ import { knowledgeBaseService } from '@/services/knowledgeBaseService';
 import { logger } from '@/lib/logger';
 // import { PluginFeatureFlags } from '@/services/pluginService';
 
-// import { WorkCreationData } from '@/components/work-manager/CreateWorkCard';
-// import DocumentCarousel from '@/components/work-manager/DocumentCarousel';
+import { WorkCreationData } from '@/components/work-manager/CreateWorkCard';
+import DocumentCarousel from '@/components/work-manager/DocumentCarousel';
 // import WorkPluginConfigModal from '@/components/work-manager/WorkPluginConfigModal';
 import BottomInput from '@/components/common/BottomInput';
 
@@ -162,34 +162,34 @@ export default function DocumentsPage() {
     }
   };
 
-  // const handleCreateWork = async (data: WorkCreationData) => {
-  //     try {
-  //       logger.debug('Creating work with data:', data);
+  const handleCreateWork = async (data: WorkCreationData) => {
+      try {
+        logger.debug('Creating work with data:', data);
         
-  //       // 构造 DTO
-  //       const createDto: CreateWorkDto = {
-  //         user_id: userId,
-  //         work_name: data.title,
-  //         work_summary: data.synopsis,
-  //         work_cover_image_url: data.cover || undefined,
-  //         kd_id_list: data.selectedKbIds,
-  //         work_type: data.type,
-  //         work_genre: data.genre,
-  //         plugins: data.plugins
-  //       };
+        // 构造 DTO
+        const createDto: CreateWorkDto = {
+          user_id: userId,
+          work_name: data.title,
+          work_summary: data.synopsis,
+          work_cover_image_url: data.cover || undefined,
+          kd_id_list: data.selectedKbIds,
+          work_type: data.type,
+          work_genre: data.genre,
+          plugins: data.plugins
+        };
 
-  //       const newWork = await createWork(createDto);
+        const newWork = await createWork(createDto);
         
-  //       setWorks(prev => [...prev, newWork]);
-  //       setIsCreating(false);
-  //       // Navigate to the new work page
-  //       router.push(`/works/${newWork.id}`);
-  //     } catch (err: unknown) {
-  //       logger.error('Failed to create work:', err);
-  //       const message = err instanceof Error ? err.message : '创建失败';
-  //       setError(`创建失败: ${message}`);
-  //     }
-  // };
+        setWorks(prev => [...prev, newWork]);
+        setIsCreating(false);
+        // Navigate to the new work page
+        router.push(`/works/${newWork.id}`);
+      } catch (err: unknown) {
+        logger.error('Failed to create work:', err);
+        const message = err instanceof Error ? err.message : '创建失败';
+        setError(`创建失败: ${message}`);
+      }
+  };
 
   const handleOpenPluginConfig = (work: Novel) => {
     setPluginConfigWork(work);
@@ -239,10 +239,10 @@ export default function DocumentsPage() {
               </div>
           ) : (
           <>
-            {/* <DocumentCarousel 
+            <DocumentCarousel 
                 works={works}
                 onSelectWork={handleSelectWork}
-                // onCreateWork={handleCreateWork}
+                onCreateWork={handleCreateWork}
                 onDeleteWork={handleDeleteWork}
                 onEditWork={handleEditWork}
                 onOpenPluginConfig={handleOpenPluginConfig}
@@ -251,7 +251,7 @@ export default function DocumentsPage() {
                 isCreating={isCreating}
                 onToggleCreating={setIsCreating}
                 existingKnowledgeBases={knowledgeBases}
-            /> */}
+            />
             
             {/* {pluginConfigWork && (
               // <WorkPluginConfigModal 

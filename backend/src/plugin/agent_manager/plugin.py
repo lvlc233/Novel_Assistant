@@ -38,7 +38,6 @@ class AgentManagerPlugin:
     ):
         self.session = session
         self.checkpoint = checkpoint
-        # self.agents = xxx,在这里使用sessin获取tag为agent的插件的信息并存储到插件中
     
     async def _get_email_config(self) -> Dict[str, bool]:
         """获取AgentManager的邮件配置 (agent_name -> enabled)"""
@@ -126,7 +125,7 @@ class AgentManagerPlugin:
         name="get_agent_info",
         description="获取Agent信息,用于在邮箱侧边栏显示",
         with_ui=[Home.EmailBoot.filter()],
-        ui_target=Home.EmailBox,
+        ui_target=Home.EmailBox.AgentBox,
         trigger = UITrigger.CLICK
     )
     async def get_agent_info(self):

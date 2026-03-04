@@ -6,9 +6,10 @@ from common.errors import ResourceNotFoundError
 from infrastructure.pg.pg_models import KnowledgeBaseSQLEntity, KnowledgeChunkSQLEntity
 from plugin.kd.schema import KDCreateRequest, KDDescriptionCreateRequest, KDDescriptionResponse, KDDescriptionUpdateRequest, KDMetaResponse, KDUpdateRequest
 from core.plugin.annotations import plugin_meta, runtime_config, operation
-from common.enums import PluginFromTypeEnum
+from common.enums import PluginFromTypeEnum, UITrigger
 from sqlalchemy import delete, select
 from sqlalchemy import desc
+from core.ui.home import Home
 
 @plugin_meta(
     name="kd",
@@ -23,6 +24,22 @@ class KDPlugin:
     @runtime_config
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    @operation(
+        name="manage_knowledge_bases",
+        description="管理知识库 UI",
+        ui_target=Home.PluginDetails.Info,
+        with_ui=[Home.PluginExpand.PluginCard.filter(name="kd")],
+        trigger=UITrigger.CLICK
+    )
+    async def manage_knowledge_bases(self):
+        """管理知识库 UI"""
+        kbs = await self.get_kd_list()
+        return {
+            "name": "kd",
+            "data": {"kbs": [k.model_dump() for k in kbs]},
+            "info_type": "KnowledgeBaseManager"
+        }
 
     @operation
     async def get_kd_list(self) -> List[KDMetaResponse]:

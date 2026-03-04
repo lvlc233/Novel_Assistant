@@ -15,11 +15,6 @@ export const ComponentRegistry: Record<string, React.ComponentType<any>> = {
     loading: () => <div className="w-64 h-full bg-gray-50 animate-pulse" />
   }),
 
-  // // 底部快速输入框
-  // 'BottomInput': dynamic(() => import('@/components/common/BottomInput'), {
-  //   loading: () => <div className="w-full h-12 bg-gray-100 rounded-xl animate-pulse" />
-  // }),
-
   // 项目助手输入框
   'ProjectChatInput': dynamic(() => import('@/components/home/ProjectChatInput').then(mod => mod.ProjectChatInput), {
     loading: () => <div className="w-full h-12 bg-gray-100 rounded-xl animate-pulse" />
@@ -30,25 +25,46 @@ export const ComponentRegistry: Record<string, React.ComponentType<any>> = {
     loading: () => <div className="w-10 h-10 bg-gray-100 rounded-xl animate-pulse" />
   }),
 
-  // Agent Chat Box
-  'AgentBox': dynamic(() => import('@/components/mail/AgentBox').then(mod => mod.AgentBox), {
-      loading: () => <div className="w-[350px] h-[500px] bg-white rounded-xl shadow-xl animate-pulse" />
+  // SDUI Components
+  'WelcomeCard': dynamic(() => import('@/components/sdui/WelcomeCard').then(mod => mod.WelcomeCard), {
+      loading: () => <div className="w-full h-32 bg-blue-100 rounded-xl animate-pulse" />
+  }),
+  'AgentBox': dynamic(() => import('@/components/sdui/AgentBox').then(mod => mod.AgentBox), {
+      loading: () => <div className="w-full h-48 bg-gray-50 rounded-xl animate-pulse" />
+  }),
+  'WorkTypeSettings': dynamic(() => import('@/components/sdui/WorkTypeSettings').then(mod => mod.WorkTypeSettings), {
+      loading: () => <div className="w-full h-48 bg-gray-50 rounded-xl animate-pulse" />
+  }),
+  'MemoryManager': dynamic(() => import('@/components/sdui/MemoryManager').then(mod => mod.MemoryManager), {
+      loading: () => <div className="w-full h-48 bg-gray-50 rounded-xl animate-pulse" />
+  }),
+  'KnowledgeBaseManager': dynamic(() => import('@/components/sdui/KnowledgeBaseManager').then(mod => mod.KnowledgeBaseManager), {
+      loading: () => <div className="w-full h-[600px] bg-gray-50 rounded-xl animate-pulse" />
+  }),
+  'ProjectSessionManager': dynamic(() => import('@/components/sdui/ProjectSessionManager').then(mod => mod.ProjectSessionManager), {
+      loading: () => <div className="w-full h-[600px] bg-gray-50 rounded-xl animate-pulse" />
+  }),
+  'DocumentSessionManager': dynamic(() => import('@/components/sdui/DocumentSessionManager').then(mod => mod.DocumentSessionManager), {
+      loading: () => <div className="w-full h-[600px] bg-gray-50 rounded-xl animate-pulse" />
   }),
 
   // Plugin Expand Container
   'PluginExpand': dynamic(() => import('@/components/dashboard/PluginExpand').then(mod => mod.PluginExpand)),
   'pluginexpand': dynamic(() => import('@/components/dashboard/PluginExpand').then(mod => mod.PluginExpand)),
   
-  // 兼容小写 Key (如果后端返回的是全小写路径)
+  // Lowercase Compatibility
   'mailbutton': dynamic(() => import('@/components/mail/MailButton').then(mod => mod.MailButton)),
   'aiassistant': dynamic(() => import('@/components/editor/AIAssistant')),
-  // 'bottominput': dynamic(() => import('@/components/common/BottomInput')),
   'projectchatinput': dynamic(() => import('@/components/home/ProjectChatInput').then(mod => mod.ProjectChatInput)),
   'agentsidebaritem': dynamic(() => import('@/components/mail/AgentSidebarItem').then(mod => mod.AgentSidebarItem)),
-  'agentbox': dynamic(() => import('@/components/mail/AgentBox').then(mod => mod.AgentBox)),
   
-  // 快速创建菜单入口 (如果有的话，暂时保留占位)
-  // 'QuickCreateEntry': dynamic(() => import('@/components/dashboard/QuickCreateMenu').then(mod => mod.QuickCreateEntry))
+  'welcomecard': dynamic(() => import('@/components/sdui/WelcomeCard').then(mod => mod.WelcomeCard)),
+  'agentbox': dynamic(() => import('@/components/sdui/AgentBox').then(mod => mod.AgentBox)),
+  'worktypesettings': dynamic(() => import('@/components/sdui/WorkTypeSettings').then(mod => mod.WorkTypeSettings)),
+  'memorymanager': dynamic(() => import('@/components/sdui/MemoryManager').then(mod => mod.MemoryManager)),
+  'knowledgebasemanager': dynamic(() => import('@/components/sdui/KnowledgeBaseManager').then(mod => mod.KnowledgeBaseManager)),
+  'projectsessionmanager': dynamic(() => import('@/components/sdui/ProjectSessionManager').then(mod => mod.ProjectSessionManager)),
+  'documentsessionmanager': dynamic(() => import('@/components/sdui/DocumentSessionManager').then(mod => mod.DocumentSessionManager)),
 
   // Agent Manager Plugin Components
   'PluginCard': dynamic(() => import('@/components/plugins/agent-manager/PluginCard').then(mod => mod.PluginCard)),

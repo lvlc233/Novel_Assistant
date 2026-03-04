@@ -109,27 +109,32 @@ class PluginService:
         if not plugin:
             raise ResourceNotFoundError(f"Plugin with id {plugin_id} not found")
             
+        # 转换 operations
+        operations = []
+        if plugin.plugin_operation_schema:
+            ops_dict = plugin.plugin_operation_schema.get("operations", {})
+            for op_name, op_info in ops_dict.items():
+                 operations.append(PluginOperation(
+                     name=op_name,
+                     description=op_info.get("description"),
+                     with_ui=op_info.get("with_ui", []),
+                     ui_target=op_info.get("ui_target"),
+                     trigger=op_info.get("trigger"),
+                     is_stream=op_info.get("is_stream", False),
+                     input_schema=op_info.get("input_schema", {}),
+                     output_schema=op_info.get("output_schema")
+                 ))
+                 
         return PluginResponse(
             id=plugin.id,
             name=plugin.name,
             description=plugin.description,
             enabled=plugin.enabled,
-            config=plugin.default_config or {},
             from_type=PluginFromTypeEnum(plugin.from_type),
-            tags=plugin.tags or [],
-            operations=[
-                PluginOperation(
-                    name=name,
-                    description=op.get("description"),
-                    input_schema=op.get("input_schema", {}),
-                    output_schema=op.get("output_schema"),
-                    with_ui=op.get("with_ui", []),
-                    ui_target=op.get("ui_target"),
-                    trigger=op.get("trigger"),
-                    is_stream=op.get("is_stream", False)
-                )
-                for name, op in (plugin.plugin_operation_schema or {}).get("operations", {}).items()
-            ]
+            operations=operations,
+            config=plugin.default_config or {},
+            config_schema=plugin.runtime_config or {},
+            tags=plugin.tags or []
         )
 
     async def update_plugin(self, plugin_id: UUID, request: PluginUpdateRequest) -> None:
@@ -149,16 +154,6 @@ class PluginService:
             
         if request.config is not None:
             plugin.default_config = request.config # self._to_config_dict(request.config)
-
-        if request.data_source_type is not None:
-            plugin.data_source_type = request.data_source_type.value
-
-        if request.data_source_config is not None:
-            plugin.data_source_config = request.data_source_config # request.data_source_config.model_dump()
-            if request.data_source_type is None:
-                # 尝试推断 data_source_type, 如果 dict 中有 type 字段
-                if isinstance(request.data_source_config, dict) and "type" in request.data_source_config:
-                     plugin.data_source_type = request.data_source_config["type"]
             
         if request.auth_config is not None:
             plugin.auth_config = request.auth_config # self._to_config_dict(request.auth_config)

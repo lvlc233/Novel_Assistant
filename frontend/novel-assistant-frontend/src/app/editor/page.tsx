@@ -33,6 +33,8 @@ function EditorContent() {
                     slotId={SLOT_IDS.EDITOR_SIDEBAR}
                     isExpanded={isAiExpanded} 
                     onToggle={() => setIsAiExpanded(!isAiExpanded)} 
+                    documentId={documentId}
+                    workId={workId}
                   />
               </div>
           </div>

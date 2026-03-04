@@ -6,13 +6,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from common.enums import MemoryTypeEnum, PluginFromTypeEnum
+from common.enums import MemoryTypeEnum, PluginFromTypeEnum, UITrigger
 from common.errors import ResourceNotFoundError
-from common.utils.utils import create_uuid, get_now_time
+from common.utils.utils import create_uuid, get_now_time, load_chat_model_with_env
 from infrastructure.pg.pg_models import MemorySQLEntity
 from core.plugin.annotations import plugin_meta, runtime_config, operation
 from core.plugin.di import Inject
 from infrastructure.pg.pg_client import get_session
+from core.ui.home import Home
+from langchain_core.messages import SystemMessage, HumanMessage
 
 class MemoryMetaResponse(BaseModel):
     id: UUID
@@ -55,6 +57,56 @@ class MemoryPlugin:
     @runtime_config
     def __init__(self, session: AsyncSession = Inject(get_session)):
         self.session = session
+
+    @operation(
+        name="manage_memories",
+        description="管理记忆 UI",
+        ui_target=Home.PluginDetails.Info,
+        with_ui=[Home.PluginExpand.PluginCard.filter(name="memory")],
+        trigger=UITrigger.CLICK
+    )
+    async def manage_memories(self):
+        """管理记忆 UI"""
+        memories = await self.get_memory_list()
+        return {
+            "name": "memory",
+            "data": {"memories": [m.model_dump() for m in memories]},
+            "info_type": "MemoryManager"
+        }
+
+    @operation(name="auto_organize")
+    async def auto_organize(self) -> str:
+        """自动整理记忆"""
+        stmt = select(MemorySQLEntity).where(MemorySQLEntity.enabled == True)
+        result = await self.session.execute(stmt)
+        memories = result.scalars().all()
+        
+        if not memories:
+            return "No memories to organize."
+            
+        context_text = "\n".join([f"[{m.name}]: {m.context}" for m in memories])
+        
+        model = load_chat_model_with_env("memory_organizer")
+        response = await model.ainvoke([
+            SystemMessage(content="You are a memory manager. Summarize the following memory contexts into a single cohesive summary."),
+            HumanMessage(content=context_text)
+        ])
+        
+        summary = response.content if hasattr(response, "content") else str(response)
+        
+        # Create summary memory
+        new_memory = MemorySQLEntity(
+            id=create_uuid(),
+            name=f"Summary {get_now_time().strftime('%Y-%m-%d')}",
+            type=MemoryTypeEnum.LONG_TERM.value,
+            description="Auto-generated summary",
+            context=summary,
+            create_at=get_now_time()
+        )
+        self.session.add(new_memory)
+        await self.session.commit()
+        
+        return summary
 
     @operation(name="get_memory_list")
     async def get_memory_list(self) -> List[MemoryMetaResponse]:

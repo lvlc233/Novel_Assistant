@@ -16,25 +16,9 @@ export type PluginFromType = 'system' | 'office' | 'custom';
 /**
  * 插件状态
  * - 'enabled': 已启用，功能生效中
- * - 'disabled': 已禁用，
- * - `或许可以可以再加个异常的枚举`
+ * - 'disabled': 已禁用
  */
 export type PluginStatus = 'enabled' | 'disabled' 
-
-
-/**
- * 标准数据项
- * 用于插件数据的统一渲染
- */
-// export interface KeyValueItem {
-//   key: string;
-//   value: string | number | boolean | null;
-// }
-
-// export interface PluginConfigItem {
-//   key: string;
-//   value: string | number | boolean | null;
-// }
 
 export type PluginConfig = Record<string, any>;
 
@@ -48,7 +32,6 @@ export interface ConfigField {
   readOnly?: boolean;
   children: ConfigField[];
 }
-
 
 export interface InvokeURL{
   // 组件的内部属性
@@ -77,68 +60,11 @@ export interface Operation {
 
 }
 
-
-// export interface AgentSession {
-//   session_id: string;
-//   title?: string | null;
-//   source?: string | null;
-//   created_at?: string | null;
-//   token_usage?: number | null;
-// }
-
-
-// export interface Action {
-//   type: 'invoke_operation' | 'link' | 'router';
-//   operation?: string;
-//   url?: string;
-//   params?: Record<string, any>;
-//   label?: string;
-//   danger?: boolean;
-//   confirm?: string;
-// }
-
-// export interface CardItem {
-//   id: string;
-//   title: string;
-//   summary?: string | null;
-//   tags: string[];
-//   parent_id?: string | null;
-//   actions?: Record<string, Action | Action[]>;
-// }
-
-
-// export interface ListItem {
-//   id: string;
-//   title: string;
-//   subtitle?: string | null;
-//   content?: string | null;
-//   tags: string[];
-//   metadata: KeyValueItem[];
-// }
-
-
-// export interface DetailItem {
-//   id: string;
-//   title: string;
-//   content?: string | null;
-//   fields: KeyValueItem[];
-// }
-
-
-// export interface DashboardWidget {
-//   id: string;
-//   title: string;
-//   value: string | number | boolean | null;
-//   unit?: string | null;
-//   tags: string[];
-// }
-
-
-
-// export interface StandardDataResponse {
-//   plugin_id: string;
-//   total?: number;
-// }
+export interface StandardDataResponse {
+  plugin_id: string;
+  payload: any;
+  total?: number;
+}
 
 /**
  * 插件清单 (Manifest)
@@ -153,13 +79,8 @@ export interface PluginManifest {
   version: string;
   /** 插件功能描述 */
   description: string;
-  /** 插件作者/开发团队 */
-  // author: string;
   /** 插件图标 (URL 或图标名称) */
   icon?: string;
-  /** 插件类型 (系统/用户) */
-  // type: PluginType;
-  
   
   /** 
    * 作用域类型 (可选)
@@ -206,7 +127,9 @@ export interface PluginInstance {
   /** 插件来源 */
   fromType: PluginFromType;
   /** 插件配置 */
-  config: ConfigField[];
+  config: Record<string, any>; // 配置的值 (Value)
+  /** 插件配置 Schema */
+  configSchema?: Record<string, any>; // 配置的定义 (Schema)
   /** 插件的操作(扩展点) **/
   operations: Operation[];
   
@@ -214,13 +137,12 @@ export interface PluginInstance {
   manifest?: any; // 临时补充,后续删除
 }
 
-// /**
-//  * 插件注册表项
-//  * 用于插件市场或已安装列表的展示
-//  */
-// export interface PluginRegistryItem {
-//   /** 插件清单信息 */
-//   manifest: PluginManifest;
-//   /** 当前环境是否已安装该插件 */
-//   isInstalled: boolean;
-// }
+// Alias for PluginInstance to match backend response conceptually or user request
+export type Plugin = PluginInstance;
+
+// Component Schema for older renderer (kept if needed, or remove if unused)
+export interface ComponentSchema {
+  type: string;
+  props?: any;
+  children?: ComponentSchema[];
+}

@@ -5,12 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from common.enums import NodeTypeEnum, WorkTypeEnum, PluginFromTypeEnum
+from common.enums import NodeTypeEnum, WorkTypeEnum, PluginFromTypeEnum, UITrigger
 from common.errors import ResourceNotFoundError
 from infrastructure.pg.pg_models import WorkTypeSQLEntity
 from core.plugin.annotations import plugin_meta, runtime_config, operation
 from core.plugin.di import Inject
 from infrastructure.pg.pg_client import get_session
+from core.ui.home import Home
 
 class WorkTypeResponse(BaseModel):
     id: UUID
@@ -37,6 +38,22 @@ class WorkTypePlugin:
     @runtime_config
     def __init__(self, session: AsyncSession = Inject(get_session)):
         self.session = session
+
+    @operation(
+        name="manage_work_types",
+        description="管理作品类型",
+        ui_target=Home.PluginDetails.Info,
+        with_ui=[Home.PluginExpand.PluginCard.filter(name="work_type")],
+        trigger=UITrigger.CLICK
+    )
+    async def manage_work_types(self):
+        """管理作品类型 UI"""
+        types = await self.get_work_type_list()
+        return {
+            "name": "work_type",
+            "data": {"types": [t.model_dump() for t in types]},
+            "info_type": "WorkTypeSettings"
+        }
 
     @operation(name="get_work_type_list")
     async def get_work_type_list(self) -> List[WorkTypeResponse]:

@@ -1,7 +1,7 @@
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from common.enums import UITrigger, PluginFromTypeEnum
-from core.ui.home import Home
+from core.ui.home import Home, ProjectSessionData
 from core.ui.layout import Mailbox
 from common.config import settings
 from common.model.base_agent import build_agent
@@ -54,9 +54,9 @@ class ProjectHelperPlugin:
 
     @runtime_config
     def __init__(self, 
-                base_url: str, 
-                api_key: str, 
-                model_name: str,
+                base_url: str = "https://api.openai.com/v1", 
+                api_key: str = "", 
+                model_name: str = "gpt-3.5-turbo",
                 checkpoint: AsyncPostgresSaver = Inject(get_checkpoint),
                 session:AsyncSession = Inject(get_session) 
             ):
@@ -68,9 +68,10 @@ class ProjectHelperPlugin:
             api_key: 项目助手API密钥
             model_name: 项目助手模型名称
         """
-        self.base_url = base_url
-        self.api_key = api_key
-        self.model_name = model_name
+        import os
+        self.base_url = base_url or os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
+        self.model_name = model_name or "gpt-3.5-turbo"
         self.checkpoint = checkpoint
         self.session = session
 
@@ -141,6 +142,67 @@ class ProjectHelperPlugin:
         # ))
         # await self.session.commit()
     
+    @operation(
+        name="get_project_sessions",
+        description="获取项目会话列表",
+        ui_target=Home.PluginDetails.Info.filter()
+    )
+    async def get_project_sessions(self):
+        """获取项目会话列表 (Mock Data)"""
+        data: ProjectSessionData = {
+            "pages": [
+                {
+                    "id": "page_1",
+                    "name": "世界观设定",
+                    "sessions": [
+                        {
+                            "id": "s_1",
+                            "title": "关于魔法体系的初步构想",
+                            "create_time": "2024-03-01 10:00",
+                            "message_count": 5,
+                            "tokens": 1200,
+                            "messages": [
+                                {"role": "user", "content": "帮我设计一个基于五行的魔法体系"},
+                                {"role": "assistant", "content": "好的，我们可以从金木水火土五个基本元素出发，结合相生相克的原理..."}
+                            ]
+                        },
+                        {
+                            "id": "s_2",
+                            "title": "反派势力背景",
+                            "create_time": "2024-03-02 15:30",
+                            "message_count": 8,
+                            "tokens": 2400,
+                            "messages": [
+                                {"role": "user", "content": "反派组织叫'暗影议会'，他们的动机是什么？"},
+                                {"role": "assistant", "content": "他们可能认为现有的秩序限制了人类的潜能，试图通过极端的手段打破平衡..."}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "page_2",
+                    "name": "第一章大纲",
+                    "sessions": [
+                             {
+                                "id": "s_3",
+                                "title": "开篇场景讨论",
+                                "create_time": "2024-03-03 09:15",
+                                "message_count": 12,
+                                "tokens": 3100,
+                                "messages": [
+                                    {"role": "user", "content": "主角第一次出场应该是在哪里？"},
+                                    {"role": "assistant", "content": "建议在一个充满冲突的环境中，比如热闹的集市或者危机四伏的森林边缘..."}
+                                ]
+                            }
+                        ]
+                }
+            ]
+        }
+        return {
+            "info_type": "ProjectSessionManager",
+            "data": data
+        }
+    
 
     
     
@@ -162,8 +224,7 @@ class ProjectHelperPlugin:
     @operation(
         name="chat",
         description="调度ph_agent进行对话",
-        with_ui=[Home.ProjectChatInput.filter()],
-        #这里可能也要做过滤,在加上多目标输出 
+        with_ui=[Home.ProjectChatInput.filter(name="project_helper")],
         ui_target=Home.EmailBox.AgentBox.filter(name="project_helper"),
         trigger = UITrigger.ENTER
     )
