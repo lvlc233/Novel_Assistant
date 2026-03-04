@@ -7,7 +7,7 @@ import { Work, Novel, KnowledgeBase } from '@/types/work';
 import { getWorkList, createWork, deleteWork, updateWork, CreateWorkDto } from '@/services/workService';
 import { knowledgeBaseService } from '@/services/knowledgeBaseService';
 import { logger } from '@/lib/logger';
-import { PluginFeatureFlags } from '@/services/pluginService';
+// import { PluginFeatureFlags } from '@/services/pluginService';
 
 // import { WorkCreationData } from '@/components/work-manager/CreateWorkCard';
 // import DocumentCarousel from '@/components/work-manager/DocumentCarousel';

@@ -9,9 +9,8 @@ from core.ui.layout import AppLayout, Mailbox
     name="agent_manager",
     space="official", 
     version="0.0.1",
-    description="管理Agent的插件",
-    from_type=PluginFromTypeEnum.SYSTEM,
-    tags=["agent"]
+    description="手机",
+    from_type=PluginFromTypeEnum.SYSTEM
 )
 class AgentManagerPlugin:
     

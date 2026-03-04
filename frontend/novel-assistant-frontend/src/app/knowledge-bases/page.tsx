@@ -45,10 +45,10 @@ export default function KnowledgeBaseListPage() {
         }
     };
 
-    const filteredKBs = kbs.filter(kb => 
-        kb.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        kb.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    // const filteredKBs = kbs.filter(kb => 
+    //     kb.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    //     kb.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    // );
 
     return (
         <AppLayout>
@@ -86,7 +86,7 @@ export default function KnowledgeBaseListPage() {
                 </div>
 
                 {/* Grid */}
-                {isLoading ? (
+                {/* {isLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[1, 2, 3].map(i => (
                             <div key={i} className="h-40 bg-gray-100 rounded-xl animate-pulse"></div>
@@ -148,7 +148,7 @@ export default function KnowledgeBaseListPage() {
                             立即创建
                         </button>
                     </div>
-                )}
+                )} */}
             </div>
 
             <CreateKnowledgeBaseModal

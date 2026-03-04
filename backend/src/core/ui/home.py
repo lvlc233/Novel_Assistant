@@ -30,6 +30,9 @@ class Home(Page):
         class QuickInput(Component):
             def __init__(self): pass
 
+    class Main(Slot):
+        pass
+
             
             
     # class PluginDetails(Slot):

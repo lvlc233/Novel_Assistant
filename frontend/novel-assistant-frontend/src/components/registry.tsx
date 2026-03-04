@@ -15,15 +15,15 @@ export const ComponentRegistry: Record<string, React.ComponentType<any>> = {
     loading: () => <div className="w-64 h-full bg-gray-50 animate-pulse" />
   }),
 
-  // 底部快速输入框
-  'BottomInput': dynamic(() => import('@/components/common/BottomInput'), {
-    loading: () => <div className="w-full h-12 bg-gray-100 rounded-xl animate-pulse" />
-  }),
+  // // 底部快速输入框
+  // 'BottomInput': dynamic(() => import('@/components/common/BottomInput'), {
+  //   loading: () => <div className="w-full h-12 bg-gray-100 rounded-xl animate-pulse" />
+  // }),
 
   // 项目助手输入框
-  'ProjectChatInput': dynamic(() => import('@/components/home/ProjectChatInput').then(mod => mod.ProjectChatInput), {
-    loading: () => <div className="w-full h-12 bg-gray-100 rounded-xl animate-pulse" />
-  }),
+  // 'ProjectChatInput': dynamic(() => import('@/components/home/ProjectChatInput').then(mod => mod.ProjectChatInput), {
+  //   loading: () => <div className="w-full h-12 bg-gray-100 rounded-xl animate-pulse" />
+  // }),
 
   // 邮箱侧边栏代理项
   'AgentSidebarItem': dynamic(() => import('@/components/mail/AgentSidebarItem').then(mod => mod.AgentSidebarItem), {
@@ -33,8 +33,8 @@ export const ComponentRegistry: Record<string, React.ComponentType<any>> = {
   // 兼容小写 Key (如果后端返回的是全小写路径)
   'mailbutton': dynamic(() => import('@/components/mail/MailButton').then(mod => mod.MailButton)),
   'aiassistant': dynamic(() => import('@/components/editor/AIAssistant')),
-  'bottominput': dynamic(() => import('@/components/common/BottomInput')),
-  'projectchatinput': dynamic(() => import('@/components/home/ProjectChatInput').then(mod => mod.ProjectChatInput)),
+  // 'bottominput': dynamic(() => import('@/components/common/BottomInput')),
+  // 'projectchatinput': dynamic(() => import('@/components/home/ProjectChatInput').then(mod => mod.ProjectChatInput)),
   'agentsidebaritem': dynamic(() => import('@/components/mail/AgentSidebarItem').then(mod => mod.AgentSidebarItem)),
   
   // 快速创建菜单入口 (如果有的话，暂时保留占位)

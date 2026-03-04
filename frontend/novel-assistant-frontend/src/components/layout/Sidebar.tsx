@@ -13,6 +13,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SlotRenderer } from '@/contexts/SlotContext';
 
 export function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useGlobalStore();

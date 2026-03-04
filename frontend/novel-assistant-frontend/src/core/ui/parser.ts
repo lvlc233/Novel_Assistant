@@ -75,9 +75,9 @@ export function parsePluginOperations(plugins: PluginShopItem[]): Record<string,
           slots[slotId].push({
             id: `${plugin.id}-${op.name}-${componentKey}`,
             // 这里直接渲染组件，如果需要传递 props 可以在这里扩展
-            component: React.createElement(Component, op.input_schema), 
+            component: React.createElement(Component, { ...op.input_schema, pluginId: plugin.id }), 
             order: 0, // 默认为 0，后续可从 operation 配置中读取
-            props: op.input_schema
+            props: { ...op.input_schema, pluginId: plugin.id }
           });
         } else {
             console.warn(`[UIParser] Component key "${componentKey}" (from path "${uiPath}") not found in registry.`);

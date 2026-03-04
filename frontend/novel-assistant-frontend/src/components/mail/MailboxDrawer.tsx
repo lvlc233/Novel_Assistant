@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useMail, MailMessage, Agent } from '@/contexts/MailContext';
 import { X, Filter, User, ChevronLeft } from 'lucide-react';
-import BottomInput from '@/components/common/BottomInput'; // Reuse existing input
-import { PluginFeatureFlags } from '@/services/pluginService';
+// import BottomInput from '@/components/common/BottomInput'; // Reuse existing input
+// import { PluginFeatureFlags } from '@/services/pluginService';
 import { logger } from '@/lib/logger';
 
 // Helper to format time
@@ -149,7 +149,7 @@ export const MailboxDrawer: React.FC = () => {
   } = useMail();
   
   const [selectedMessage, setSelectedMessage] = useState<MailMessage | null>(null);
-  const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
+  // const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
 
   /**
    * 注释者: FrontendAgent(react)
@@ -345,13 +345,13 @@ export const MailboxDrawer: React.FC = () => {
                 }
              </div>
              {/* Use a simple textarea for now to avoid BottomInput's fixed positioning complexity here */}
-             <BottomInput 
+             {/* <BottomInput 
                 position="static"
                 placeholder="输入回复内容..."
                 onSubmit={handleReply}
                 className="w-full"
                 disabled={!selectedMessage && currentFilter === 'all'}
-             />
+             /> */}
           </div>
         </div>
       </div>

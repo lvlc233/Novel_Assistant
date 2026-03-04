@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Dashboard from '@/components/dashboard/Dashboard';
-import BottomInput from '@/components/common/BottomInput';
+// import BottomInput from '@/components/common/BottomInput';
 import SystemIntroduction from '@/components/dashboard/SystemIntroduction';
 import SettingsModal from '@/components/settings/SettingsModal';
 import { SLOT_IDS } from '@/core/ui/schema';

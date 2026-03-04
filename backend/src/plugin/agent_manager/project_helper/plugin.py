@@ -74,15 +74,15 @@ class ProjectHelperPlugin:
         self.checkpoint = checkpoint
         self.session = session
 
-    @operation(
-        name="quick_input_bottom",
-        description="底部快速输入",
-        ui_target=Home.Bottom.filter(),
-        with_ui=["BottomInput"]
-    )
-    async def quick_input_bottom(self):
-        """底部快速输入"""
-        pass
+    # @operation(
+    #     name="quick_input_bottom",
+    #     description="底部快速输入",
+    #     ui_target=Home.Bottom.filter(),
+    #     with_ui=["ProjectChatInput"]
+    # )
+    # async def quick_input_bottom(self):
+    #     """底部快速输入"""
+    #     pass
 
     @operation(
         name="agent_sidebar_item",
@@ -208,23 +208,23 @@ class ProjectHelperPlugin:
     #             if isinstance(event, tuple):
     #                 msg = event[0]
     #                 # metadata = event[1]
-                    if hasattr(msg, "content"):
-                        data = {"content": msg.content, "type": getattr(msg, "type", "message")}
-                        if hasattr(msg, "id"):
-                            data["id"] = msg.id
-                        yield data
-                        continue
-                
-                # Handle direct message object
-                if hasattr(event, "content"):
-                    # 提取主要内容
-                    data = {"content": event.content, "type": getattr(event, "type", "message")}
-                    if hasattr(event, "id"):
-                        data["id"] = event.id
-                    yield data
-                elif isinstance(event, dict):
-                    yield event
-                else:
-                    # 兜底：转字符串
-                    yield {"type": "raw", "content": str(event)}
+    #                 if hasattr(msg, "content"):
+    #                     data = {"content": msg.content, "type": getattr(msg, "type", "message")}
+    #                     if hasattr(msg, "id"):
+    #                         data["id"] = msg.id
+    #                     yield data
+    #                     continue
+    #             
+    #             # Handle direct message object
+    #             if hasattr(event, "content"):
+    #                 # 提取主要内容
+    #                 data = {"content": event.content, "type": getattr(event, "type", "message")}
+    #                 if hasattr(event, "id"):
+    #                     data["id"] = event.id
+    #                 yield data
+    #             elif isinstance(event, dict):
+    #                 yield event
+    #             else:
+    #                 # 兜底：转字符串
+    #                 yield {"type": "raw", "content": str(event)}
             
