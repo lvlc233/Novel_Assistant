@@ -2,7 +2,6 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from common.enums import UITrigger, PluginFromTypeEnum
 from core.ui.home import Home
-from core.ui.layout import WorkDetail, Mailbox
 from common.config import settings
 from common.model.base_agent import build_agent
 from core.plugin.annotations import plugin_meta, runtime_config, operation
