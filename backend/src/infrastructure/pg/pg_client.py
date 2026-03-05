@@ -9,7 +9,7 @@ from common.config import settings
 # Database Setup
 DATABASE_URL = settings.SQLALCHEMY_DATABASE_URI
 
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+engine = create_async_engine(DATABASE_URL, echo=False, future=True, pool_pre_ping=True)
 async_session = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )

@@ -9,7 +9,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.error_handler import register_exception_handlers
 from api.routes.file.router import router as file_router
@@ -18,7 +17,7 @@ from api.routes.plugin.router import router as plugin_router
 from api.routes.work.router import router as work_router
 from common.config import settings
 from common.log.log import logger
-from infrastructure.pg.pg_client import engine
+from infrastructure.pg.pg_client import async_session, engine
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from core.plugin.runtime import PluginInternalRegistry, PluginManager
 
@@ -61,7 +60,7 @@ async def lifespan(app: FastAPI):
     app.state.internal_plugin_registry = internal_registry
     logger.info(f"已加载: {len(internal_registry.get_plugin_list())} 个内部插件定义")
     logger.info(f"已预实例化: {internal_registry}")
-    async with AsyncSession(engine) as session:
+    async with async_session() as session:
         manager = PluginManager(session)
         for plugin_def in internal_registry.get_plugin_list():
             await manager.add_plugin_with_register(plugin_def)

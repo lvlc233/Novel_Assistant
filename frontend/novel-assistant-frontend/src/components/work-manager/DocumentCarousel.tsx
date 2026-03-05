@@ -21,7 +21,34 @@ interface DocumentCarouselProps {
   existingKnowledgeBases?: KnowledgeBase[];
 }
 
-// 作品卡片轮播组件
+/**
+ * 开发者: FrontendAgent(react)
+ * 创建时间: 2026-01-20 21:40
+ * 更新时间: 2026-03-05 15:30
+ * 
+ * 作品卡片轮播组件 (DocumentCarousel)
+ * 
+ * 在何处使用:
+ * - 主要用于 `src/app/works/page.tsx` 作品列表页。
+ * 
+ * 如何使用:
+ * ```tsx
+ * <DocumentCarousel 
+ *   works={works} 
+ *   onSelectWork={handleSelect} 
+ *   onCreateWork={handleCreate} 
+ *   // ... other props
+ * />
+ * ```
+ * 
+ * 内部实现梗概:
+ * - 核心是一个基于 framer-motion 的 3D 轮播图。
+ * - 维护一个 `items` 数组，包含所有 `works` 和一个末尾的 `Create` 占位卡片。
+ * - 使用 `activeIndex` 控制当前显示的卡片索引。
+ * - 计算 `visibleIndices` (左、中、右) 来决定渲染哪些卡片以及它们的位置 (variants)。
+ * - 支持受控模式 (通过 props 控制 index 和 creating 状态) 和非受控模式。
+ * - 当 `isCreating` 为 true 时，显示 `CreateWorkCard` 组件覆盖轮播图。
+ */
 const DocumentCarousel: React.FC<DocumentCarouselProps> = ({ 
   // 作品列表
   works, 

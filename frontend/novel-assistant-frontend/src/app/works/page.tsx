@@ -11,7 +11,7 @@ import { logger } from '@/lib/logger';
 
 import { WorkCreationData } from '@/components/work-manager/CreateWorkCard';
 import DocumentCarousel from '@/components/work-manager/DocumentCarousel';
-// import WorkPluginConfigModal from '@/components/work-manager/WorkPluginConfigModal';
+import WorkPluginConfigModal from '@/components/work-manager/WorkPluginConfigModal';
 import BottomInput from '@/components/common/BottomInput';
 
 // userId is no longer needed for backend API but kept for function signature compatibility
@@ -19,10 +19,11 @@ const userId = "";
 
 /**
  * 开发者: FrontendAgent(react)
- * 当前版本: FE-REF-20260131-02
+ * 当前版本: FE-REF-20260305-01
  * 创建时间: 2026-01-20 21:40
- * 更新时间: 2026-01-31 14:45
+ * 更新时间: 2026-03-05 15:40
  * 更新记录:
+ * - [2026-03-05 15:40:FE-REF-20260305-01: 恢复 DocumentCarousel 及 WorkPluginConfigModal 的使用; 确保数据加载正常。]
  * - [2026-01-31 14:45:FE-REF-20260131-02: 采用通用 Work 类型，支持多作品类型列表展示。]
  * - [2026-01-31 14:25:FE-REF-20260131-01: 在何处使用: 作品列表页；如何使用: 替换Novel为Work terminology；实现概述: 重命名所有变量、状态、接口引用，对接新的WorkService。]
  * - [2026-01-26 20:45:FE-REF-20260126-02: 彻底移除 Mock 数据依赖，userId 传空（后端基于 Token）。]
@@ -37,7 +38,7 @@ export default function DocumentsPage() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
+  // const [featureFlags, setFeatureFlags] = useState<PluginFeatureFlags | null>(null);
 
   // Fetch works and knowledge bases
   useEffect(() => {
@@ -74,6 +75,7 @@ export default function DocumentsPage() {
     fetchData();
   }, []);
 
+  // Plugin Feature Flags Logic (Deprecated/Commented out for now)
   // useEffect(() => {
   //   let isActive = true;
   //   const loadFlags = (force = false) => {
@@ -89,11 +91,6 @@ export default function DocumentsPage() {
   //       });
   //   };
   //   loadFlags();
-  //   /**
-  //    * 注释者: FrontendAgent(react)
-  //    * 时间: 2026-02-23 22:12:00
-  //    * 说明: 在何处使用: 作品列表页插件状态刷新；如何使用: 订阅插件变更事件并强制刷新；实现概述: 插件安装/移除后更新快捷输入框显示。
-  //    */
   //   const unsubscribe = subscribePluginFeatureFlagsChanged(() => loadFlags(true));
   //   return () => {
   //     isActive = false;
@@ -103,8 +100,10 @@ export default function DocumentsPage() {
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
-  const [pluginConfigWork, setPluginConfigWork] = useState<Novel | null>(null);
-  const isQuickInputEnabled = featureFlags?.quickInput ?? false;
+  const [pluginConfigWork, setPluginConfigWork] = useState<Work | null>(null);
+  
+  // Default to true or check actual flags if available
+  const isQuickInputEnabled = true; // featureFlags?.quickInput ?? false;
 
   // Keyboard navigation
   useEffect(() => {
@@ -133,7 +132,7 @@ export default function DocumentsPage() {
     router.push(`/works/${work.id}`);
   };
 
-  const handleEditWork = async (work: Novel) => {
+  const handleEditWork = async (work: Work) => {
     logger.debug('Edit work:', work);
     
     try {
@@ -191,7 +190,7 @@ export default function DocumentsPage() {
       }
   };
 
-  const handleOpenPluginConfig = (work: Novel) => {
+  const handleOpenPluginConfig = (work: Work) => {
     setPluginConfigWork(work);
   };
 
@@ -253,13 +252,13 @@ export default function DocumentsPage() {
                 existingKnowledgeBases={knowledgeBases}
             />
             
-            {/* {pluginConfigWork && (
-              // <WorkPluginConfigModal 
-              //   work={pluginConfigWork}
-              //   onClose={() => setPluginConfigWork(null)}
-              //   onSave={handleSavePluginConfig}
-              // />
-            )} */}
+            {pluginConfigWork && (
+              <WorkPluginConfigModal 
+                work={pluginConfigWork}
+                onClose={() => setPluginConfigWork(null)}
+                onSave={handleSavePluginConfig}
+              />
+            )}
           </>
           )}
         </div>

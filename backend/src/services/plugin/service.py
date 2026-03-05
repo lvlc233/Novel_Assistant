@@ -191,69 +191,91 @@ class PluginService:
         # 获取基于注入的参数列表
         injections = getattr(wrapper, "injections", {})
         
-        # 处理初始化函数的来源信息
-        for name in signature.parameters:
-            # 跳过首个参数
-            if name == "self":
-                continue
+        cleanup_tasks = []
+
+        async def perform_cleanup():
+            for task in cleanup_tasks:
+                try:
+                    await task()
+                except Exception as e:
+                    print(f"Error during cleanup: {e}")
+
+        try:
+            # 处理初始化函数的来源信息
+            for name in signature.parameters:
+                # 跳过首个参数
+                if name == "self":
+                    continue
+                
+                # Dependency Injection
+                if name in injections:
+                    dep_info = injections[name]
+                    if dep_info.dependency: # 获取注入函数
+                        try:
+                            # 直接调用依赖函数，不传递任何参数
+                            # 依赖函数内部负责获取所需资源（如通过 contextvars 或全局配置）
+                            dep_instance = dep_info.dependency()
+                            
+                            # 处理异步生成器 (如 get_session)
+                            if inspect.isasyncgen(dep_instance):
+                                gen = dep_instance
+                                dep_instance = await gen.__anext__()
+                                cleanup_tasks.append(gen.aclose)
+                            # 处理普通生成器
+                            elif inspect.isgenerator(dep_instance):
+                                dep_instance = next(dep_instance)
+                            # 处理协程
+                            elif inspect.iscoroutine(dep_instance):
+                                dep_instance = await dep_instance
+                            # 将注入的信息注入到运行时的参数中
+                            runtime_kwargs[name] = dep_instance
+                        except Exception as e:
+                            # Fallback or re-raise
+                            print(f"Warning: Failed to inject dependency '{name}': {e}")
+                    continue
+                
+                # 将一般的插件配置信息注入到运行时参数中
+                if name in merged_config:
+                    runtime_kwargs[name] = merged_config[name]
+
+            # 创建插件实例
+            instance = wrapper.create_instance(**runtime_kwargs)
+            # 调度插件的指定操作(并传递参数)
+            result_value = wrapper.invoke(instance, operation_name, **(params or {}))
             
-            # Dependency Injection
-            if name in injections:
-                dep_info = injections[name]
-                if dep_info.dependency: # 获取注入函数
+            if inspect.iscoroutine(result_value):
+                result_value = await result_value
+
+            # 如果是异步生成器，直接返回，交给 Router 处理 StreamingResponse
+            if inspect.isasyncgen(result_value):
+                async def wrapped_gen():
                     try:
-                        # 直接调用依赖函数，不传递任何参数
-                        # 依赖函数内部负责获取所需资源（如通过 contextvars 或全局配置）
-                        dep_instance = dep_info.dependency()
-                        
-                        # 处理异步生成器 (如 get_session)
-                        if inspect.isasyncgen(dep_instance):
-                            # 取第一个值
-                            dep_instance = await dep_instance.__anext__()
-                        # 处理普通生成器
-                        elif inspect.isgenerator(dep_instance):
-                            dep_instance = next(dep_instance)
-                        # 处理协程
-                        elif inspect.iscoroutine(dep_instance):
-                            dep_instance = await dep_instance
-                        # 将注入的信息注入到运行时的参数中
-                        runtime_kwargs[name] = dep_instance
-                    except Exception as e:
-                        # Fallback or re-raise
-                        print(f"Warning: Failed to inject dependency '{name}': {e}")
-                continue
+                        async for item in result_value:
+                            yield item
+                    finally:
+                        await perform_cleanup()
+                return wrapped_gen()
+
+            if isinstance(result_value, BaseModel):
+                payload: Any = result_value.model_dump()
+            elif isinstance(result_value, list):
+                payload = [
+                    item.model_dump() if isinstance(item, BaseModel) else item
+                    for item in result_value
+                ]
+            else:
+                payload = result_value
             
-            # 将一般的插件配置信息注入到运行时参数中
-            if name in merged_config:
-                runtime_kwargs[name] = merged_config[name]
+            await perform_cleanup()
 
-        # 创建插件实例
-        instance = wrapper.create_instance(**runtime_kwargs)
-        # 调度插件的指定操作(并传递参数)
-        result_value = wrapper.invoke(instance, operation_name, **(params or {}))
-        
-        # 如果是异步生成器，直接返回，交给 Router 处理 StreamingResponse
-        if inspect.isasyncgen(result_value):
-            return result_value
-
-        if inspect.iscoroutine(result_value):
-            result_value = await result_value
-
-        if isinstance(result_value, BaseModel):
-            payload: Any = result_value.model_dump()
-        elif isinstance(result_value, list):
-            payload = [
-                item.model_dump() if isinstance(item, BaseModel) else item
-                for item in result_value
-            ]
-        else:
-            payload = result_value
-
-        return PluginOperationInvokeResponse(
-            plugin_id=plugin_id,
-            operation=operation_name,
-            payload=payload
-        )
+            return PluginOperationInvokeResponse(
+                plugin_id=plugin_id,
+                operation=operation_name,
+                payload=payload
+            )
+        except Exception:
+            await perform_cleanup()
+            raise
 
     # async def proxy_plugin_data(self, plugin_id: UUID, params: Dict[str, Any]):
         # """BFF Proxy for plugin data."""
