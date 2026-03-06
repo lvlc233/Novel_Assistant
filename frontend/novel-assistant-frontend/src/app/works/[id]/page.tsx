@@ -67,7 +67,7 @@ export default function WorkDetailPage() {
       try {
         setIsLoading(true);
         // userId is not used by backend
-        const data = await getWorkDetail(userId, id);
+        const data = await getWorkDetail(id);
         setWork(data);
         setVolumes(data.volumes || []);
         setOrphanChapters(data.orphanChapters || []);
@@ -130,17 +130,14 @@ export default function WorkDetailPage() {
                 id: v.id,
                 version: v.version,
                 updatedAt: v.create_at,
-                content: v.id === detail.document_version_id ? (detail.document_body_text || '') : '',
+                content: v.id === detail.now_version_id ? (detail.full_text || '') : '',
                 versionNumber: parseInt(v.version.replace(/[^0-9.]/g, '')) || 1 // Simple parse
             }));
 
-            // If the fetched detail version is not in the list (shouldn't happen usually), add it?
-            // Or just ensure the current version in state has content.
-            
             // Construct updates
             const updates: Partial<Chapter> = {
-                currentVersionId: detail.document_version_id || 'v1',
-                currentVersionName: detail.current_version_name || detail.document_version_id,
+                currentVersionId: detail.now_version_id || 'v1',
+                currentVersionName: detail.now_version || 'v1.0.0',
                 versions: updatedVersions
             };
 
@@ -167,7 +164,6 @@ export default function WorkDetailPage() {
   const handleCreateVolume = async (name: string) => {
       try {
           const newFolder = await createFolder({
-              user_id: userId,
               work_id: id,
               name: name
           });
@@ -188,7 +184,6 @@ export default function WorkDetailPage() {
   const handleCreateChapter = async (volumeId?: string, name?: string) => {
       try {
           const newDoc = await createDocument({
-              user_id: userId,
               work_id: id,
               title: name || '新建章节',
               folder_id: volumeId
@@ -241,7 +236,6 @@ export default function WorkDetailPage() {
       if (data.title) {
           try {
              await renameFolder({
-                 user_id: userId,
                  work_id: params.id as string,
                  folder_id: id,
                  name: data.title
@@ -268,7 +262,6 @@ export default function WorkDetailPage() {
       if (data.title) {
           try {
              await renameDocument({
-                 user_id: userId,
                  work_id: params.id as string,
                  document_id: id,
                  title: data.title
@@ -282,7 +275,6 @@ export default function WorkDetailPage() {
   const handleDeleteVolume = async (volumeId: string) => {
       try {
           await deleteFolder({
-              user_id: userId,
               work_id: id,
               folder_id: volumeId
           });
@@ -299,7 +291,6 @@ export default function WorkDetailPage() {
   const handleDeleteChapter = async (chapterId: string) => {
       try {
           await deleteDocument({
-              user_id: userId,
               work_id: id,
               document_id: chapterId
           });
@@ -324,7 +315,6 @@ export default function WorkDetailPage() {
 
   const handleEditContent = () => {
       if (selectedChapter) {
-          logger.debug('Navigating to edit chapter', selectedChapter.id);
           router.push(`/editor?workId=${id}&initialChapterId=${selectedChapter.id}`);
       }
   };
@@ -343,10 +333,10 @@ export default function WorkDetailPage() {
           // 2. Update State with new content and set as current (for viewing)
           const updates: Partial<Chapter> = {
               currentVersionId: versionId,
-              currentVersionName: detail.current_version_name || detail.document_version_id,
+              currentVersionName: detail.now_version || 'v1.0.0',
               // Update content for this version in the list
               versions: selectedChapter?.versions.map(v => 
-                  v.id === versionId ? { ...v, content: detail.document_body_text || '' } : v
+                  v.id === versionId ? { ...v, content: detail.full_text || '' } : v
               ) || []
           };
           

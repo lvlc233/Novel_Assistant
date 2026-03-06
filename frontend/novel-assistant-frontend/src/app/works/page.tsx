@@ -138,7 +138,6 @@ export default function DocumentsPage() {
     try {
         const updatedWork = await updateWork({
             work_id: work.id,
-            user_id: userId,
             work_name: work.title,
             work_status: work.status,
             work_cover_image_url: work.cover
@@ -167,7 +166,6 @@ export default function DocumentsPage() {
         
         // 构造 DTO
         const createDto: CreateWorkDto = {
-          user_id: userId,
           work_name: data.title,
           work_summary: data.synopsis,
           work_cover_image_url: data.cover || undefined,
@@ -200,7 +198,6 @@ export default function DocumentsPage() {
     try {
       const updatedWork = await updateWork({
         work_id: pluginConfigWork.id,
-        user_id: userId,
         plugins: plugins
       });
       

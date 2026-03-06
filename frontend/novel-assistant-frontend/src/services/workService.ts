@@ -199,13 +199,12 @@ export async function getWorkList(userId: string): Promise<Novel[]> {
 /**
  * 获取作品详情
  */
-export async function getWorkDetail(userId: string, workId: string): Promise<Novel> {
+export async function getWorkDetail( workId: string): Promise<Novel> {
   const data = await request.get<WorkDetailResponse>(`/work/${workId}`);
   return mapDetailResponseToModel(data);
 }
 
 export interface CreateWorkDto {
-  user_id: string; // 后端忽略此字段
   work_name: string;
   work_summary?: string;
   work_cover_image_url?: string | File;
@@ -247,12 +246,11 @@ export async function createWork(data: CreateWorkDto): Promise<Novel> {
     };
     
     const result = await request.post<WorkMetaResponse>('/work', payload);
-    return getWorkDetail(data.user_id, result.meta.id);
+    return getWorkDetail(result.meta.id);
 }
 
 export interface UpdateWorkDto {
   work_id: string;
-  user_id: string; // 后端忽略
   work_name?: string;
   work_summary?: string;
   work_cover_image_url?: string | File;
@@ -304,7 +302,7 @@ export async function updateWork(data: UpdateWorkDto): Promise<Novel> {
         await request.patch(`/work/${data.work_id}`, payload);
     }
 
-    return getWorkDetail(data.user_id, data.work_id);
+    return getWorkDetail(data.work_id);
 }
 
 /**

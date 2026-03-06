@@ -121,13 +121,13 @@ export interface GetDocumentDetailDto {
 }
 
 export interface DocumentDetailDto {
-    document_id: string;
-    document_version_id: string;
-    document_title: string;
-    document_body_text: string | null;
-    document_word_count: number;
-    work_id?: string; // Add work_id to return
-    current_version_name?: string | null;
+    id: string;
+    now_version_id: string;
+    title: string;
+    full_text: string;
+    word_count: number;
+    work_id?: string;
+    now_version: string | null;
 }
 
 export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<DocumentDetailDto> {    
@@ -136,10 +136,13 @@ export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<Doc
     if (data.work_id) {
         if (data.version_id) {
              const encodedVersion = encodeURIComponent(data.version_id);
-             console.log(`[documentService] Fetching version: ${data.version_id} (encoded: ${encodedVersion})`);
-             response = await request.get<DocumentDetailResponse>(`/work/${data.work_id}/document/${data.document_id}/version/${encodedVersion}`);
+             // Backend uses path: /work/{work_id}/document/{document_id}/version/{version_id}
+             console.log(`[documentService] Fetching version: ${data.version_id}`);
+             const result = await request.get<DocumentDetailResponse>(`/work/${data.work_id}/document/${data.document_id}/version/${encodedVersion}`);
+             response = result;
         } else {
-             response = await request.get<DocumentDetailResponse>(`/work/${data.work_id}/document/${data.document_id}`);
+             const result = await request.get<DocumentDetailResponse>(`/work/${data.work_id}/document/${data.document_id}`);
+             response = result;
         }
     } else {
         // Strict Mode: work_id is required per architecture
@@ -147,13 +150,13 @@ export async function getDocumentDetail(data: GetDocumentDetailDto): Promise<Doc
     }
 
     return {
-      document_id: response.id || data.document_id,
-      document_version_id: response.now_version || 'latest', 
-      document_title: response.title,
-      document_body_text: response.full_text || '',
-      document_word_count: (response.full_text || '').length,
+      id: response.id,
+      now_version_id: response.now_version_id || 'latest', // Backend ensures now_version_id for detail
+      title: response.title,
+      full_text: response.full_text || '',
+      word_count: (response.full_text || '').length,
       work_id: response.work_id || data.work_id,
-      current_version_name: response.now_version
+      now_version: response.now_version || null
     };
 }
 

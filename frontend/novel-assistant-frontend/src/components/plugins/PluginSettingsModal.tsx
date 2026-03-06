@@ -75,6 +75,15 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
 
     const isProjectHelper = plugin.name === 'project_helper';
     const isDocumentHelper = plugin.name === 'document_helper';
+    const isWorkType = plugin.name === '作品类型' || plugin.name === 'work_type';
+    const isMemory = plugin.name === 'memory';
+    const isKD = plugin.name === 'kd';
+      
+    console.log('PluginSettingsModal: Detecting plugin type:', { 
+        name: plugin.name, 
+        isWorkType, 
+        isAgentManager 
+    });
       
     // Determine UI Target from operation if applicable
     if (isAgentManager) {
@@ -87,17 +96,27 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
     } 
     
     // Simplified data fetching logic for now
-    const fetchData = isAgentManager
-      ? invokePlugin(plugin.id, 'get_agent_info_in_card', new Map())
-      : isProjectHelper 
-        ? invokePlugin(plugin.id, 'get_project_sessions', new Map())
-        : isDocumentHelper
-          ? invokePlugin(plugin.id, 'get_document_sessions', new Map())
-          : getPluginDetail(plugin.id);
+    let fetchPromise;
+    if (isAgentManager) {
+        fetchPromise = invokePlugin(plugin.id, 'get_agent_info_in_card', new Map());
+    } else if (isProjectHelper) {
+        fetchPromise = invokePlugin(plugin.id, 'get_project_sessions', new Map());
+    } else if (isDocumentHelper) {
+        fetchPromise = invokePlugin(plugin.id, 'get_document_sessions', new Map());
+    } else if (isWorkType) {
+        fetchPromise = invokePlugin(plugin.id, 'get_work_type_list_in_plugin_expand', new Map());
+    } else if (isMemory) {
+        fetchPromise = invokePlugin(plugin.id, 'manage_memories', new Map());
+    } else if (isKD) {
+        fetchPromise = invokePlugin(plugin.id, 'manage_knowledge_bases', new Map());
+    } else {
+        fetchPromise = getPluginDetail(plugin.id);
+    }
       
-    fetchData
+    fetchPromise
       .then((response) => {
         if (active) {
+            console.log('PluginSettingsModal: Fetch response:', response);
             // FrontendAgent 2026-03-05: Map info_type to ui_target and unwrap data payload
             
             // 1. Determine UI Target
@@ -105,6 +124,8 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
             const payload = response?.payload;
             const uiTarget = payload?.ui_target || payload?.info_type || response?.ui_target || response?.info_type;
             
+            console.log('PluginSettingsModal: Resolved uiTarget:', uiTarget);
+
             if (uiTarget) {
                 setUiTarget(uiTarget);
             }

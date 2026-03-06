@@ -99,3 +99,5 @@ class NodeDetailResponse(BaseModel):
     description: str | None = None
     parent_node_id: UUID | None = None
     now_version: str | None = None
+    now_version_id: UUID | None = None # 添加 version_id
+    now_version: str | None = None

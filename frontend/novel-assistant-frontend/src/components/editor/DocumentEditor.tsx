@@ -85,7 +85,7 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
   const refreshWorkStructure = useCallback(async () => {
     if (!workId) return;
     try {
-        const work = await getWorkDetail(userId, workId);
+        const work = await getWorkDetail(workId);
         setVolumes(work.volumes || []);
         setOrphanChapters(work.orphanChapters || []);
         setIsStructureLoaded(true);
@@ -145,7 +145,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       if (!workId) return;
       try {
           await createFolder({
-              user_id: userId,
               work_id: workId,
               name: name || '新卷'
           });
@@ -159,7 +158,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       if (!workId) return;
       try {
           const newDoc = await createDocument({
-              user_id: userId,
               work_id: workId,
               title: name || '新章节',
               folder_id: volumeId
@@ -179,7 +177,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       try {
           if (data.title) {
               await renameFolder({
-                  user_id: userId,
                   work_id: workId,
                   folder_id: volumeId,
                   name: data.title
@@ -200,7 +197,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       try {
           if (data.title) {
               await renameDocument({
-                  user_id: userId,
                   work_id: workId,
                   document_id: chapterId,
                   title: data.title
@@ -220,7 +216,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       if (!workId) return;
       try {
           await deleteFolder({
-              user_id: userId,
               work_id: workId,
               folder_id: volumeId
           });
@@ -242,7 +237,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       if (!workId) return;
       try {
           await deleteDocument({
-              user_id: userId,
               work_id: workId,
               document_id: chapterId
           });
@@ -264,12 +258,16 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
         // Get version from URL if available
         const versionParam = searchParams.get('version');
         console.log(`[DocumentEditor] Initial load, version from URL: ${versionParam}`);
-
-        // If we have workId, we use it (standard path)
-        // If we don't have workId, we try to fetch by documentId directly to get context
-        const params = workId 
-            ? { document_id: currentChapterId, user_id: userId, work_id: workId, version_id: versionParam || undefined }
-            : { document_id: currentChapterId, user_id: userId, version_id: versionParam || undefined }; // work_id is optional now in service
+        
+        // If versionParam is 'asd' or clearly invalid, maybe ignore it? 
+        // Or let it fail and handle the error.
+        
+        // Construct params
+        const params: any = { 
+            document_id: currentChapterId, 
+            work_id: workId || undefined, 
+            version_id: versionParam || undefined 
+        };
 
         try {
             const detail = await getDocumentDetail(params);
@@ -279,14 +277,13 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
                 setWorkId(detail.work_id);
             }
 
-            setContent(detail.document_body_text || '');
-            setTitle(detail.document_title || '未命名文档');
-            if (detail.document_version_id) setVersion(detail.document_version_id); // Use document_version_id mapped from backend
+            setContent(detail.full_text || '');
+            setTitle(detail.title || '未命名文档');
+            if (detail.now_version_id) setVersion(detail.now_version_id);
             
-            // Prioritize version name from detail, but if it's 'latest' or matches ID, we might want to be careful
-            // For display:
-            if (detail.current_version_name) {
-                 setVersionName(detail.current_version_name);
+            // Prioritize version name from detail
+            if (detail.now_version) {
+                 setVersionName(detail.now_version);
             } else if (versionParam) {
                  setVersionName(versionParam);
             }
@@ -294,17 +291,26 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
             setIsSaved(true);
         } catch (err) {
             logger.error("Fetch document failed", err);
-            // If fetch fails (e.g. 404), reset currentChapterId so we don't show invalid editor state
-            // Only if we are sure it's a "not found" or similar fatal error.
-            // For now, let's assume if we can't fetch it, we shouldn't show it.
-            setCurrentChapterId(null);
-            setContent('');
-            setTitle('');
+            // If fetch fails (e.g. 404), likely due to invalid version or ID
+            // We should probably try to load without version first if version was present?
+            if (versionParam) {
+                console.warn("[DocumentEditor] Failed to load with version, retrying without version...");
+                // Remove version from URL
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('version');
+                router.replace(`${pathname}?${newParams.toString()}`);
+                // Retry fetch without version (implicitly happens on next render due to URL change, 
+                // but we can also clear state here)
+            } else {
+                 setCurrentChapterId(null);
+                 setContent('');
+                 setTitle('');
+            }
         }
     };
 
     fetchDoc();
-  }, [currentChapterId, workId, searchParams]); // Dependencies
+  }, [currentChapterId, workId, searchParams, router, pathname]);
 
   const handleSwitchVersion = async (versionStr: string) => {
       console.log(`[DocumentEditor] Switching to version: ${versionStr}`);
@@ -318,16 +324,15 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       try {
           const detail = await getDocumentDetail({
               document_id: currentChapterId,
-              user_id: userId,
               work_id: workId,
               version_id: versionStr
           });
           console.log('[DocumentEditor] Version detail fetched:', detail);
-          setContent(detail.document_body_text || '');
-          setTitle(detail.document_title || '未命名文档');
+          setContent(detail.full_text || '');
+          setTitle(detail.title || '未命名文档');
           
           setVersion(versionStr); 
-          setVersionName(versionStr); // Update version name explicitly
+          setVersionName(detail.now_version || ''); // Update version name explicitly
           setIsVersionDropdownOpen(false);
           
           // Update URL
@@ -356,13 +361,12 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
           if (version === versionStr) {
               const detail = await getDocumentDetail({
                   document_id: currentChapterId,
-                  user_id: userId,
                   work_id: workId
               });
-              setVersion(detail.document_version_id || 'latest');
-              setVersionName(detail.current_version_name || '');
-              setContent(detail.document_body_text || '');
-              setTitle(detail.document_title || '未命名文档');
+              setVersion(detail.now_version_id || 'latest');
+              setVersionName(detail.now_version || '');
+              setContent(detail.full_text || '');
+              setTitle(detail.title || '未命名文档');
               
               // Remove version param from URL as we reset to latest/default
               const params = new URLSearchParams(searchParams);
@@ -384,7 +388,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
 
           // Create version with entered name (or undefined/empty)
           await createDocumentVersion({
-              user_id: userId,
               work_id: workId,
               document_id: currentChapterId,
               version_name: newVersionName || undefined
@@ -393,11 +396,10 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
           await fetchVersions(); 
            const detail = await getDocumentDetail({
                document_id: currentChapterId,
-               user_id: userId,
                work_id: workId
            });
-           setVersion(detail.document_version_id || 'latest');
-           setVersionName(detail.current_version_name || '');
+           setVersion(detail.now_version_id || 'latest');
+           setVersionName(detail.now_version || '');
            
            setIsVersionDropdownOpen(false);
            setIsCreatingVersion(false);
@@ -406,9 +408,9 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
            // Clear version param as new version creation might switch context or stay on latest logic
            // If the backend switches to the new version automatically, we might want to update URL to that new version
            // But here we just reset to what getDocumentDetail returns (likely the new version as current)
-           if (detail.document_version_id && detail.document_version_id !== 'latest') {
+           if (detail.now_version_id && detail.now_version_id !== 'latest') {
                const params = new URLSearchParams(searchParams);
-               params.set('version', detail.document_version_id);
+               params.set('version', detail.now_version_id);
                router.replace(`${pathname}?${params.toString()}`);
            }
            
@@ -432,7 +434,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
       if (!workId || !currentChapterId) return;
       try {
           await renameDocument({
-              user_id: userId,
               work_id: workId,
               document_id: currentChapterId,
               title: title
@@ -454,7 +455,6 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
     }
     try {
         const updatedDoc = await updateDocumentContent({
-            user_id: userId,
             work_id: workId,
             document_id: currentChapterId,
             version_id: version, 
@@ -467,7 +467,7 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
         }
         
         setIsSaved(true);
-        logger.debug('保存文档成功:', { title, content, version: updatedDoc.current_version_id });
+        logger.debug('保存文档成功:', { title, content, version: updatedDoc.now_version});
         
         // Also ensure title is saved if it was changed
         await handleTitleSave();
@@ -571,7 +571,7 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
                             if (version === 'latest') return 'LATEST';
                             if (versionName) return versionName;
                             // Use find to get the version object and display its version name (v.version)
-                            const v = versionList.find(i => i.version === version);
+                            const v = versionList.find(i => i.id === version);
                             return v ? v.version : 'UNKNOWN'; 
                         })()}
                      </span>
@@ -584,22 +584,22 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
                        {versionList.map((v) => (
                           <div 
                             key={v.id} 
-                            onClick={() => handleSwitchVersion(v.version)}
-                            className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between transition-colors cursor-pointer group/item ${v.version === version ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-50'}`}
+                            onClick={() => handleSwitchVersion(v.id)}
+                            className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between transition-colors cursor-pointer group/item ${v.id === version ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-50'}`}
                           >
                              <div className="flex flex-col">
                                 <span className="font-medium truncate max-w-[150px]">
                                     {v.version}
                                 </span>
-                                <span className={`text-[10px] ${v.version === version ? 'text-stone-400' : 'text-stone-400'}`}>
+                                <span className={`text-[10px] ${v.id === version ? 'text-stone-400' : 'text-stone-400'}`}>
                                     {format(new Date(v.create_at), 'MM-dd HH:mm')}
                                 </span>
                              </div>
                              <div className="flex items-center gap-2">
-                                 {v.version === version && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
+                                 {v.id === version && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
                                  <button
-                                    onClick={(e) => handleDeleteVersion(e, v.version)}
-                                    className={`p-1 rounded-md hover:bg-red-100 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-all ${v.version === version ? 'text-stone-400 hover:text-red-400' : 'text-stone-400'}`}
+                                    onClick={(e) => handleDeleteVersion(e, v.id)}
+                                    className={`p-1 rounded-md hover:bg-red-100 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-all ${v.id === version ? 'text-stone-400 hover:text-red-400' : 'text-stone-400'}`}
                                     title="Delete Version"
                                  >
                                      <Trash2 size={12} />

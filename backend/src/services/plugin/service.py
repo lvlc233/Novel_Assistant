@@ -156,8 +156,8 @@ class PluginService:
         if request.config is not None:
             plugin.default_config = request.config # self._to_config_dict(request.config)
             
-        if request.auth_config is not None:
-            plugin.auth_config = request.auth_config # self._to_config_dict(request.auth_config)
+        # if request.auth_config is not None:
+        #     plugin.auth_config = request.auth_config # self._to_config_dict(request.auth_config)
             
         await self.session.commit()
 

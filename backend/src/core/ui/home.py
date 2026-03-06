@@ -2,6 +2,7 @@
 # 示例：前端系统定义的结构（通常放在一个 shared_ui.py 中）
 from typing import TypedDict, List
 
+from backend.src.common.enums import NodeTypeEnum, WorkTypeEnum
 from core.ui.base import Component, Page, Slot
 
 
@@ -58,12 +59,25 @@ class DocumentItem(TypedDict):
 
 class DocumentSessionData(TypedDict):
     documents: List[DocumentItem]
+
+# 作品类型(用于WorkCreate)
+class WorkTypeItem(TypedDict):
+    id: str
+    name: str
+
+class WorkTypeDetail(TypedDict):
+    id:str
+    name:str
+    tags:List[str] # 该作品类型下的节点标签
+    relationship:List[str] # 该作品类型下的节点关系
     
 registed={
     "AgentMessages":List[AgentMessageHistoryItem],
     "Email":Email,
     "ProjectSessionManager": ProjectSessionData,
-    "DocumentSessionManager": DocumentSessionData
+    "DocumentSessionManager": DocumentSessionData,
+    "WorkTypeSelect":List[WorkTypeItem],
+    "WorkTypeDetail":List[WorkTypeDetail]
 }
 
 class Home(Page):
@@ -91,8 +105,16 @@ class Home(Page):
         # Agent块
         class AgentBox(Component):
             def __init__(self, agent_name: str, on_email: bool, history: List[AgentMessageHistoryItem]): pass
-    
 
+class Works(Page):
+    # 创建作品的组件
+    class WorkCreate(Component):
+         def __init__(self, data: List[WorkTypeItem]): pass
+    class WorkTypeSelect(Slot):
+        # 作品类型选择项
+        class WorkTypeSelectItem(Component):
+            def __init__(self, id: str, name: str): pass
+           
 
 
             

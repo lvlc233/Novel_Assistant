@@ -119,7 +119,16 @@ async def get_document_version_detail(
 ) -> Response[DocumentDetailResponse]:
     """获取指定文档的指定版本的详情,并切换当前的版本为指定version的版本."""
     data = await service.get_document_version_detail_and_switch(document_id, version_id)
-    return Response.ok(data=data)
+    return Response.ok(data=DocumentDetailResponse(
+        id=data.id,
+        work_id=data.work_id,
+        title=data.title,
+        description=data.description,
+        from_node_id=data.from_node_id,
+        full_text=data.full_text,
+        now_version=data.now_version,
+        now_version_id=data.now_version_id # Map service current_version_id to response now_version_id
+    ))
 
 @router.post("/work/{work_id}/document/{document_id}/version", response_model=Response[None])
 async def create_document_version(
@@ -170,7 +179,8 @@ async def get_document_detail(
         description=data.description,
         from_node_id=data.parent_node_id,
         full_text=data.content,
-        now_version=str(data.now_version) if data.now_version else None
+        now_version=str(data.now_version) if data.now_version else None,
+        now_version_id=data.now_version_id # Pass version_id
     ))
 
 # --- Nodes (Folders) ---

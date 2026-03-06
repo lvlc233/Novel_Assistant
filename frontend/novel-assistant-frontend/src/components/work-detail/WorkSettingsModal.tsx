@@ -68,7 +68,6 @@ export default function WorkSettingsModal({ isOpen, onClose, work, onUpdate }: W
       const coverUrl = formData.cover ? formData.coverUrl : formData.coverUrl;
 
       const updated = await updateWork({
-        user_id: userId,
         work_id: work.id,
         work_name: formData.title,
         work_summary: formData.synopsis,

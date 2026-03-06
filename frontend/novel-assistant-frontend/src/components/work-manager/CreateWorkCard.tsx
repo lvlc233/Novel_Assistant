@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, X, ChevronDown, Check, Sparkles, Book, Settings, Puzzle, Info, Layout, ArrowLeft, Wand2 } from 'lucide-react';
+import { Upload, X, ChevronDown, Check, Sparkles, Book, ArrowLeft, Wand2 } from 'lucide-react';
 import { KnowledgeBase } from '@/types/work';
-import { PluginInstance } from '@/types/plugin';
-import { getPlugins } from '@/services/pluginService';
+import { getPlugins, invokePluginOperation } from '@/services/pluginService';
 
 interface CreateWorkCardProps {
   onCancel: () => void;
@@ -20,11 +19,6 @@ export interface WorkCreationData {
   plugins?: { id: string; config: Record<string, unknown>; enabled: boolean }[];
 }
 
-// TODO: work类型是通过插件获取的,不应该被硬编码在这里
-const WORK_TYPES = [
-  { label: "小说", value: "novel" }
-];
-
 //  创建作品卡片信息
 const CreateWorkCard: React.FC<CreateWorkCardProps> = ({ 
   onCancel, 
@@ -33,8 +27,12 @@ const CreateWorkCard: React.FC<CreateWorkCardProps> = ({
 }) => {
   // Navigation State
   const [creationStep, setCreationStep] = useState<'type-selection' | 'configuration'>('type-selection');
-  const [configTab, setConfigTab] = useState<'basic' | 'plugins'>('basic');
   
+  // Work Types State
+  const [workTypes, setWorkTypes] = useState<{label: string, value: string}[]>([
+    { label: "小说", value: "novel" } // Default fallback
+  ]);
+
   // Form Data
   const [formData, setFormData] = useState({
     title: '',
@@ -45,35 +43,34 @@ const CreateWorkCard: React.FC<CreateWorkCardProps> = ({
     genre: 'fantasy' // default genre
   });
 
-  // Plugins State
-  const [availablePlugins, setAvailablePlugins] = useState<PluginInstance[]>([]);
-  const [selectedPlugins, setSelectedPlugins] = useState<Set<string>>(new Set());
-  const [pluginConfigs, setPluginConfigs] = useState<Record<string, any>>({});
-  const [activePluginId, setActivePluginId] = useState<string | null>(null);
-
   // Knowledge Base UI State
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load plugins
-    getPlugins().then(plugins => {
-      setAvailablePlugins(plugins);
-      // Auto-select system plugins
-      const systemPlugins = plugins.filter(p => p.fromType === 'system').map(p => p.id);
-      setSelectedPlugins(new Set(systemPlugins));
-      
-      // Initialize default configs
-      const initialConfigs: Record<string, any> = {};
-      plugins.forEach(p => {
-        initialConfigs[p.id] = { model: "GPT-4", ...p.config };
-      });
-      setPluginConfigs(initialConfigs);
-      
-      if (plugins.length > 0) {
-        setActivePluginId(plugins[0].id);
+    const loadData = async () => {
+      try {
+        const plugins = await getPlugins();
+        
+        // Load Work Types from Plugin
+        const workTypePlugin = plugins.find(p => p.name === "作品类型" && p.fromType === 'system');
+        if (workTypePlugin) {
+          const result = await invokePluginOperation(workTypePlugin.id, "get_work_type_list_in_work_create", {});
+          if (result && result.info_type === "WorkTypeSelect" && Array.isArray(result.data)) {
+             const types = result.data.map((item: any) => ({
+                 label: item.name,
+                 value: item.name // Use name as value for now
+             }));
+             if (types.length > 0) {
+                 setWorkTypes(types);
+             }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load data", e);
       }
-    });
+    };
+    loadData();
   }, []);
 
   // Close dropdown when clicking outside
@@ -104,37 +101,10 @@ const CreateWorkCard: React.FC<CreateWorkCardProps> = ({
     setFormData(prev => ({ ...prev, selectedKbIds: prev.selectedKbIds.filter(k => k !== id) }));
   };
 
-  const togglePlugin = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const newSet = new Set(selectedPlugins);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
-    setSelectedPlugins(newSet);
-  };
-
-  const updatePluginConfig = (id: string, key: string, value: unknown) => {
-    setPluginConfigs(prev => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [key]: value
-      }
-    }));
-  };
-
   const handleSubmit = () => {
-    const pluginsData = Array.from(selectedPlugins).map(id => ({
-      id,
-      enabled: true,
-      config: pluginConfigs[id] || {}
-    }));
-
     onCreate({
       ...formData,
-      plugins: pluginsData
+      plugins: [] // No plugins configuration
     });
   };
 
@@ -183,7 +153,7 @@ const CreateWorkCard: React.FC<CreateWorkCardProps> = ({
         {creationStep === 'type-selection' && (
           <div className="flex-1 p-8 overflow-y-auto animate-slide-in-right">
              <div className="grid grid-cols-3 gap-4 max-w-3xl mx-auto mt-8">
-               {WORK_TYPES.map(typeItem => (
+               {workTypes.map(typeItem => (
                  <button
                    key={typeItem.value}
                    onClick={() => handleTypeSelect(typeItem.value)}
@@ -213,49 +183,10 @@ const CreateWorkCard: React.FC<CreateWorkCardProps> = ({
         {/* View 2: Configuration */}
         {creationStep === 'configuration' && (
           <div className="flex-1 flex w-full animate-slide-in-right">
-             {/* Sidebar */}
-             <div className="w-64 bg-gray-50/50 border-r border-gray-100 flex flex-col p-4 gap-2">
-                <button
-                  onClick={() => setConfigTab('basic')}
-                  className={`
-                    w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold
-                    ${configTab === 'basic' 
-                      ? 'bg-white text-black shadow-sm border border-gray-200' 
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}
-                  `}
-                >
-                  <Layout className="w-4 h-4" />
-                  基本信息
-                </button>
-                <button
-                  onClick={() => setConfigTab('plugins')}
-                  className={`
-                    w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold
-                    ${configTab === 'plugins' 
-                      ? 'bg-white text-black shadow-sm border border-gray-200' 
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}
-                  `}
-                >
-                  <Puzzle className="w-4 h-4" />
-                  插件配置
-                </button>
-
-                <div className="mt-auto p-4 bg-blue-50 rounded-xl border border-blue-100 hidden">
-                  <div className="flex items-center gap-2 text-blue-800 font-bold text-xs mb-1">
-                    <Info className="w-3 h-3" />
-                    当前类型
-                  </div>
-                  <div className="text-blue-900 font-serif font-bold text-lg">
-                    {WORK_TYPES.find(t => t.value === formData.type)?.label || formData.type}
-                  </div>
-                </div>
-             </div>
-
              {/* Main Content */}
              <div className="flex-1 flex flex-col bg-white overflow-hidden">
-                {/* Tab: Basic Info */}
-                {configTab === 'basic' && (
-                  <div className="flex-1 p-8 overflow-y-auto animate-fade-in">
+                {/* Form Content */}
+                <div className="flex-1 p-8 overflow-y-auto animate-fade-in">
                      <div className="flex gap-8">
                        {/* Cover Upload */}
                        <div className="w-1/3 shrink-0">
@@ -371,146 +302,11 @@ const CreateWorkCard: React.FC<CreateWorkCardProps> = ({
                        </div>
                      </div>
                   </div>
-                )}
-
-                {/* Tab: Plugins */}
-                {configTab === 'plugins' && (
-                  <div className="flex-1 flex animate-fade-in overflow-hidden">
-                     {/* Plugin List */}
-                     <div className="w-[240px] border-r border-gray-100 flex flex-col bg-gray-50/30 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                        {availablePlugins.map(plugin => {
-                          const isSelected = selectedPlugins.has(plugin.id);
-                          const isActive = activePluginId === plugin.id;
-                          return (
-                            <div 
-                              key={plugin.id}
-                              onClick={() => setActivePluginId(plugin.id)}
-                              className={`
-                                p-3 rounded-xl border cursor-pointer transition-all relative group
-                                ${isActive ? 'border-black bg-white shadow-md' : 'border-transparent hover:bg-white hover:border-gray-200'}
-                              `}
-                            >
-                               <div className="flex items-start gap-3">
-                                  <div className={`
-                                    w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                                    ${isSelected ? 'bg-black text-white' : 'bg-gray-200 text-gray-400'}
-                                  `}>
-                                    <Puzzle className="w-4 h-4" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                     <div className="flex items-center justify-between mb-0.5">
-                                       <span className={`font-bold text-sm truncate ${isActive ? 'text-black' : 'text-gray-700'}`}>
-                                         {plugin.name}
-                                       </span>
-                                       <div 
-                                         onClick={(e) => togglePlugin(plugin.id, e)}
-                                         className={`
-                                           w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors
-                                           ${isSelected ? 'bg-green-500' : 'bg-gray-300'}
-                                         `}
-                                       >
-                                          <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${isSelected ? 'translate-x-4' : ''}`} />
-                                       </div>
-                                     </div>
-                                     <p className="text-[10px] text-gray-500 line-clamp-2 leading-tight">
-                                       {plugin.description}
-                                     </p>
-                                  </div>
-                               </div>
-                            </div>
-                          );
-                        })}
-                     </div>
-
-                     {/* Plugin Config Panel */}
-                     <div className="flex-1 p-6 overflow-y-auto">
-                        {activePluginId ? (
-                          <div className="max-w-lg mx-auto">
-                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="font-bold text-lg text-gray-900">
-                                  {availablePlugins.find(p => p.id === activePluginId)?.name} 配置
-                                </h3>
-                                <span className={`px-2 py-1 rounded text-xs font-bold ${selectedPlugins.has(activePluginId) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                  {selectedPlugins.has(activePluginId) ? '已启用' : '未启用'}
-                                </span>
-                             </div>
-
-                             {/* Plugin Description - Always Visible */}
-                             <div className="p-4 bg-blue-50 rounded-xl flex gap-3 border border-blue-100 mb-6">
-                                <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                                <div className="space-y-1">
-                                  <p className="text-sm text-blue-900 font-medium">关于此插件</p>
-                                  <p className="text-xs text-blue-700 leading-relaxed">
-                                    {availablePlugins.find(p => p.id === activePluginId)?.description || "暂无描述"}
-                                  </p>
-                                </div>
-                             </div>
-
-                             {!selectedPlugins.has(activePluginId) ? (
-                                <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                   <Settings className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                                   <p className="text-gray-500 text-sm font-medium">启用此插件以配置更多选项</p>
-                                   <button 
-                                     onClick={() => togglePlugin(activePluginId)}
-                                     className="mt-4 px-4 py-2 bg-black text-white text-xs font-bold rounded-lg hover:scale-105 transition-transform"
-                                   >
-                                     启用插件
-                                   </button>
-                                </div>
-                             ) : (
-                                <div className="space-y-6">
-                                   <div className="space-y-4">
-                                      <div>
-                                         <label className="text-xs font-bold text-gray-500 mb-2 block uppercase">模型选择</label>
-                                         <select 
-                                           className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-black transition-colors"
-                                           value={pluginConfigs[activePluginId]?.model || "GPT-4"}
-                                           onChange={(e) => updatePluginConfig(activePluginId, 'model', e.target.value)}
-                                         >
-                                            {/* {MOCK_MODELS.map(m => <option key={m} value={m}>{m}</option>)} */}
-                                         </select>
-                                      </div>
-
-                                      <div>
-                                         <label className="text-xs font-bold text-gray-500 mb-2 block uppercase">功能开关</label>
-                                         <div className="space-y-2">
-                                            <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                                              <input 
-                                                type="checkbox" 
-                                                className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
-                                                checked={pluginConfigs[activePluginId]?.autoSave ?? true}
-                                                onChange={(e) => updatePluginConfig(activePluginId, 'autoSave', e.target.checked)}
-                                              />
-                                              <span className="text-sm text-gray-700">自动保存生成内容</span>
-                                            </label>
-                                            <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                                              <input 
-                                                type="checkbox" 
-                                                className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
-                                                checked={pluginConfigs[activePluginId]?.notifications ?? false}
-                                                onChange={(e) => updatePluginConfig(activePluginId, 'notifications', e.target.checked)}
-                                              />
-                                              <span className="text-sm text-gray-700">启用桌面通知</span>
-                                            </label>
-                                         </div>
-                                      </div>
-                                   </div>
-                                </div>
-                             )}
-                          </div>
-                        ) : (
-                          <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-                            请选择一个插件进行配置
-                          </div>
-                        )}
-                     </div>
-                  </div>
-                )}
 
                 {/* Footer Action */}
                 <div className="h-16 border-t border-gray-100 flex items-center justify-between px-8 bg-gray-50/50 shrink-0">
                    <div className="text-xs text-gray-400">
-                      {configTab === 'basic' ? '请填写作品基础信息' : '配置您的 AI 助手插件'}
+                      请填写作品基础信息
                    </div>
                    <button 
                       onClick={handleSubmit}

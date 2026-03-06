@@ -108,6 +108,7 @@ class NodeService:
 
         content = ""
         word_count = 0
+        now_version_id = None
         
         if node.node_type == NodeTypeEnum.DOCUMENT.value:
             # 获取指定版本(now_version) 或 最新版本
@@ -132,6 +133,7 @@ class NodeService:
             if latest_version:
                 content = latest_version.full_text
                 word_count = latest_version.word_count
+                now_version_id = latest_version.id
         
         # 获取父节点ID
         stmt_parent = select(NodeRelationshipSQLEntity.from_node_id)\
@@ -148,7 +150,8 @@ class NodeService:
             word_count=word_count,
             description=node.description,
             parent_node_id=parent_id,
-            now_version=latest_version.version
+            now_version=latest_version.version if latest_version else None,
+            now_version_id=now_version_id
         )
 
     async def update_node(self, node_id: str, request: UpdateNodeDTO) -> NodeDetailResponse:
@@ -200,6 +203,7 @@ class NodeService:
         content = ""
         word_count = 0
         current_version_id = None
+        now_version_id = None
         
         if node.node_type == "document":
             # Fetch existing content for response
@@ -224,6 +228,7 @@ class NodeService:
                 content = latest_version.full_text
                 word_count = latest_version.word_count
                 current_version_id = latest_version.version
+                now_version_id = latest_version.id # Get UUID
 
         return NodeDetailResponse(
             id=node.id,
@@ -234,7 +239,55 @@ class NodeService:
             word_count=word_count,
             description=node.description,
             parent_node_id=parent_id,
-            now_version=current_version_id
+            now_version=current_version_id,
+            now_version_id=now_version_id
+        )
+
+    async def get_document_version_detail_and_switch(self, node_id: str, version_id: str) -> DocumentDetailResponse:
+        """获取指定版本的文档详情，并更新节点的 now_version 为该版本."""
+        # 1. Get Node
+        stmt = select(NodeSQLEntity).where(NodeSQLEntity.id == node_id)
+        result = await self.session.execute(stmt)
+        node = result.scalar_one_or_none()
+        
+        if not node:
+             raise ResourceNotFoundError(f"Node not found: {node_id}")
+
+        # 2. Get Version (Check existence)
+        # version_id here is the UUID of the version
+        stmt_ver = select(DocumentVersionSQLEntity).where(
+            DocumentVersionSQLEntity.node_id == node_id,
+            DocumentVersionSQLEntity.id == version_id
+        )
+        result_ver = await self.session.execute(stmt_ver)
+        version = result_ver.scalar_one_or_none()
+        
+        if not version:
+             raise ResourceNotFoundError(f"Version not found: {version_id}")
+
+        # 3. Update Node's now_version to this version's version_name (version field)
+        # Note: now_version stores the version string (e.g., "v1.0.0"), not UUID.
+        if node.now_version != version.version:
+             node.now_version = version.version
+             node.update_at = get_now_time()
+             await self.session.commit()
+             await self.session.refresh(node)
+        
+        # 4. Get Parent ID
+        stmt_parent = select(NodeRelationshipSQLEntity.from_node_id)\
+            .where(NodeRelationshipSQLEntity.to_node_id == node_id)
+        result_parent = await self.session.execute(stmt_parent)
+        parent_id = result_parent.scalar_one_or_none()
+
+        return DocumentDetailResponse(
+            id=node.id,
+            work_id=node.work_id,
+            title=node.name,
+            description=node.description,
+            from_node_id=parent_id,
+            full_text=version.full_text,
+            now_version=version.version,
+            now_version_id=version.id
         )
 
     async def update_document_version_content(self, node_id: str, version_id: str, content: str) -> DocumentDetailResponse:
@@ -246,10 +299,10 @@ class NodeService:
         if not node:
              raise ResourceNotFoundError(f"Node not found: {node_id}")
 
-        # 2. Get Version
+        # 2. Get Version (By UUID)
         stmt_ver = select(DocumentVersionSQLEntity).where(
             DocumentVersionSQLEntity.node_id == node_id,
-            DocumentVersionSQLEntity.version == version_id
+            DocumentVersionSQLEntity.id == version_id
         )
         result_ver = await self.session.execute(stmt_ver)
         version = result_ver.scalar_one_or_none()
@@ -260,7 +313,6 @@ class NodeService:
         # 3. Update Content
         version.full_text = content
         version.word_count = len(content)
-        # version.create_at = get_now_time() # Do not update create_at, maybe update_at if exists
         
         # 4. If this is the current version, update node update_at
         if node.now_version == version.version:
@@ -283,142 +335,42 @@ class NodeService:
             from_node_id=parent_id,
             full_text=version.full_text,
             now_version=node.now_version,
-            current_version_id=version.id
+            now_version_id=version.id
         )
 
-    async def get_document_detail_by_id(self, node_id: str) -> DocumentDetailResponse:
-        """根据ID直接获取文档详情 (不需要work_id)."""
-        # 1. Get Node
-        stmt = select(NodeSQLEntity).where(NodeSQLEntity.id == node_id)
-        result = await self.session.execute(stmt)
-        node = result.scalar_one_or_none()
-        if not node:
-             raise ResourceNotFoundError(f"Node not found: {node_id}")
-
-        if node.node_type != "document":
-             # Optional: raise error if not a document? Or just return basic info?
-             pass
-
-        # 2. Get Content (now_version or latest)
-        content = ""
-        current_ver_name = None
-        current_ver_id = None
-        
-        if node.now_version:
-             stmt_ver = select(DocumentVersionSQLEntity).where(
-                 DocumentVersionSQLEntity.node_id == node.id,
-                 DocumentVersionSQLEntity.version == node.now_version
-             )
-             result_ver = await self.session.execute(stmt_ver)
-             version = result_ver.scalar_one_or_none()
-             if version:
-                 content = version.full_text
-                 current_ver_name = version.version
-                 current_ver_id = version.id
-        
-        if not current_ver_id:
-             # Fallback to latest
-             stmt_ver = select(DocumentVersionSQLEntity)\
-                .where(DocumentVersionSQLEntity.node_id == node_id)\
-                .order_by(DocumentVersionSQLEntity.version.desc())\
-                .limit(1)
-             result_ver = await self.session.execute(stmt_ver)
-             latest_version = result_ver.scalar_one_or_none()
-             if latest_version:
-                 content = latest_version.full_text
-                 current_ver_name = latest_version.version
-                 current_ver_id = latest_version.id
-
-        # 3. Get Parent ID
-        stmt_parent = select(NodeRelationshipSQLEntity.from_node_id)\
-            .where(NodeRelationshipSQLEntity.to_node_id == node_id)
-        result_parent = await self.session.execute(stmt_parent)
-        parent_id = result_parent.scalar_one_or_none()
-
-        return DocumentDetailResponse(
-            id=node.id,
-            work_id=node.work_id,
-            title=node.name,
-            description=node.description,
-            from_node_id=parent_id,
-            full_text=content,
-            now_version=current_ver_name,
-            current_version_id=current_ver_id
-        )
 
     async def get_document_versions(self, node_id: str) -> DocumentVersionResponse:
-        """获取文档的所有版本."""
-        stmt = select(DocumentVersionSQLEntity).where(DocumentVersionSQLEntity.node_id == node_id).order_by(DocumentVersionSQLEntity.create_at.desc())
+        """获取文档版本列表."""
+        stmt = select(DocumentVersionSQLEntity)\
+            .where(DocumentVersionSQLEntity.node_id == node_id)\
+            .order_by(DocumentVersionSQLEntity.create_at.desc())
+        
         result = await self.session.execute(stmt)
         versions = result.scalars().all()
         
-        return DocumentVersionResponse(versions=[
-            DocumentVersionItem(
-                id=v.id,
-                version=v.version,
-                create_at=v.create_at
-            ) for v in versions
-        ])
+        return DocumentVersionResponse(
+            versions=[
+                DocumentVersionItem(
+                    id=v.id,
+                    version=v.version,
+                    create_at=v.create_at
+                ) for v in versions
+            ]
+        )
 
-    async def get_document_version_detail_and_switch(self, node_id: str, version_id: str) -> DocumentDetailResponse:
-        """获取指定文档的指定版本的详情,并切换当前的版本为指定version的版本."""
-        return await self.restore_version(node_id, version_id)
-
-    async def restore_version(self, node_id: str, version_id: str) -> DocumentDetailResponse:
-        """回退到指定版本 (Update now_version)."""
+    async def create_document_version(self, node_id: str, request: DocumentVersionCreateRequest) -> None:
+        """创建新版本 (基于当前 now_version)."""
         # 1. Get Node
         stmt = select(NodeSQLEntity).where(NodeSQLEntity.id == node_id)
         result = await self.session.execute(stmt)
         node = result.scalar_one_or_none()
+        
         if not node:
              raise ResourceNotFoundError(f"Node not found: {node_id}")
 
-        # 2. Get Version (By version string)
-        stmt_ver = select(DocumentVersionSQLEntity).where(
-            DocumentVersionSQLEntity.node_id == node_id,
-            DocumentVersionSQLEntity.version == version_id
-        )
-        result_ver = await self.session.execute(stmt_ver)
-        version = result_ver.scalar_one_or_none()
-        if not version:
-             raise ResourceNotFoundError(f"Version not found: {version_id}")
-        
-        # 3. Switch Version
-        node.now_version = version.version
-        await self.session.commit()
-        await self.session.refresh(node)
-        
-        # 4. Get Parent ID
-        stmt_parent = select(NodeRelationshipSQLEntity.from_node_id)\
-            .where(NodeRelationshipSQLEntity.to_node_id == node_id)
-        result_parent = await self.session.execute(stmt_parent)
-        parent_id = result_parent.scalar_one_or_none()
-
-        # 5. Return Detail
-        return DocumentDetailResponse(
-            id=node.id,
-            work_id=node.work_id,
-            title=node.name,
-            description=node.description,
-            from_node_id=parent_id,
-            full_text=version.full_text,
-            now_version=version.version,
-            current_version_id=version.id
-        )
-
-    async def create_document_version(self, node_id: str, request: DocumentVersionCreateRequest) -> NodeDetailResponse:
-        """创建文档的新版本,并将最新的版本指定为该版本,新版本继承自当前版本的内容."""
-        # 1. Get Node
-        stmt = select(NodeSQLEntity).where(NodeSQLEntity.id == node_id)
-        result = await self.session.execute(stmt)
-        node = result.scalar_one_or_none()
-        if not node:
-             raise ResourceNotFoundError(f"Node not found: {node_id}")
-        
-        # 2. Get Current Content (from now_version or latest)
-        content = ""
-        word_count = 0
-        current_ver = None
+        # 2. Get Current Version Content
+        current_content = ""
+        current_word_count = 0
         
         if node.now_version:
              stmt_ver = select(DocumentVersionSQLEntity).where(
@@ -427,66 +379,67 @@ class NodeService:
              )
              result_ver = await self.session.execute(stmt_ver)
              current_ver = result_ver.scalar_one_or_none()
+             if current_ver:
+                 current_content = current_ver.full_text
+                 current_word_count = current_ver.word_count
         
-        if not current_ver:
-             stmt_ver = select(DocumentVersionSQLEntity)\
-                .where(DocumentVersionSQLEntity.node_id == node_id)\
-                .order_by(DocumentVersionSQLEntity.create_at.desc())\
-                .limit(1)
-             result_ver = await self.session.execute(stmt_ver)
-             current_ver = result_ver.scalar_one_or_none()
+        # 3. Determine New Version Name
+        # Logic: If request.version_name provided, use it.
+        # Else: Increment last version number. e.g. v1 -> v2
+        new_version_name = request.version_name
         
-        if current_ver:
-            content = current_ver.full_text
-            word_count = current_ver.word_count
-            
-        # 3. Determine new version name
-        new_ver_str = request.version_name
-        if not new_ver_str:
-            # Generate random string (8 chars)
-            new_ver_str = uuid.uuid4().hex[:8]
-        
+        if not new_version_name:
+             # Find latest version to increment
+             stmt_latest = select(DocumentVersionSQLEntity)\
+                 .where(DocumentVersionSQLEntity.node_id == node_id)\
+                 .order_by(DocumentVersionSQLEntity.create_at.desc())\
+                 .limit(1)
+             result_latest = await self.session.execute(stmt_latest)
+             latest = result_latest.scalar_one_or_none()
+             
+             if latest:
+                 # Try to parse 'vX' or 'X'
+                 try:
+                     import re
+                     match = re.search(r'(\d+)', latest.version)
+                     if match:
+                         ver_num = int(match.group(1))
+                         new_version_name = f"v{ver_num + 1}"
+                     else:
+                         new_version_name = f"{latest.version}.1"
+                 except:
+                     new_version_name = f"v_{uuid.uuid4().hex[:8]}"
+             else:
+                 new_version_name = "v1"
+
         # 4. Create New Version
-        new_version = DocumentVersionSQLEntity(
+        new_ver = DocumentVersionSQLEntity(
             node_id=node.id,
-            version=new_ver_str,
-            full_text=content,
-            word_count=word_count,
+            version=new_version_name,
+            full_text=current_content, # Inherit content
+            word_count=current_word_count,
             create_at=get_now_time()
         )
-        self.session.add(new_version)
-        await self.session.flush()
+        self.session.add(new_ver)
+        await self.session.flush() # Get ID
         
-        # 5. Set as now_version
-        node.now_version = new_version.version
+        # 5. Set as current version
+        node.now_version = new_ver.version
+        node.update_at = get_now_time()
+        
         await self.session.commit()
-        
-        current_parent_id = None
-        stmt_parent = select(NodeRelationshipSQLEntity.from_node_id)\
-            .where(NodeRelationshipSQLEntity.to_node_id == node_id)
-        result_parent = await self.session.execute(stmt_parent)
-        current_parent_id = result_parent.scalar_one_or_none()
-        
-        return NodeDetailResponse(
-            id=node.id,
-            name=node.name,
-            content=content,
-            type=NodeTypeEnum(node.node_type),
-            word_count=word_count,
-            description=node.description,
-            parent_node_id=current_parent_id
-        )
 
     async def delete_document_version(self, node_id: str, version_id: str) -> None:
-        """删除文档版本."""
+        """删除指定版本 (UUID)."""
+        # version_id is UUID
         stmt = select(DocumentVersionSQLEntity).where(
             DocumentVersionSQLEntity.node_id == node_id,
-            DocumentVersionSQLEntity.version == version_id
+            DocumentVersionSQLEntity.id == version_id
         )
         result = await self.session.execute(stmt)
-        version = result.scalar_one_or_none()
+        ver = result.scalar_one_or_none()
         
-        if not version:
+        if not ver:
              raise ResourceNotFoundError(f"Version not found: {version_id}")
              
         # Check if it is the current version
@@ -494,17 +447,22 @@ class NodeService:
         result_node = await self.session.execute(stmt_node)
         node = result_node.scalar_one_or_none()
         
-        if node and node.now_version and node.now_version == version.version:
-             # Cannot delete current version
-             # Or we can allow but need to switch to another version or set to None?
-             # For safety, disallow deletion of current active version.
-             # Or if it's the only version?
-             pass # Logic to handle current version deletion if needed. For now let's assume we can delete but warn or block?
-             # Let's block for now as per common logic
-             # raise ValueError("Cannot delete the current active version. Switch to another version first.")
-             pass
-
-        await self.session.delete(version)
+        if node and node.now_version == ver.version:
+             # If deleting current version, we must switch to another one or allow null?
+             # Strategy: Switch to latest created version that is not this one
+             stmt_latest = select(DocumentVersionSQLEntity)\
+                 .where(DocumentVersionSQLEntity.node_id == node_id, DocumentVersionSQLEntity.id != version_id)\
+                 .order_by(DocumentVersionSQLEntity.create_at.desc())\
+                 .limit(1)
+             result_latest = await self.session.execute(stmt_latest)
+             latest = result_latest.scalar_one_or_none()
+             
+             if latest:
+                 node.now_version = latest.version
+             else:
+                 node.now_version = None # No versions left
+        
+        await self.session.delete(ver)
         await self.session.commit()
 
     async def delete_node(self, node_id: str) -> None:
