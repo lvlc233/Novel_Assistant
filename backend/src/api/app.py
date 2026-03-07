@@ -64,6 +64,9 @@ async def lifespan(app: FastAPI):
         manager = PluginManager(session)
         for plugin_def in internal_registry.get_plugin_list():
             await manager.add_plugin_with_register(plugin_def)
+        removed = await manager.cleanup_stale_internal_plugins(internal_registry.get_plugin_list())
+        if removed:
+            logger.info(f"已清理 {removed} 条过期内部插件记录")
     yield
     
     # 清理插件管理器

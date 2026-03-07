@@ -96,6 +96,19 @@ class AgentManagerPlugin:
         stmt_agents = select(AgentsManagerSQLEntity)
         result_agents = await self.session.execute(stmt_agents)
         existing_agents = result_agents.scalars().all()
+        seen_agent_names = set()
+        duplicated_agents = []
+        for agent in existing_agents:
+            if agent.name in seen_agent_names:
+                duplicated_agents.append(agent)
+            else:
+                seen_agent_names.add(agent.name)
+        if duplicated_agents:
+            for duplicated in duplicated_agents:
+                await self.session.delete(duplicated)
+            await self.session.commit()
+            existing_agents = [a for a in existing_agents if a not in duplicated_agents]
+            print(f"[AgentManager] 已清理 {len(duplicated_agents)} 条重复 Agent 记录")
         existing_agent_names = {a.name for a in existing_agents}
         
         # 3. 注册新 Agent
@@ -152,6 +165,73 @@ class AgentManagerPlugin:
         agent.config = config
         await self.session.commit()
 
+    async def _try_delegate_session_operation(self, agent_name: str, operation_name: str, params: Dict[str, Any]):
+        plugin_stmt = select(PluginSQLEntity).where(PluginSQLEntity.name == agent_name)
+        plugin_result = await self.session.execute(plugin_stmt)
+        plugin = plugin_result.scalar_one_or_none()
+        if not plugin:
+            return None
+        operations = ((plugin.plugin_operation_schema or {}).get("operations") or {})
+        if operation_name not in operations:
+            return None
+        operation_schema = operations.get(operation_name) or {}
+        input_schema = operation_schema.get("input_schema") or {}
+        filtered_params = params
+        if isinstance(input_schema, dict) and input_schema:
+            filtered_params = {
+                key: value
+                for key, value in params.items()
+                if key in input_schema
+            }
+        registry = PluginInternalRegistry.get_global()
+        if not registry:
+            return None
+        service = PluginService(self.session)
+        result = await service.invoke_plugin_operation(
+            plugin_id=plugin.id,
+            operation_name=operation_name,
+            params=filtered_params,
+            registry=registry
+        )
+        if hasattr(result, "payload"):
+            return result.payload
+        return result
+
+    def _normalize_proxy_stream_event(self, chunk: Any) -> Dict[str, Any]:
+        if isinstance(chunk, str):
+            return {"event_type": "assistant_chunk", "content": chunk}
+        if not isinstance(chunk, dict):
+            return {"event_type": "raw", "data": chunk}
+        if chunk.get("status") == "error":
+            return {
+                "event_type": "error",
+                "message": chunk.get("message", "unknown error"),
+                "raw": chunk
+            }
+        chunk_type = str(chunk.get("event_type") or chunk.get("type") or "").lower()
+        if chunk_type in {"tool_call", "tool_dispatch"}:
+            return {
+                "event_type": "tool_dispatch",
+                "tool_name": chunk.get("tool_name") or chunk.get("name"),
+                "args": chunk.get("args"),
+                "message": chunk.get("message"),
+                "raw": chunk
+            }
+        if chunk_type in {"tool_result", "tool_message"}:
+            return {
+                "event_type": "tool_result",
+                "tool_name": chunk.get("tool_name") or chunk.get("name"),
+                "content": chunk.get("content") or chunk.get("message"),
+                "raw": chunk
+            }
+        if chunk_type in {"hitl_interrupt", "interrupt"}:
+            return {"event_type": "hitl_interrupt", "payload": chunk}
+        if chunk_type in {"hitl_resume", "resumed"}:
+            return {"event_type": "hitl_resumed", "payload": chunk}
+        if isinstance(chunk.get("content"), str):
+            return {"event_type": "assistant_chunk", "content": chunk.get("content"), "raw": chunk}
+        return {"event_type": "raw", "data": chunk}
+
     @operation(
         name="get_agent_info",
         description="获取Agent信息,用于在邮箱侧边栏显示",
@@ -205,6 +285,21 @@ class AgentManagerPlugin:
                                     }
                                     for m in raw_messages
                                 ]
+                            if not messages:
+                                agent_config = dict(agent.config or {})
+                                session_histories = agent_config.get("session_histories", {})
+                                if isinstance(session_histories, dict):
+                                    fallback_history = session_histories.get(session_id, [])
+                                    if isinstance(fallback_history, list):
+                                        messages = [
+                                            {
+                                                "type": item.get("role", "unknown"),
+                                                "role": item.get("role", "unknown"),
+                                                "content": item.get("content", "")
+                                            }
+                                            for item in fallback_history
+                                            if isinstance(item, dict)
+                                        ]
 
                             history_items.append({
                                 "agent_name": agent.name,
@@ -271,6 +366,9 @@ class AgentManagerPlugin:
         trigger = UITrigger.CLICK
     )
     async def list_agent_sessions(self, agent_name: str):
+        delegated = await self._try_delegate_session_operation(agent_name, "list_sessions", {"agent_name": agent_name})
+        if delegated is not None:
+            return delegated
         agent = await self._get_agent_entity(agent_name)
         if not agent:
             return {"agent_name": agent_name, "sessions": [], "current_session_id": None}
@@ -287,6 +385,13 @@ class AgentManagerPlugin:
         trigger = UITrigger.CLICK
     )
     async def create_agent_session(self, agent_name: str, session_id: str | None = None):
+        delegated = await self._try_delegate_session_operation(
+            agent_name,
+            "create_session",
+            {"agent_name": agent_name, "session_id": session_id}
+        )
+        if delegated is not None:
+            return delegated
         new_session_id = session_id or f"{agent_name}-{uuid4()}"
         await self._ensure_agent_session(agent_name, new_session_id)
         return {"agent_name": agent_name, "session_id": new_session_id}
@@ -297,6 +402,13 @@ class AgentManagerPlugin:
         trigger = UITrigger.CLICK
     )
     async def switch_agent_session(self, agent_name: str, session_id: str):
+        delegated = await self._try_delegate_session_operation(
+            agent_name,
+            "switch_session",
+            {"agent_name": agent_name, "session_id": session_id}
+        )
+        if delegated is not None:
+            return delegated
         await self._ensure_agent_session(agent_name, session_id)
         return {"agent_name": agent_name, "session_id": session_id}
 
@@ -306,6 +418,13 @@ class AgentManagerPlugin:
         trigger = UITrigger.CLICK
     )
     async def delete_agent_session(self, agent_name: str, session_id: str):
+        delegated = await self._try_delegate_session_operation(
+            agent_name,
+            "delete_session",
+            {"agent_name": agent_name, "session_id": session_id}
+        )
+        if delegated is not None:
+            return delegated
         agent = await self._get_agent_entity(agent_name)
         if not agent:
             return {"agent_name": agent_name, "deleted": False}
@@ -324,7 +443,17 @@ class AgentManagerPlugin:
         with_ui=[Home.EmailBox.AgentBox.filter()],
         trigger = UITrigger.ENTER
     )
-    async def proxy_send_agent_message(self, agent_name: str, message: str, session_id: str):
+    async def proxy_send_agent_message(
+        self,
+        agent_name: str,
+        message: str,
+        session_id: str,
+        work_id: str | None = None,
+        document_id: str | None = None,
+        version_id: str | None = None,
+        document_content: str | None = None,
+        document_title: str | None = None,
+    ):
         # 1. 查找目标插件
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.name == agent_name)
         result = await self.session.execute(stmt)
@@ -357,6 +486,11 @@ class AgentManagerPlugin:
                     "session_id": session_id,
                     "thread_id": session_id,
                     "page_id": session_id,
+                    "work_id": work_id,
+                    "document_id": document_id,
+                    "version_id": version_id,
+                    "document_content": document_content,
+                    "document_title": document_title,
                 }
                 params = {
                     key: value
@@ -372,15 +506,17 @@ class AgentManagerPlugin:
             )
             
             if inspect.isasyncgen(result):
+                yield {"event_type": "assistant_start", "session_id": session_id, "agent_name": agent_name}
                 async for chunk in result:
-                    yield chunk
+                    yield self._normalize_proxy_stream_event(chunk)
+                yield {"event_type": "assistant_end", "session_id": session_id, "agent_name": agent_name}
                 return
 
             if hasattr(result, 'payload'):
-                yield result.payload
+                yield self._normalize_proxy_stream_event(result.payload)
                 return
             
-            yield result
+            yield self._normalize_proxy_stream_event(result)
             
         except Exception as e:
             print(f"[AgentManager] 调用 Agent 插件 '{agent_name}' 失败: {e}")
@@ -390,5 +526,63 @@ class AgentManagerPlugin:
                 yield {"status": "error", "message": f"Agent '{agent_name}' 内部错误: 可能是运行时上下文未注入或配置缺失。"}
             else:
                 yield {"status": "error", "message": str(e)} 
-        
 
+    @operation(
+        name="proxy_resume_agent_review",
+        description="代理恢复Agent人工审核",
+        with_ui=[Home.EmailBox.AgentBox.filter()],
+        trigger=UITrigger.CLICK
+    )
+    async def proxy_resume_agent_review(
+        self,
+        agent_name: str,
+        session_id: str,
+        decision: str,
+        edited_action: Dict[str, Any] | None = None,
+        work_id: str | None = None,
+        document_id: str | None = None,
+        version_id: str | None = None,
+        document_content: str | None = None,
+        document_title: str | None = None,
+    ):
+        stmt = select(PluginSQLEntity).where(PluginSQLEntity.name == agent_name)
+        result = await self.session.execute(stmt)
+        plugin = result.scalar_one_or_none()
+        if not plugin:
+            yield {"status": "error", "message": f"Agent plugin '{agent_name}' not found"}
+            return
+        registry = PluginInternalRegistry.get_global()
+        if not registry:
+            yield {"status": "error", "message": "Plugin registry not initialized"}
+            return
+        service = PluginService(self.session)
+        try:
+            payload = {
+                "session_id": session_id,
+                "decision": decision,
+                "edited_action": edited_action,
+                "work_id": work_id,
+                "document_id": document_id,
+                "version_id": version_id,
+                "document_content": document_content,
+                "document_title": document_title,
+            }
+            invoke_result = await service.invoke_plugin_operation(
+                plugin_id=plugin.id,
+                operation_name="resume_human_review",
+                params=payload,
+                registry=registry
+            )
+            if inspect.isasyncgen(invoke_result):
+                yield {"event_type": "assistant_start", "session_id": session_id, "agent_name": agent_name}
+                async for chunk in invoke_result:
+                    yield self._normalize_proxy_stream_event(chunk)
+                yield {"event_type": "assistant_end", "session_id": session_id, "agent_name": agent_name}
+                return
+            if hasattr(invoke_result, "payload"):
+                yield self._normalize_proxy_stream_event(invoke_result.payload)
+                return
+            yield self._normalize_proxy_stream_event(invoke_result)
+        except Exception as e:
+            yield {"status": "error", "message": str(e)}
+        

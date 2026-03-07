@@ -4,11 +4,30 @@ import { Settings, Plus, Send, MoreHorizontal, User, Bot, ChevronLeft, StopCircl
 import { agentService } from '@/services/agentService';
 import { invokePluginOperation, getPluginsFromShop } from '@/services/pluginService';
 import { config } from '@/config';
+import ToolDispatchCard from './ToolDispatchCard';
+import HumanInTheLoopCard from './HumanInTheLoopCard';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
+}
+
+interface StreamArtifact {
+  id: string;
+  type: 'tool_dispatch' | 'tool_result' | 'hitl_interrupt';
+  toolName?: string;
+  message?: string;
+  args?: unknown;
+  content?: string;
+  status?: 'pending' | 'approved' | 'edited' | 'rejected';
+  actionName?: string;
+}
+
+interface DocumentHelperContextPayload {
+  version_id?: string | null;
+  document_content?: string;
+  document_title?: string;
 }
 
 interface AgentHistoryItem {
@@ -31,12 +50,24 @@ interface AIAssistantProps {
   workId?: string | null;
 }
 
+const INITIAL_WELCOME_MESSAGE: Message = {
+  id: '1',
+  role: 'assistant',
+  content: '你好！我是你的小说助手。请选择一个 Agent 开始对话。'
+};
+const INITIAL_WELCOME_MESSAGES: Message[] = [INITIAL_WELCOME_MESSAGE];
+
 export default function AIAssistant({ isExpanded, onToggle, documentId, workId }: AIAssistantProps) {
-  const initialWelcome: Message = { id: '1', role: 'assistant', content: '你好！我是你的小说助手。请选择一个 Agent 开始对话。' };
+  const areMessagesEqual = (left: Message[] | undefined, right: Message[] | undefined) => {
+      if (!left || !right) return !left && !right;
+      if (left.length !== right.length) return false;
+      return left.every((m, i) => {
+          const n = right[i];
+          return m.id === n.id && m.role === n.role && m.content === n.content;
+      });
+  };
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([
-    initialWelcome,
-  ]);
+  const [messages, setMessages] = useState<Message[]>(INITIAL_WELCOME_MESSAGES);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -45,13 +76,60 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
   const [sessionsByAgent, setSessionsByAgent] = useState<Record<string, string[]>>({});
   const [currentSessionByAgent, setCurrentSessionByAgent] = useState<Record<string, string>>({});
   const [messagesByAgentSession, setMessagesByAgentSession] = useState<Record<string, Message[]>>({});
+  const [artifactsByMessageId, setArtifactsByMessageId] = useState<Record<string, StreamArtifact[]>>({});
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<() => void>(() => {});
   const currentAgentRef = useRef<string>('');
   const currentSessionRef = useRef<string>('');
+  const isHydratingMessagesRef = useRef(false);
 
   const makeAgentSessionKey = (agentName: string, sid: string) => `${agentName}::${sid}`;
+  const getCurrentVersionIdFromUrl = () => {
+      if (typeof window === 'undefined') return null;
+      const params = new URLSearchParams(window.location.search);
+      return params.get('version');
+  };
+  const getCurrentDocumentContext = () => {
+      if (typeof window === 'undefined') {
+          return { documentContent: '', documentTitle: '', versionId: null as string | null };
+      }
+      const windowWithContext = window as Window & { __DOCUMENT_HELPER_CONTEXT__?: DocumentHelperContextPayload };
+      const payload = windowWithContext.__DOCUMENT_HELPER_CONTEXT__ || {};
+      const versionId = payload.version_id || getCurrentVersionIdFromUrl();
+      return {
+          documentContent: typeof payload.document_content === 'string' ? payload.document_content : '',
+          documentTitle: typeof payload.document_title === 'string' ? payload.document_title : '',
+          versionId,
+      };
+  };
+  const notifyDocumentRefresh = (source: string) => {
+      if (typeof window === 'undefined') return;
+      window.dispatchEvent(new CustomEvent('document-helper:refresh', {
+          detail: {
+              source,
+              work_id: workId,
+              document_id: documentId,
+              version_id: getCurrentVersionIdFromUrl(),
+          }
+      }));
+  };
+  const extractHitlActionRequest = (data: any): { name?: string; args?: unknown } | null => {
+      const maybeRequests =
+          data?.payload?.payload?.[0]?.action_requests ||
+          data?.payload?.[0]?.action_requests ||
+          data?.payload?.action_requests ||
+          data?.action_requests ||
+          [];
+      if (!Array.isArray(maybeRequests) || maybeRequests.length === 0) {
+          return null;
+      }
+      const firstRequest = maybeRequests[0];
+      return {
+          name: firstRequest?.name,
+          args: firstRequest?.args,
+      };
+  };
 
   useEffect(() => {
       // Init Session ID
@@ -138,15 +216,18 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                           if (!sid) return;
                           const mappedMessages = (h.messages || []).map((m, i) => ({
                               id: `${sid}-${i}-${Date.now()}`,
-                              role: String(m?.type || '').toLowerCase().includes('human') || String(m?.type || '').toLowerCase().includes('user') ? 'user' as const : 'assistant' as const,
+                              role: (
+                                  String(m?.type || m?.role || '').toLowerCase().includes('human') ||
+                                  String(m?.type || m?.role || '').toLowerCase().includes('user')
+                              ) ? 'user' as const : 'assistant' as const,
                               content: m?.content || ''
                           }));
-                          nextMessagesByAgentSession[makeAgentSessionKey(agentName, sid)] = mappedMessages.length > 0 ? mappedMessages : [initialWelcome];
+                          nextMessagesByAgentSession[makeAgentSessionKey(agentName, sid)] = mappedMessages.length > 0 ? mappedMessages : INITIAL_WELCOME_MESSAGES;
                       });
 
                       const currentKey = makeAgentSessionKey(agentName, currentSession);
                       if (!nextMessagesByAgentSession[currentKey]) {
-                          nextMessagesByAgentSession[currentKey] = [initialWelcome];
+                          nextMessagesByAgentSession[currentKey] = INITIAL_WELCOME_MESSAGES;
                       }
                   });
 
@@ -168,19 +249,35 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
       const selectedSession = currentSessionByAgent[agentName];
       if (!selectedSession) return;
       const key = makeAgentSessionKey(agentName, selectedSession);
-      const nextMessages = messagesByAgentSession[key] || [initialWelcome];
+      const nextMessages = messagesByAgentSession[key] || INITIAL_WELCOME_MESSAGES;
       currentAgentRef.current = agentName;
       currentSessionRef.current = selectedSession;
-      setSessionId(selectedSession);
-      setMessages(nextMessages);
+      setSessionId(prev => (prev === selectedSession ? prev : selectedSession));
+      setMessages(prev => {
+          if (areMessagesEqual(prev, nextMessages)) {
+              return prev;
+          }
+          isHydratingMessagesRef.current = true;
+          return nextMessages;
+      });
   }, [selectedAgent, currentSessionByAgent, messagesByAgentSession]);
 
   useEffect(() => {
+      if (isHydratingMessagesRef.current) {
+          isHydratingMessagesRef.current = false;
+          return;
+      }
       const agentName = currentAgentRef.current;
       const sid = currentSessionRef.current;
       if (!agentName || !sid) return;
       const key = makeAgentSessionKey(agentName, sid);
-      setMessagesByAgentSession(prev => ({ ...prev, [key]: messages }));
+      setMessagesByAgentSession(prev => {
+          const existing = prev[key];
+          if (areMessagesEqual(existing, messages)) {
+              return prev;
+          }
+          return { ...prev, [key]: messages };
+      });
   }, [messages]);
 
   useEffect(() => {
@@ -227,11 +324,140 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
       });
       setMessagesByAgentSession(prev => ({
           ...prev,
-          [makeAgentSessionKey(agentName, newSessionId)]: [initialWelcome]
+          [makeAgentSessionKey(agentName, newSessionId)]: INITIAL_WELCOME_MESSAGES
       }));
       setCurrentSessionByAgent(prev => ({ ...prev, [agentName]: newSessionId }));
       setSessionId(newSessionId);
-      setMessages([initialWelcome]);
+      setMessages(INITIAL_WELCOME_MESSAGES);
+  };
+
+  const handleLocalHitlDecision = async (
+      messageId: string,
+      artifactId: string,
+      decision: 'approve' | 'edit' | 'reject',
+      editedAction?: { name: string; args: unknown }
+  ) => {
+      setArtifactsByMessageId(prev => ({
+          ...prev,
+          [messageId]: (prev[messageId] || []).map(item =>
+              item.id === artifactId
+                  ? {
+                      ...item,
+                      status: decision === 'approve' ? 'approved' : decision === 'edit' ? 'edited' : 'rejected'
+                  }
+                  : item
+          )
+      }));
+      if (!agentManagerId || !selectedAgent || !sessionId) {
+          setMessages(prev => [...prev, { id: `${Date.now()}`, role: 'system', content: `已记录人工决策：${decision}` }]);
+          return;
+      }
+      const appendArtifactToMessage = (artifact: StreamArtifact) => {
+          setArtifactsByMessageId(prev => ({
+              ...prev,
+              [messageId]: [...(prev[messageId] || []), artifact]
+          }));
+      };
+      const appendContentToMessage = (text: string) => {
+          if (!text) return;
+          setMessages(prev => prev.map(msg =>
+              msg.id === messageId
+                  ? { ...msg, content: msg.content + text }
+                  : msg
+          ));
+      };
+      const applyReviewEvent = (data: any) => {
+          const eventType = String(data?.event_type || '').toLowerCase();
+          if (eventType === 'assistant_chunk' && typeof data?.content === 'string') {
+              appendContentToMessage(data.content);
+              return;
+          }
+          if (eventType === 'tool_dispatch') {
+              appendArtifactToMessage({
+                  id: `${messageId}-dispatch-${Date.now()}`,
+                  type: 'tool_dispatch',
+                  toolName: data?.tool_name,
+                  args: data?.args,
+                  message: data?.message,
+              });
+              return;
+          }
+          if (eventType === 'tool_result') {
+              notifyDocumentRefresh('review_tool_result');
+              appendArtifactToMessage({
+                  id: `${messageId}-result-${Date.now()}`,
+                  type: 'tool_result',
+                  toolName: data?.tool_name,
+                  content: data?.content,
+              });
+              return;
+          }
+          if (eventType === 'hitl_interrupt') {
+              const actionRequest = extractHitlActionRequest(data);
+              appendArtifactToMessage({
+                  id: `${messageId}-hitl-${Date.now()}`,
+                  type: 'hitl_interrupt',
+                  status: 'pending',
+                  actionName: actionRequest?.name,
+                  args: actionRequest?.args,
+              });
+              return;
+          }
+          if (eventType === 'error' || data?.status === 'error') {
+              setMessages(prev => [...prev, { id: `${Date.now()}`, role: 'system', content: `审核恢复失败：${String(data?.message || 'unknown error')}` }]);
+          }
+      };
+      const baseUrl = config.work.apiBaseUrl.replace(/\/$/, '');
+      const url = `${baseUrl}/api/v1/plugin/proxy/${agentManagerId}/proxy_resume_agent_review`;
+      const contextPayload = getCurrentDocumentContext();
+      const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              params: {
+                  agent_name: selectedAgent.name,
+                  session_id: sessionId,
+                  decision,
+                  edited_action: editedAction || null,
+                  work_id: workId,
+                  document_id: documentId,
+                  version_id: contextPayload.versionId,
+                  document_content: contextPayload.documentContent,
+                  document_title: contextPayload.documentTitle,
+              }
+          }),
+      });
+      if (!response.ok) {
+          const raw = await response.text();
+          setMessages(prev => [...prev, { id: `${Date.now()}`, role: 'system', content: `审核恢复失败：${raw || response.statusText}` }]);
+          return;
+      }
+      const reader = response.body?.getReader();
+      if (!reader) return;
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                  applyReviewEvent(JSON.parse(line));
+              } catch (e) {
+                  console.error('Error parsing review event', e);
+              }
+          }
+      }
+      if (buffer.trim()) {
+          try {
+              applyReviewEvent(JSON.parse(buffer.trim()));
+          } catch (e) {
+              console.error('Error parsing final review event', e);
+          }
+      }
   };
 
   const handleSend = () => {
@@ -257,6 +483,95 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
     // Placeholder for assistant
     const assistantMsgId = (Date.now() + 1).toString();
     setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '' }]);
+    setArtifactsByMessageId(prev => ({ ...prev, [assistantMsgId]: [] }));
+    const appendAssistantContent = (content: string) => {
+        if (!content) return;
+        setMessages(prev => prev.map(msg =>
+            msg.id === assistantMsgId
+                ? { ...msg, content: msg.content + content }
+                : msg
+        ));
+    };
+    const appendArtifact = (artifact: StreamArtifact) => {
+        setArtifactsByMessageId(prev => ({
+            ...prev,
+            [assistantMsgId]: [...(prev[assistantMsgId] || []), artifact]
+        }));
+    };
+    const appendToolDispatch = (toolName?: string, args?: unknown, message?: string) => {
+        appendArtifact({
+            id: `${assistantMsgId}-dispatch-${Date.now()}`,
+            type: 'tool_dispatch',
+            toolName,
+            args,
+            message
+        });
+    };
+    const appendToolResult = (toolName?: string, content?: string) => {
+        appendArtifact({
+            id: `${assistantMsgId}-result-${Date.now()}`,
+            type: 'tool_result',
+            toolName,
+            content
+        });
+    };
+    const applyStreamEvent = (data: any) => {
+        if (data?.status === 'error' || data?.event_type === 'error') {
+            const errorText = typeof data?.message === 'string' ? data.message : JSON.stringify(data);
+            setMessages(prev => prev.map(msg =>
+                msg.id === assistantMsgId
+                    ? { ...msg, content: `后端报错：${errorText}` }
+                    : msg
+            ));
+            return { shouldAbort: true };
+        }
+        const eventType = String(data?.event_type || '').toLowerCase();
+        if (eventType === 'assistant_chunk') {
+            appendAssistantContent(typeof data?.content === 'string' ? data.content : '');
+            return { shouldAbort: false };
+        }
+        if (eventType === 'tool_dispatch') {
+            appendToolDispatch(data?.tool_name, data?.args, data?.message);
+            return { shouldAbort: false };
+        }
+        if (eventType === 'tool_result') {
+            notifyDocumentRefresh('chat_tool_result');
+            appendToolResult(data?.tool_name, typeof data?.content === 'string' ? data.content : '');
+            return { shouldAbort: false };
+        }
+        if (eventType === 'hitl_interrupt') {
+            const actionRequest = extractHitlActionRequest(data);
+            appendArtifact({
+                id: `${assistantMsgId}-hitl-${Date.now()}`,
+                type: 'hitl_interrupt',
+                status: 'pending',
+                actionName: actionRequest?.name,
+                args: actionRequest?.args,
+            });
+            return { shouldAbort: false };
+        }
+        if (typeof data === 'string') {
+            appendAssistantContent(data);
+            return { shouldAbort: false };
+        }
+        if (typeof data?.content === 'string') {
+            appendAssistantContent(data.content);
+            return { shouldAbort: false };
+        }
+        if (data?.messages && Array.isArray(data.messages)) {
+            const lastMsg = data.messages[data.messages.length - 1];
+            if (typeof lastMsg?.content === 'string') {
+                appendAssistantContent(lastMsg.content);
+            }
+            return { shouldAbort: false };
+        }
+        if (data?.output) {
+            const outputText = typeof data.output === 'string' ? data.output : JSON.stringify(data.output);
+            appendAssistantContent(outputText);
+            return { shouldAbort: false };
+        }
+        return { shouldAbort: false };
+    };
 
     // Use Plugin Proxy for streaming if we have the plugin ID
     if (agentManagerId) {
@@ -264,6 +579,7 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
         const baseUrl = config.work.apiBaseUrl.replace(/\/$/, ''); // Remove trailing slash
         const url = `${baseUrl}/api/v1/plugin/proxy/${agentManagerId}/proxy_send_agent_message`;
         const controller = new AbortController();
+        const contextPayload = getCurrentDocumentContext();
         
         fetch(url, {
             method: 'POST',
@@ -272,7 +588,12 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                 params: {
                     agent_name: selectedAgent.name,
                     message: input,
-                    session_id: activeSessionId
+                    session_id: activeSessionId,
+                    work_id: workId,
+                    document_id: documentId,
+                    version_id: contextPayload.versionId,
+                    document_content: contextPayload.documentContent,
+                    document_title: contextPayload.documentTitle,
                 }
             }),
             signal: controller.signal
@@ -303,59 +624,11 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                     if (!line.trim()) continue;
                     try {
                         const data = JSON.parse(line);
-                        // Backend proxy_send_agent_message returns whatever the agent returns.
-                        // LangGraph typically returns events. 
-                        // Assuming the agent returns chunks of text or event dicts.
-                        // Let's assume it returns { content: "..." } or just string if the generator yields strings.
-                        // But wait, the backend generator_wrapper dumps dicts as JSON.
-                        
-                        // Based on proxy_send_agent_message in backend, it calls agent.astream.
-                        // agent.astream yields events.
-                        // We need to inspect what the backend actually yields.
-                        // For now, let's append data.content or data if string.
-                        
-                        if (data?.status === 'error') {
-                            const errorText = typeof data?.message === 'string' ? data.message : JSON.stringify(data);
-                            setMessages(prev => prev.map(msg =>
-                                msg.id === assistantMsgId
-                                    ? { ...msg, content: `后端报错：${errorText}` }
-                                    : msg
-                            ));
+                        const applied = applyStreamEvent(data);
+                        if (applied.shouldAbort) {
                             setIsStreaming(false);
                             controller.abort();
                             return;
-                        }
-
-                        let content = '';
-                        if (typeof data === 'string') {
-                            content = data;
-                        } else if (data?.content) {
-                            content = data.content;
-                        } else if (data?.messages && Array.isArray(data.messages)) {
-                             // LangGraph state update?
-                             const lastMsg = data.messages[data.messages.length - 1];
-                             if (lastMsg?.content) content = lastMsg.content;
-                        } else if (data?.output) {
-                             content = typeof data.output === 'string' ? data.output : JSON.stringify(data.output);
-                        }
-                        
-                        // Accumulate or replace?
-                        // If streaming tokens, we accumulate.
-                        // But LangGraph astream might return full state updates.
-                        // If the backend wraps it, we need to be careful.
-                        // Let's assume for now it's simple accumulation if possible, or we might see duplicate text.
-                        // Actually, let's just dump the raw content for debugging if format is unknown, 
-                        // but better to try to be smart.
-                        
-                        // If it is a token stream, we append.
-                        // If it is state snapshots, we might need to replace.
-                        // Given we are using a general proxy, let's assume we append whatever string we find.
-                        if (content) {
-                             setMessages(prev => prev.map(msg => 
-                                msg.id === assistantMsgId 
-                                    ? { ...msg, content: msg.content + content } // Append
-                                    : msg
-                            ));
                         }
                     } catch (e) {
                         console.error("Error parsing NDJSON line", e);
@@ -366,14 +639,7 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
             if (buffer.trim()) {
                 try {
                     const data = JSON.parse(buffer.trim());
-                    if (data?.status === 'error') {
-                        const errorText = typeof data?.message === 'string' ? data.message : JSON.stringify(data);
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMsgId
-                                ? { ...msg, content: `后端报错：${errorText}` }
-                                : msg
-                        ));
-                    }
+                    applyStreamEvent(data);
                 } catch (e) {
                     console.error("Error parsing final NDJSON buffer", e);
                 }
@@ -515,20 +781,46 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
             </div>
             
             {/* Bubble */}
-            <div className={`
-                max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed shadow-sm border overflow-hidden
-                ${msg.role === 'user' 
-                    ? 'bg-white border-gray-100 text-gray-800 rounded-tr-sm' 
-                    : 'bg-gray-50 border-gray-100 text-gray-700 rounded-tl-sm'}
-                ${msg.role === 'system' ? 'bg-red-50 text-red-600 border-red-100 w-full max-w-full text-center' : ''}
-            `}>
-                {msg.role === 'user' ? (
-                   <div className="whitespace-pre-wrap">{msg.content}</div>
-                ) : (
-                   <div className="prose prose-sm max-w-none prose-p:my-0">
-                       <ReactMarkdown>{msg.content}</ReactMarkdown>
-                   </div>
-                )}
+            <div className={`${msg.role === 'system' ? 'w-full max-w-full' : 'max-w-[80%]'}`}>
+                <div className={`
+                    p-3 rounded-2xl text-sm leading-relaxed shadow-sm border overflow-hidden
+                    ${msg.role === 'user' 
+                        ? 'bg-white border-gray-100 text-gray-800 rounded-tr-sm' 
+                        : 'bg-gray-50 border-gray-100 text-gray-700 rounded-tl-sm'}
+                    ${msg.role === 'system' ? 'bg-red-50 text-red-600 border-red-100 w-full max-w-full text-center' : ''}
+                `}>
+                    {msg.role === 'user' ? (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    ) : (
+                    <div className="prose prose-sm max-w-none prose-p:my-0">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                    )}
+                </div>
+                {msg.role === 'assistant' && (artifactsByMessageId[msg.id] || []).map((artifact) => (
+                    artifact.type === 'tool_dispatch' ? (
+                        <ToolDispatchCard
+                            key={artifact.id}
+                            title={`工具调度 · ${artifact.toolName || 'unknown_tool'}`}
+                            subtitle={artifact.message}
+                            payload={artifact.args}
+                        />
+                    ) : artifact.type === 'tool_result' ? (
+                        <ToolDispatchCard
+                            key={artifact.id}
+                            title={`工具结果 · ${artifact.toolName || 'tool'}`}
+                            subtitle={artifact.content}
+                        />
+                    ) : (
+                        <HumanInTheLoopCard
+                            key={artifact.id}
+                            status={artifact.status || 'pending'}
+                            actionName={artifact.actionName}
+                            args={artifact.args}
+                            onDecision={(decision, editedAction) => handleLocalHitlDecision(msg.id, artifact.id, decision, editedAction)}
+                        />
+                    )
+                ))}
             </div>
           </div>
         ))}

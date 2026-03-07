@@ -136,6 +136,27 @@ class PluginManager:
         plugin_id: UUID = plugin.id
         return plugin_id
 
+    async def cleanup_stale_internal_plugins(self, plugin_defs: List[PluginDefinition]) -> int:
+        valid_ids = {p["id"] for p in plugin_defs}
+        stmt = select(PluginSQLEntity).where(PluginSQLEntity.loader_type == LoaderType.INTERNAL.value)
+        result = await self.session.execute(stmt)
+        plugins = result.scalars().all()
+        stale_plugins = [
+            p for p in plugins
+            if p.id not in valid_ids and p.from_type in {PluginFromTypeEnum.SYSTEM.value, PluginFromTypeEnum.OFFICIAL.value}
+        ]
+        if not stale_plugins:
+            return 0
+        stale_ids = [p.id for p in stale_plugins]
+        await self.session.execute(
+            delete(WorkPluginMappingSQLEntity).where(WorkPluginMappingSQLEntity.plugin_id.in_(stale_ids))
+        )
+        for plugin in stale_plugins:
+            await self.session.delete(plugin)
+            self._plugins.pop(plugin.id, None)
+        await self.session.commit()
+        return len(stale_plugins)
+
     async def remove_plugin(self, plugin_id: UUID) -> bool:
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
         result = await self.session.execute(stmt)

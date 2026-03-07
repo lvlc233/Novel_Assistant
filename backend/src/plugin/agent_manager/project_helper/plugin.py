@@ -9,6 +9,7 @@ from core.plugin.annotations import plugin_meta, runtime_config, operation
 from core.plugin.di import Inject
 from sqlmodel import select
 from typing import List, Any
+from uuid import uuid4
 from infrastructure.pg.pg_models import AgentsManagerSQLEntity
 
 
@@ -77,6 +78,24 @@ class ProjectHelperPlugin:
         self.model_name = model_name or "gpt-3.5-turbo"
         self.checkpoint = checkpoint
         self.session = session
+
+    async def _get_agent_entity(self):
+        stmt = select(AgentsManagerSQLEntity).where(AgentsManagerSQLEntity.name == "project_helper")
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def _ensure_session(self, session_id: str):
+        entity = await self._get_agent_entity()
+        if not entity:
+            return
+        sessions = list(entity.sessions or [])
+        if session_id not in sessions:
+            sessions.append(session_id)
+            entity.sessions = sessions
+        config = dict(entity.config or {})
+        config["current_session_id"] = session_id
+        entity.config = config
+        await self.session.commit()
 
     # @operation(
     #     name="quick_input_bottom",
@@ -212,12 +231,15 @@ class ProjectHelperPlugin:
         # 2. Iterate through sessions and get checkpoints
         async with self.checkpoint as checkpointer:
             for session_id in sessions:
-                # Use checkpointer.aget to retrieve the checkpoint
                 config = {"configurable": {"thread_id": session_id}}
                 checkpoint = await checkpointer.aget(config)
-                
-                if checkpoint:
-                    session_item = self._format_checkpoint_to_session_item(session_id, checkpoint)
+                checkpoint_payload = None
+                if isinstance(checkpoint, dict):
+                    checkpoint_payload = checkpoint.get("checkpoint", checkpoint)
+                elif checkpoint and hasattr(checkpoint, "checkpoint"):
+                    checkpoint_payload = checkpoint.checkpoint
+                if isinstance(checkpoint_payload, dict):
+                    session_item = self._format_checkpoint_to_session_item(session_id, checkpoint_payload)
                     project_sessions.append(session_item)
         
         # 3. Construct ProjectSessionData
@@ -236,6 +258,58 @@ class ProjectHelperPlugin:
             "info_type": "ProjectSessionManager",
             "data": data
         }
+
+    @operation(
+        name="list_sessions",
+        description="列出项目助手会话",
+        trigger = UITrigger.CLICK
+    )
+    async def list_sessions(self):
+        entity = await self._get_agent_entity()
+        if not entity:
+            return {"agent_name": "project_helper", "sessions": [], "current_session_id": None}
+        return {
+            "agent_name": "project_helper",
+            "sessions": list(entity.sessions or []),
+            "current_session_id": (entity.config or {}).get("current_session_id")
+        }
+
+    @operation(
+        name="create_session",
+        description="创建项目助手会话",
+        trigger = UITrigger.CLICK
+    )
+    async def create_session(self, session_id: str | None = None):
+        sid = session_id or f"project_helper-{uuid4()}"
+        await self._ensure_session(sid)
+        return {"agent_name": "project_helper", "session_id": sid}
+
+    @operation(
+        name="switch_session",
+        description="切换项目助手会话",
+        trigger = UITrigger.CLICK
+    )
+    async def switch_session(self, session_id: str):
+        await self._ensure_session(session_id)
+        return {"agent_name": "project_helper", "session_id": session_id}
+
+    @operation(
+        name="delete_session",
+        description="删除项目助手会话",
+        trigger = UITrigger.CLICK
+    )
+    async def delete_session(self, session_id: str):
+        entity = await self._get_agent_entity()
+        if not entity:
+            return {"agent_name": "project_helper", "deleted": False, "session_id": session_id}
+        sessions = [sid for sid in (entity.sessions or []) if sid != session_id]
+        entity.sessions = sessions
+        config = dict(entity.config or {})
+        if config.get("current_session_id") == session_id:
+            config["current_session_id"] = sessions[-1] if sessions else None
+        entity.config = config
+        await self.session.commit()
+        return {"agent_name": "project_helper", "deleted": True, "session_id": session_id}
     
 
     

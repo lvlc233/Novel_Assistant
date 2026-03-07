@@ -45,6 +45,14 @@ interface DocumentEditorProps {
   workId?: string | null;
 }
 
+interface DocumentHelperContextPayload {
+  work_id: string | null;
+  document_id: string | null;
+  version_id: string | null;
+  document_title: string;
+  document_content: string;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function DocumentEditor({ isChatExpanded, documentId, workId: propWorkId }: DocumentEditorProps) {
   const [content, setContent] = useState('');
@@ -311,6 +319,57 @@ export default function DocumentEditor({ isChatExpanded, documentId, workId: pro
 
     fetchDoc();
   }, [currentChapterId, workId, searchParams, router, pathname]);
+
+  useEffect(() => {
+      const handleDocumentRefresh = async (evt: Event) => {
+          const customEvent = evt as CustomEvent<{
+              work_id?: string | null;
+              document_id?: string | null;
+              version_id?: string | null;
+          }>;
+          const detail = customEvent.detail || {};
+          if (!currentChapterId || !workId) return;
+          if (detail.document_id && detail.document_id !== currentChapterId) return;
+          if (detail.work_id && detail.work_id !== workId) return;
+          try {
+              const targetVersion = detail.version_id || (version !== 'latest' ? version : undefined);
+              const doc = await getDocumentDetail({
+                  work_id: workId,
+                  document_id: currentChapterId,
+                  version_id: targetVersion || undefined,
+              });
+              setContent(doc.full_text || '');
+              setTitle(doc.title || '未命名文档');
+              if (doc.now_version_id) {
+                  setVersion(doc.now_version_id);
+              }
+              if (doc.now_version) {
+                  setVersionName(doc.now_version);
+              }
+              setIsSaved(true);
+              await refreshWorkStructure();
+              await fetchVersions();
+          } catch (e) {
+              logger.error('Refresh document after agent tool failed', e);
+          }
+      };
+      window.addEventListener('document-helper:refresh', handleDocumentRefresh as EventListener);
+      return () => window.removeEventListener('document-helper:refresh', handleDocumentRefresh as EventListener);
+  }, [currentChapterId, workId, version, refreshWorkStructure, fetchVersions]);
+
+  useEffect(() => {
+      if (typeof window === 'undefined') return;
+      const payload: DocumentHelperContextPayload = {
+          work_id: workId,
+          document_id: currentChapterId,
+          version_id: version,
+          document_title: title,
+          document_content: content,
+      };
+      const windowWithContext = window as Window & { __DOCUMENT_HELPER_CONTEXT__?: DocumentHelperContextPayload };
+      windowWithContext.__DOCUMENT_HELPER_CONTEXT__ = payload;
+      window.dispatchEvent(new CustomEvent('document-helper:context', { detail: payload }));
+  }, [workId, currentChapterId, version, title, content]);
 
   const handleSwitchVersion = async (versionStr: string) => {
       console.log(`[DocumentEditor] Switching to version: ${versionStr}`);
