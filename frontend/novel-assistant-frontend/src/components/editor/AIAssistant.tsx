@@ -11,10 +11,17 @@ interface Message {
   content: string;
 }
 
+interface AgentHistoryItem {
+  session_id: string;
+  messages?: Array<{ type?: string; content?: string }>;
+}
+
 interface AgentInfo {
     id: string; // or agent_id
     name: string;
     description?: string;
+    history?: AgentHistoryItem[];
+    current_session_id?: string;
 }
 
 interface AIAssistantProps {
@@ -25,18 +32,26 @@ interface AIAssistantProps {
 }
 
 export default function AIAssistant({ isExpanded, onToggle, documentId, workId }: AIAssistantProps) {
+  const initialWelcome: Message = { id: '1', role: 'assistant', content: '你好！我是你的小说助手。请选择一个 Agent 开始对话。' };
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'assistant', content: '你好！我是你的小说助手。请选择一个 Agent 开始对话。' },
+    initialWelcome,
   ]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [agentManagerId, setAgentManagerId] = useState<string>('');
+  const [sessionsByAgent, setSessionsByAgent] = useState<Record<string, string[]>>({});
+  const [currentSessionByAgent, setCurrentSessionByAgent] = useState<Record<string, string>>({});
+  const [messagesByAgentSession, setMessagesByAgentSession] = useState<Record<string, Message[]>>({});
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<() => void>(() => {});
+  const currentAgentRef = useRef<string>('');
+  const currentSessionRef = useRef<string>('');
+
+  const makeAgentSessionKey = (agentName: string, sid: string) => `${agentName}::${sid}`;
 
   useEffect(() => {
       // Init Session ID
@@ -80,7 +95,9 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                       loadedAgents = agentsList.map((a: any) => ({
                           id: a.id || a.agent_id || a.agent_name || a.name, // Fallback to agent_name if id/name missing
                           name: a.name || a.agent_name,
-                          description: a.description || a.agent_description
+                          description: a.description || a.agent_description,
+                          history: Array.isArray(a.history) ? a.history : [],
+                          current_session_id: a.current_session_id
                       }));
                   }
               } else {
@@ -100,6 +117,42 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
               setAgents(loadedAgents);
               if (loadedAgents.length > 0) {
                   setSelectedAgent(loadedAgents[0]);
+                  const now = Date.now();
+                  const nextSessionsByAgent: Record<string, string[]> = {};
+                  const nextCurrentSessionByAgent: Record<string, string> = {};
+                  const nextMessagesByAgentSession: Record<string, Message[]> = {};
+
+                  loadedAgents.forEach((agent, idx) => {
+                      const agentName = agent.name;
+                      const history = agent.history || [];
+                      const sessionIds = history.map(h => h.session_id).filter(Boolean);
+                      const fallbackSession = `session-${now}-${idx}`;
+                      const currentSession = agent.current_session_id || sessionIds[sessionIds.length - 1] || fallbackSession;
+                      const mergedSessions = sessionIds.includes(currentSession) ? sessionIds : [...sessionIds, currentSession];
+
+                      nextSessionsByAgent[agentName] = mergedSessions;
+                      nextCurrentSessionByAgent[agentName] = currentSession;
+
+                      history.forEach(h => {
+                          const sid = h.session_id;
+                          if (!sid) return;
+                          const mappedMessages = (h.messages || []).map((m, i) => ({
+                              id: `${sid}-${i}-${Date.now()}`,
+                              role: String(m?.type || '').toLowerCase().includes('human') || String(m?.type || '').toLowerCase().includes('user') ? 'user' as const : 'assistant' as const,
+                              content: m?.content || ''
+                          }));
+                          nextMessagesByAgentSession[makeAgentSessionKey(agentName, sid)] = mappedMessages.length > 0 ? mappedMessages : [initialWelcome];
+                      });
+
+                      const currentKey = makeAgentSessionKey(agentName, currentSession);
+                      if (!nextMessagesByAgentSession[currentKey]) {
+                          nextMessagesByAgentSession[currentKey] = [initialWelcome];
+                      }
+                  });
+
+                  setSessionsByAgent(nextSessionsByAgent);
+                  setCurrentSessionByAgent(nextCurrentSessionByAgent);
+                  setMessagesByAgentSession(nextMessagesByAgentSession);
               }
           } catch (e) {
               console.error("Failed to load agents:", e);
@@ -110,16 +163,96 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
   }, []);
 
   useEffect(() => {
+      if (!selectedAgent) return;
+      const agentName = selectedAgent.name;
+      const selectedSession = currentSessionByAgent[agentName];
+      if (!selectedSession) return;
+      const key = makeAgentSessionKey(agentName, selectedSession);
+      const nextMessages = messagesByAgentSession[key] || [initialWelcome];
+      currentAgentRef.current = agentName;
+      currentSessionRef.current = selectedSession;
+      setSessionId(selectedSession);
+      setMessages(nextMessages);
+  }, [selectedAgent, currentSessionByAgent, messagesByAgentSession]);
+
+  useEffect(() => {
+      const agentName = currentAgentRef.current;
+      const sid = currentSessionRef.current;
+      if (!agentName || !sid) return;
+      const key = makeAgentSessionKey(agentName, sid);
+      setMessagesByAgentSession(prev => ({ ...prev, [key]: messages }));
+  }, [messages]);
+
+  useEffect(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleSwitchSession = async (nextSessionId: string) => {
+      if (!selectedAgent) return;
+      const agentName = selectedAgent.name;
+      if (agentManagerId) {
+          try {
+              await invokePluginOperation(agentManagerId, 'switch_agent_session', {
+                  agent_name: agentName,
+                  session_id: nextSessionId
+              });
+          } catch (e) {
+              console.error('Failed to switch session on backend:', e);
+          }
+      }
+      setCurrentSessionByAgent(prev => ({ ...prev, [agentName]: nextSessionId }));
+      setSessionId(nextSessionId);
+  };
+
+  const handleCreateSession = async () => {
+      if (!selectedAgent) return;
+      const agentName = selectedAgent.name;
+      let newSessionId = `session-${Date.now()}`;
+      if (agentManagerId) {
+          try {
+              const res = await invokePluginOperation(agentManagerId, 'create_agent_session', { agent_name: agentName });
+              const payload = res?.payload || res;
+              if (payload?.session_id) {
+                  newSessionId = payload.session_id;
+              }
+          } catch (e) {
+              console.error('Failed to create session on backend:', e);
+          }
+      }
+      setSessionsByAgent(prev => {
+          const existing = prev[agentName] || [];
+          return existing.includes(newSessionId)
+              ? prev
+              : { ...prev, [agentName]: [...existing, newSessionId] };
+      });
+      setMessagesByAgentSession(prev => ({
+          ...prev,
+          [makeAgentSessionKey(agentName, newSessionId)]: [initialWelcome]
+      }));
+      setCurrentSessionByAgent(prev => ({ ...prev, [agentName]: newSessionId }));
+      setSessionId(newSessionId);
+      setMessages([initialWelcome]);
+  };
 
   const handleSend = () => {
     if (!input.trim() || !selectedAgent) return;
     
+    const activeAgentName = selectedAgent.name;
+    const activeSessionId = sessionId || `session-${Date.now()}`;
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: input };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsStreaming(true);
+    if (!sessionId) {
+        setSessionId(activeSessionId);
+        setCurrentSessionByAgent(prev => ({ ...prev, [activeAgentName]: activeSessionId }));
+        setSessionsByAgent(prev => {
+            const existing = prev[activeAgentName] || [];
+            return existing.includes(activeSessionId)
+                ? prev
+                : { ...prev, [activeAgentName]: [...existing, activeSessionId] };
+        });
+    }
 
     // Placeholder for assistant
     const assistantMsgId = (Date.now() + 1).toString();
@@ -139,12 +272,15 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                 params: {
                     agent_name: selectedAgent.name,
                     message: input,
-                    session_id: sessionId
+                    session_id: activeSessionId
                 }
             }),
             signal: controller.signal
         }).then(async (response) => {
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                const raw = await response.text();
+                throw new Error(`HTTP ${response.status}: ${raw || response.statusText}`);
+            }
             
             const reader = response.body?.getReader();
             if (!reader) throw new Error('Response body is null');
@@ -178,6 +314,18 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                         // We need to inspect what the backend actually yields.
                         // For now, let's append data.content or data if string.
                         
+                        if (data?.status === 'error') {
+                            const errorText = typeof data?.message === 'string' ? data.message : JSON.stringify(data);
+                            setMessages(prev => prev.map(msg =>
+                                msg.id === assistantMsgId
+                                    ? { ...msg, content: `后端报错：${errorText}` }
+                                    : msg
+                            ));
+                            setIsStreaming(false);
+                            controller.abort();
+                            return;
+                        }
+
                         let content = '';
                         if (typeof data === 'string') {
                             content = data;
@@ -214,6 +362,22 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                     }
                 }
             }
+
+            if (buffer.trim()) {
+                try {
+                    const data = JSON.parse(buffer.trim());
+                    if (data?.status === 'error') {
+                        const errorText = typeof data?.message === 'string' ? data.message : JSON.stringify(data);
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === assistantMsgId
+                                ? { ...msg, content: `后端报错：${errorText}` }
+                                : msg
+                        ));
+                    }
+                } catch (e) {
+                    console.error("Error parsing final NDJSON buffer", e);
+                }
+            }
             setIsStreaming(false);
         }).catch(err => {
             if (err.name === 'AbortError') return;
@@ -229,7 +393,7 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
     // Fallback to old agentService if plugin ID not found (e.g. mock mode)
     const stop = agentService.chatStream(
         selectedAgent.id, // Ensure this ID is correct for backend routing
-        sessionId,
+        activeSessionId,
         { 
             messages_type: 'text', 
             context: input,
@@ -297,6 +461,31 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                 </div>
             ) : (
                 <span className="font-serif font-bold text-gray-800 truncate">小说助手(未连接)</span>
+            )}
+            {selectedAgent && (
+                <div className="flex items-center gap-1 ml-1">
+                    <div className="relative">
+                        <select
+                            className="appearance-none bg-white border border-gray-200 text-[11px] rounded px-2 py-1 pr-5 text-gray-600 max-w-[120px] truncate"
+                            value={currentSessionByAgent[selectedAgent.name] || ''}
+                            onChange={(e) => handleSwitchSession(e.target.value)}
+                        >
+                            {(sessionsByAgent[selectedAgent.name] || []).map(sid => (
+                                <option key={sid} value={sid}>{sid}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                            <ChevronLeft size={12} className="-rotate-90" />
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleCreateSession}
+                        className="p-1 rounded border border-gray-200 text-gray-500 hover:text-black hover:border-gray-300"
+                        title="新建会话"
+                    >
+                        <Plus size={12} />
+                    </button>
+                </div>
             )}
         </div>
         <div className="flex items-center gap-1 shrink-0">

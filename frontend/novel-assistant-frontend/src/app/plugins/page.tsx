@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { getPluginsFromShop, PluginShopItem, togglePluginStatus, unregisterShopPlugin, mapShopItemToPlugin } from '@/services/pluginService';
+import { getPluginsFromShop, togglePluginStatus, unregisterShopPlugin, mapShopItemToPlugin, updatePlugin } from '@/services/pluginService';
 import { PluginConfig, PluginInstance } from '@/types/plugin';
 import { logger } from '@/lib/logger';
 import { Power, Trash2, Settings, Puzzle } from 'lucide-react';
@@ -73,10 +73,13 @@ export default function PluginsPage() {
 
   const saveSettings = async (config: PluginConfig) => {
       if (!selectedPlugin) return;
-      // TODO: API call to save config
       logger.info('Saving config for', selectedPlugin.id, config);
-      // Optimistic update
-      setPlugins(prev => prev.map(p => p.id === selectedPlugin.id ? { ...p, config } : p));
+      await updatePlugin(selectedPlugin.id, { config });
+      const refreshed = await getPluginsFromShop(true);
+      const installedPlugins = refreshed.filter(p => p.installed).map(mapShopItemToPlugin);
+      setPlugins(installedPlugins);
+      const updated = installedPlugins.find(p => p.id === selectedPlugin.id) || null;
+      setSelectedPlugin(updated);
   };
 
   return (

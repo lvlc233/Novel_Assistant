@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 import inspect
+from uuid import uuid4
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -133,6 +134,24 @@ class AgentManagerPlugin:
         else:
              print("[AgentManager] 没有需要移除的 Agent")
 
+    async def _get_agent_entity(self, agent_name: str) -> AgentsManagerSQLEntity | None:
+        stmt = select(AgentsManagerSQLEntity).where(AgentsManagerSQLEntity.name == agent_name)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _ensure_agent_session(self, agent_name: str, session_id: str) -> None:
+        agent = await self._get_agent_entity(agent_name)
+        if not agent:
+            return
+        sessions = list(agent.sessions or [])
+        if session_id not in sessions:
+            sessions.append(session_id)
+            agent.sessions = sessions
+        config = dict(agent.config or {})
+        config["current_session_id"] = session_id
+        agent.config = config
+        await self.session.commit()
+
     @operation(
         name="get_agent_info",
         description="获取Agent信息,用于在邮箱侧边栏显示",
@@ -170,15 +189,20 @@ class AgentManagerPlugin:
                             checkpoint_tuple = await checkpointer.aget({"configurable": {"thread_id": session_id}})
                             
                             messages = []
-                            if checkpoint_tuple and checkpoint_tuple.checkpoint:
-                                # 尝试从 channel_values 中获取 messages
-                                # LangGraph 的状态通常在 channel_values 中
-                                channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})
-                                # 假设 messages key 存在
-                                raw_messages = channel_values.get("messages", [])
-                                # 简单序列化 messages (这里可能需要更复杂的转换，视 Message 对象结构而定)
+                            checkpoint_payload = None
+                            if isinstance(checkpoint_tuple, dict):
+                                checkpoint_payload = checkpoint_tuple.get("checkpoint", checkpoint_tuple)
+                            elif checkpoint_tuple and hasattr(checkpoint_tuple, "checkpoint"):
+                                checkpoint_payload = checkpoint_tuple.checkpoint
+
+                            if isinstance(checkpoint_payload, dict):
+                                channel_values = checkpoint_payload.get("channel_values", {})
+                                raw_messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
                                 messages = [
-                                    {"type": getattr(m, "type", "unknown"), "content": getattr(m, "content", str(m))} 
+                                    {
+                                        "type": (m.get("type", "unknown") if isinstance(m, dict) else getattr(m, "type", "unknown")),
+                                        "content": (m.get("content", "") if isinstance(m, dict) else getattr(m, "content", str(m)))
+                                    }
                                     for m in raw_messages
                                 ]
 
@@ -191,7 +215,8 @@ class AgentManagerPlugin:
                     agent_list.append({
                         "agent_name": agent.name,
                         "on_email": email_config.get(agent.name, False), # 默认为 False
-                        "history": history_items
+                        "history": history_items,
+                        "current_session_id": (agent.config or {}).get("current_session_id")
                     })
 
             # 3. 封装为 List[AgentMessageHistoryItem]的字典并返回
@@ -241,6 +266,59 @@ class AgentManagerPlugin:
         return {"success": True, "agent_name": agent_name, "on_email": on_email}
 
     @operation(
+        name="list_agent_sessions",
+        description="列出指定Agent会话",
+        trigger = UITrigger.CLICK
+    )
+    async def list_agent_sessions(self, agent_name: str):
+        agent = await self._get_agent_entity(agent_name)
+        if not agent:
+            return {"agent_name": agent_name, "sessions": [], "current_session_id": None}
+        sessions = list(agent.sessions or [])
+        return {
+            "agent_name": agent_name,
+            "sessions": sessions,
+            "current_session_id": (agent.config or {}).get("current_session_id")
+        }
+
+    @operation(
+        name="create_agent_session",
+        description="创建指定Agent会话",
+        trigger = UITrigger.CLICK
+    )
+    async def create_agent_session(self, agent_name: str, session_id: str | None = None):
+        new_session_id = session_id or f"{agent_name}-{uuid4()}"
+        await self._ensure_agent_session(agent_name, new_session_id)
+        return {"agent_name": agent_name, "session_id": new_session_id}
+
+    @operation(
+        name="switch_agent_session",
+        description="切换指定Agent会话",
+        trigger = UITrigger.CLICK
+    )
+    async def switch_agent_session(self, agent_name: str, session_id: str):
+        await self._ensure_agent_session(agent_name, session_id)
+        return {"agent_name": agent_name, "session_id": session_id}
+
+    @operation(
+        name="delete_agent_session",
+        description="删除指定Agent会话",
+        trigger = UITrigger.CLICK
+    )
+    async def delete_agent_session(self, agent_name: str, session_id: str):
+        agent = await self._get_agent_entity(agent_name)
+        if not agent:
+            return {"agent_name": agent_name, "deleted": False}
+        sessions = [sid for sid in (agent.sessions or []) if sid != session_id]
+        agent.sessions = sessions
+        config = dict(agent.config or {})
+        if config.get("current_session_id") == session_id:
+            config["current_session_id"] = sessions[-1] if sessions else None
+        agent.config = config
+        await self.session.commit()
+        return {"agent_name": agent_name, "deleted": True, "session_id": session_id}
+
+    @operation(
         name="proxy_send_agent_message",
         description="代理发送Agent消息",
         with_ui=[Home.EmailBox.AgentBox.filter()],
@@ -266,7 +344,25 @@ class AgentManagerPlugin:
         service = PluginService(self.session)
         
         try:
-            params = {"message": message, "session_id": session_id}
+            await self._ensure_agent_session(agent_name, session_id)
+            ops = ((plugin.plugin_operation_schema or {}).get("operations") or {})
+            chat_op = ops.get("chat") or {}
+            input_schema = chat_op.get("input_schema") or {}
+
+            params = {"message": message}
+            if isinstance(input_schema, dict) and input_schema:
+                candidate_params = {
+                    "message": message,
+                    "query": message,
+                    "session_id": session_id,
+                    "thread_id": session_id,
+                    "page_id": session_id,
+                }
+                params = {
+                    key: value
+                    for key, value in candidate_params.items()
+                    if key in input_schema
+                } or {"message": message}
             
             result = await service.invoke_plugin_operation(
                 plugin_id=plugin.id,
@@ -291,11 +387,8 @@ class AgentManagerPlugin:
             import traceback
             traceback.print_exc()
             if "'NoneType' object has no attribute 'get'" in str(e):
-                 yield {"status": "error", "message": f"Agent '{agent_name}' 内部错误: 可能是运行时上下文未注入或配置缺失。"}
+                yield {"status": "error", "message": f"Agent '{agent_name}' 内部错误: 可能是运行时上下文未注入或配置缺失。"}
             else:
-                 yield {"status": "error", "message": str(e)} 
+                yield {"status": "error", "message": str(e)} 
         
-
-
-
 

@@ -57,6 +57,7 @@ export interface PluginShopItem {
   installed: boolean;
   operations?: PluginOperation[];
   config_schema?: Record<string, any>;
+  config?: Record<string, any>;
 }
 
 /**
@@ -73,7 +74,7 @@ export const mapShopItemToPlugin = (item: PluginShopItem): PluginInstance => {
         description: item.description || '',
         status: item.installed ? 'enabled' : 'disabled',
         fromType: item.from_type as any, // 临时类型断言
-        config: [],
+        config: item.config || {},
         configSchema: item.config_schema,
         operations: (item.operations || []).map(op => ({
             ...op,
