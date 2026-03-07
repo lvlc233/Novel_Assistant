@@ -44,18 +44,18 @@ class AgentManagerPlugin:
         # 注意: 这里 space 必须与 plugin_meta 中的 space 一致
         # plugin_meta 中 space="system", name="Agent管理器"
         plugin_id = build_plugin_id("system", "Agent管理器")
-        print(f"[AgentManager] Fetching config for plugin_id: {plugin_id}")
+        print(f"[AgentManager] 正在获取插件配置，插件ID: {plugin_id}")
         
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
         result = await self.session.execute(stmt)
         plugin = result.scalar_one_or_none()
         
         if not plugin:
-            print(f"[AgentManager] Plugin not found in DB for id: {plugin_id}")
+            print(f"[AgentManager] 数据库中未找到ID为 {plugin_id} 的插件")
             return {}
         
         if not plugin.runtime_config:
-            print("[AgentManager] No runtime_config found")
+            print("[AgentManager] 未找到运行时配置 (runtime_config)")
             return {}
         
         return plugin.runtime_config.get("email_config", {})
@@ -72,26 +72,24 @@ class AgentManagerPlugin:
             current_config["email_config"] = config
             plugin.runtime_config = current_config
             await self.session.commit()
-            print(f"[AgentManager] Config saved: {config}")
+            print(f"[AgentManager] 配置已保存: {config}")
         else:
-            print(f"[AgentManager] Failed to save config: Plugin {plugin_id} not found")
+            print(f"[AgentManager] 保存配置失败: 未找到ID为 {plugin_id} 的插件")
 
     async def _sync_agents_from_plugins(self):
         """同步插件中的Agent到Agent管理器"""
-        print("[AgentManager] Syncing agents from plugins...")
+        print("[AgentManager] 正在从插件同步 Agent...")
         # 1. 获取所有带有 'agent' 标签的插件
-        # 注意: JSON 数组包含查询可能因数据库方言而异，这里在 Python 中过滤
         stmt_plugins = select(PluginSQLEntity)
         result_plugins = await self.session.execute(stmt_plugins)
         all_plugins = result_plugins.scalars().all()
         
-        # 修正: tags 可能是 list 或 None，确保安全访问
         agent_plugins = []
         for p in all_plugins:
             if p.tags and isinstance(p.tags, list) and "agent" in p.tags:
                 agent_plugins.append(p)
                 
-        print(f"[AgentManager] Found {len(agent_plugins)} plugins with 'agent' tag")
+        print(f"[AgentManager] 发现 {len(agent_plugins)} 个带有 'agent' 标签的插件")
         
         # 2. 获取现有的 AgentManager 实体
         stmt_agents = select(AgentsManagerSQLEntity)
@@ -99,10 +97,11 @@ class AgentManagerPlugin:
         existing_agents = result_agents.scalars().all()
         existing_agent_names = {a.name for a in existing_agents}
         
+        # 3. 注册新 Agent
         new_agents = []
         for plugin in agent_plugins:
             if plugin.name not in existing_agent_names:
-                print(f"[AgentManager] Registering new agent from plugin: {plugin.name}")
+                print(f"[AgentManager] 正在注册新 Agent: {plugin.name}")
                 new_agent = AgentsManagerSQLEntity(
                     name=plugin.name,
                     description=plugin.description,
@@ -117,9 +116,22 @@ class AgentManagerPlugin:
         
         if new_agents:
             await self.session.commit()
-            print(f"[AgentManager] Registered {len(new_agents)} new agents")
+            print(f"[AgentManager] 已注册 {len(new_agents)} 个新 Agent")
+        
+        # 4. 清理不再存在的 Agent
+        valid_agent_plugin_names = {p.name for p in agent_plugins}
+        agents_to_remove = []
+        for agent in existing_agents:
+            if agent.name not in valid_agent_plugin_names:
+                print(f"[AgentManager] Agent '{agent.name}' 不再是有效的 Agent 插件，正在移除...")
+                await self.session.delete(agent)
+                agents_to_remove.append(agent.name)
+        
+        if agents_to_remove:
+            await self.session.commit()
+            print(f"[AgentManager] 已移除 {len(agents_to_remove)} 个无效 Agent: {agents_to_remove}")
         else:
-            print("[AgentManager] No new agents to register")
+             print("[AgentManager] 没有需要移除的 Agent")
 
     @operation(
         name="get_agent_info",
@@ -130,7 +142,7 @@ class AgentManagerPlugin:
     )
     async def get_agent_info(self):
         """获取Agent信息"""
-        print("[AgentManager] get_agent_info called")
+        print("[AgentManager] get_agent_info 被调用")
         try:
             # 0. 同步 Agent
             await self._sync_agents_from_plugins()
@@ -139,7 +151,7 @@ class AgentManagerPlugin:
             stmt = select(AgentsManagerSQLEntity)
             result = await self.session.execute(stmt)
             agents = result.scalars().all()
-            print(f"[AgentManager] Found {len(agents)} agents in DB")
+            print(f"[AgentManager] 数据库中发现 {len(agents)} 个 Agent")
             
             # 2. 获取邮件配置
             email_config = await self._get_email_config()
@@ -183,14 +195,10 @@ class AgentManagerPlugin:
                     })
 
             # 3. 封装为 List[AgentMessageHistoryItem]的字典并返回
-            # 注意：前端可能期待 {"AgentMessages": [...], "Email": ...} 或者是列表
-            # 根据 user provided snippet: registed={"AgentMessages":..., "Email":...}
-            # 这里 Home.EmailBox 可能期待的是列表或者特定结构。
-            # 假设直接返回 List[Email] 结构
-            print(f"[AgentManager] Returning {len(agent_list)} agents info")
+            print(f"[AgentManager] 返回 {len(agent_list)} 个 Agent 信息")
             return agent_list
         except Exception as e:
-            print(f"[AgentManager] Error in get_agent_info: {e}")
+            print(f"[AgentManager] get_agent_info 出错: {e}")
             import traceback
             traceback.print_exc()
             raise e
@@ -204,7 +212,7 @@ class AgentManagerPlugin:
     )
     async def get_agent_info_in_card(self):
         """获取Agent信息"""
-        print("[AgentManager] get_agent_info_in_card called")
+        print("[AgentManager] get_agent_info_in_card 被调用")
         # 复用 get_agent_info 的逻辑
         data = await self.get_agent_info()
         
@@ -220,7 +228,7 @@ class AgentManagerPlugin:
 
 
     @operation(
-    name="update_agent_email_state",
+        name="update_agent_email_state",
         description="更新插件中的Agent邮件状态(是否开启)",
         with_ui=[Home.PluginDetails.Info.filter(name="agent_manager")],
         trigger = UITrigger.CLICK
@@ -240,8 +248,6 @@ class AgentManagerPlugin:
     )
     async def proxy_send_agent_message(self, agent_name: str, message: str, session_id: str):
         # 1. 查找目标插件
-        # 注意：这里我们假设插件名就是 agent_name。
-        # 实际上 AgentsManagerSQLEntity 可能有不同的 name，但我们先假设一致。
         stmt = select(PluginSQLEntity).where(PluginSQLEntity.name == agent_name)
         result = await self.session.execute(stmt)
         plugin = result.scalar_one_or_none()
@@ -257,17 +263,11 @@ class AgentManagerPlugin:
             return
              
         # 3. 调用插件的 chat 操作
-        # 假设所有 Agent 插件都有一个 'chat' 操作
-        # 这里需要实例化一个新的 PluginService，因为它需要 session
-        # 注意：这里的 session 是当前请求的 session，可以直接复用
         service = PluginService(self.session)
         
         try:
-            # 构造参数: 这里的参数名必须与目标插件方法的参数名一致
-            # 假设标准接口为 chat(message: str, session_id: str)
             params = {"message": message, "session_id": session_id}
             
-            # 调用插件操作
             result = await service.invoke_plugin_operation(
                 plugin_id=plugin.id,
                 operation_name="chat", # 约定操作名为 chat
@@ -275,28 +275,26 @@ class AgentManagerPlugin:
                 registry=registry
             )
             
-            # 处理响应
-            # 如果是异步生成器 (流式响应)，我们需要将其转换为生成器并 yield
-            # invoke_plugin_operation 如果检测到生成器会直接返回生成器对象
             if inspect.isasyncgen(result):
                 async for chunk in result:
                     yield chunk
                 return
 
-            # 如果是普通对象 (PluginOperationInvokeResponse)，提取 payload
             if hasattr(result, 'payload'):
                 yield result.payload
                 return
             
-            # 其他情况直接返回
             yield result
             
         except Exception as e:
-            # 记录错误并返回友好提示
-            print(f"Error invoking agent plugin '{agent_name}': {e}")
-            yield {"status": "error", "message": str(e)} 
+            print(f"[AgentManager] 调用 Agent 插件 '{agent_name}' 失败: {e}")
+            import traceback
+            traceback.print_exc()
+            if "'NoneType' object has no attribute 'get'" in str(e):
+                 yield {"status": "error", "message": f"Agent '{agent_name}' 内部错误: 可能是运行时上下文未注入或配置缺失。"}
+            else:
+                 yield {"status": "error", "message": str(e)} 
         
-
 
 
 

@@ -57,13 +57,13 @@ class DocumentHelperPlugin:
         return {"title": "AI Assistant"}
 
     @operation(
-        name="chat_document",
+        name="chat",
         description="与文档对话",
         with_ui=[Assistant.filter()],
         ui_target=Assistant, # This might need a specific slot for messages or stream back to component
         trigger=UITrigger.ENTER
     )
-    async def chat_document(
+    async def chat(
         self, 
         message: str, 
         document_content: Annotated[str, UIParamSourceEnum.CONTEXT, "document_content"] = ""

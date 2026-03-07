@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 from os import name
-from typing import Callable, Dict, Any, List, Generic, TypeVar, Type, TypedDict, Optional
+from typing import Callable, Dict, Any, List, Generic, TypeVar, Type, Optional
+from typing_extensions import TypedDict
 from abc import ABC
 from uuid import UUID
 from pydantic import BaseModel

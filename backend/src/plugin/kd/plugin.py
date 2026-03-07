@@ -17,7 +17,7 @@ from core.ui.home import Home
     version="0.0.1",
     description="知识库插件",
     from_type=PluginFromTypeEnum.OFFICIAL,
-    tags=["agent"]
+    tags=["tool"]
 )
 class KDPlugin:
     

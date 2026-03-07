@@ -281,23 +281,20 @@ class ProjectHelperPlugin:
             
             # 配置项
             config = {
-                "thread_id": page_id,
                 "configurable": {
-                    "model_name": self.model_name,
-                    "base_url": self.base_url,
-                    "api_key": self.api_key
+                    "thread_id": page_id
                 }
             }
-            # runtime = ProjectHelperAgentRuntime(
-            #     base_url=self.base_url,
-            #     api_key=self.api_key,
-            #     model_name=self.model_name,
-            # )
+            runtime = ProjectHelperAgentRuntime(
+                base_url=self.base_url,
+                api_key=self.api_key,
+                model_name=self.model_name,
+            )
             
             async for event in agent.astream(
                 {"query": query, "page_id": page_id},
                 config=config,
-                # context=runtime, # 移除不支持的参数
+                context=runtime,
                 stream_mode="messages",
                 ):
                 # print("测试:"+str(event)) # Debug log

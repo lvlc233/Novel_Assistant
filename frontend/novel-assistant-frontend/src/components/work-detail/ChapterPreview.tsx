@@ -79,7 +79,11 @@ const ChapterPreview: React.FC<ChapterPreviewProps> = ({ chapter, onEdit, onSele
         {/* Content Preview */}
         <div className="flex-1 overflow-y-auto p-8 md:p-12">
             <div className="max-w-3xl mx-auto font-serif text-lg leading-loose text-stone-800 whitespace-pre-wrap">
-                {currentVersion?.content || <span className="text-stone-300 italic">暂无内容，点击右下角按钮开始创作...</span>}
+                {currentVersion?.content ? (
+                    <div dangerouslySetInnerHTML={{ __html: currentVersion.content }} />
+                ) : (
+                    <span className="text-stone-300 italic">暂无内容，点击右下角按钮开始创作...</span>
+                )}
             </div>
         </div>
 

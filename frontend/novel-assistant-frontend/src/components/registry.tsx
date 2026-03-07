@@ -55,12 +55,14 @@ export const ComponentRegistry: Record<string, React.ComponentType<any>> = {
   // Lowercase Compatibility
   'mailbutton': dynamic(() => import('@/components/mail/MailButton').then(mod => mod.MailButton)),
   'aiassistant': dynamic(() => import('@/components/editor/AIAssistant')),
+  'assistant': dynamic(() => import('@/components/editor/AIAssistant')), // Mapping for /assistant path
   'projectchatinput': dynamic(() => import('@/components/home/ProjectChatInput').then(mod => mod.ProjectChatInput)),
   'agentsidebaritem': dynamic(() => import('@/components/mail/AgentSidebarItem').then(mod => mod.AgentSidebarItem)),
   
   'welcomecard': dynamic(() => import('@/components/sdui/WelcomeCard').then(mod => mod.WelcomeCard)),
   'agentbox': dynamic(() => import('@/components/sdui/AgentBox').then(mod => mod.AgentBox)),
   'worktypesettings': dynamic(() => import('@/components/sdui/WorkTypeSettings').then(mod => mod.WorkTypeSettings)),
+  'workcreate': dynamic(() => import('@/components/sdui/WorkTypeSettings').then(mod => mod.WorkTypeSettings)), // Mapping for /works/workcreate path (assuming it maps to WorkTypeSettings or needs new component)
   'memorymanager': dynamic(() => import('@/components/sdui/MemoryManager').then(mod => mod.MemoryManager)),
   'knowledgebasemanager': dynamic(() => import('@/components/sdui/KnowledgeBaseManager').then(mod => mod.KnowledgeBaseManager)),
   'projectsessionmanager': dynamic(() => import('@/components/sdui/ProjectSessionManager').then(mod => mod.ProjectSessionManager)),

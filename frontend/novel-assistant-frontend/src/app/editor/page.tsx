@@ -31,6 +31,8 @@ function EditorContent() {
               <div className="w-[400px] h-full">
                   <SlotRenderer 
                     slotId={SLOT_IDS.EDITOR_SIDEBAR}
+                    className="h-full flex flex-col"
+                    itemClassName="h-full flex flex-col"
                     isExpanded={isAiExpanded} 
                     onToggle={() => setIsAiExpanded(!isAiExpanded)} 
                     documentId={documentId}
