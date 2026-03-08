@@ -354,13 +354,16 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
               }
           }
 
-          if (role === 'user') {
+          const isUserMessage = role === 'user' || role === 'human' || type === 'user' || type === 'human';
+          const isToolMessage = role === 'tool' || type === 'tool';
+
+          if (isUserMessage) {
               const msgId = `${sessionKey}-${index}-${Date.now()}`;
               messages.push({ id: msgId, role: 'user', content });
               lastAssistantMsgId = null;
           } else {
               // Assistant or Tool
-              if (type === 'tool') {
+              if (isToolMessage) {
                    // Tool Result - attach to last assistant message
                    if (lastAssistantMsgId) {
                        const artifactId = `${lastAssistantMsgId}-result-${index}`;
