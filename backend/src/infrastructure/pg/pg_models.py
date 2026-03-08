@@ -219,10 +219,11 @@ class MemorySQLEntity(SQLModel, table=True):
     
     id: UUID = Field(default_factory=create_uuid, primary_key=True)
     work_id: UUID | None = Field(default=None, index=True, description="关联作品ID，空则为全局")
-    name: str = Field(default="未命名记忆库")
+    title: str = Field(default="未命名记忆", description="记忆标题")
     description: str | None = None
     enabled: bool = Field(default=True, description="是否启用记忆库")
     type: str = Field(default=MemoryTypeEnum.LONG_TERM.value, sa_column=Column(String), description="记忆类型")
-    context: str
+    content: str = Field(description="详细记忆内容")
+    tags: List[str] = Field(default=[], sa_column=Column(JSON), description="标签列表")
     create_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True))
     update_at: datetime = Field(default_factory=get_now_time, sa_type=TIMESTAMP(timezone=True)) 

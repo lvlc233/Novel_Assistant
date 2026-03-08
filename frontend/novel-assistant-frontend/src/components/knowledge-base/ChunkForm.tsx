@@ -13,7 +13,7 @@ export const ChunkForm: React.FC<ChunkFormProps> = ({ kbId, onSuccess, onCancel 
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState<CreateKnowledgeBaseChunkRequest>({
         chunk_id: crypto.randomUUID(),
-        context: '',
+        content: '',
         search_keys: []
     });
     const [tagInput, setTagInput] = useState('');
@@ -40,7 +40,7 @@ export const ChunkForm: React.FC<ChunkFormProps> = ({ kbId, onSuccess, onCancel 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.context.trim()) return;
+        if (!formData.content.trim()) return;
 
         try {
             setLoading(true);
@@ -67,8 +67,8 @@ export const ChunkForm: React.FC<ChunkFormProps> = ({ kbId, onSuccess, onCancel 
                             内容 <span className="text-red-500">*</span>
                         </label>
                         <textarea
-                            value={formData.context}
-                            onChange={e => setFormData({ ...formData, context: e.target.value })}
+                            value={formData.content}
+                            onChange={e => setFormData({ ...formData, content: e.target.value })}
                             className="w-full px-4 py-3 rounded-lg border border-border-primary focus:ring-2 focus:ring-accent-primary/20 focus:border-accent-primary transition-all outline-none min-h-[200px] resize-y font-mono text-sm"
                             placeholder="输入知识点内容..."
                             autoFocus
@@ -114,7 +114,7 @@ export const ChunkForm: React.FC<ChunkFormProps> = ({ kbId, onSuccess, onCancel 
                         </button>
                         <button
                             type="submit"
-                            disabled={loading || !formData.context.trim()}
+                            disabled={loading || !formData.content.trim()}
                             className="px-6 py-2.5 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 ml-auto"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

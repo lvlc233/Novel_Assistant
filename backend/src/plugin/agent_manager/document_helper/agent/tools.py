@@ -214,4 +214,46 @@ def build_document_helper_tools(
             "message": f"不支持的 action: {action}",
         }
 
-    return [read_document_info, patch_document_content, manage_outline]
+    @tool("read_work_outline")
+    async def read_work_outline(work_id: Optional[str] = None) -> dict:
+        """读取整个作品的目录结构（卷、章、大盘信息）。
+
+        调用时机:
+        - 当你需要了解作品的整体组织架构、有哪些卷、哪些章节时调用。
+        - 当你需要确认某个章节所属的卷，或者寻找特定名称的章节ID时调用。
+
+        返回字段:
+        - work_name: 作品名称。
+        - tree: 递归的树状结构，包含 id, name, type (folder/document), children。
+        """
+        from services.work.service import WorkService
+        
+        resolved_work_id = work_id or default_work_id
+        if not resolved_work_id:
+            return {"status": "error", "message": "无法确定作品ID，请明确提供或在支持的作品上下文中调用"}
+            
+        work_service = WorkService(session)
+        detail = await work_service.get_work_detail(resolved_work_id)
+        
+        # 构建内存中的索引映射
+        node_map = {str(n.id): {"id": str(n.id), "name": n.name, "type": n.type.value, "children": []} for n in detail.document}
+        
+        child_ids = set()
+        for edge in detail.relationship:
+            parent_id = edge.from_node_id
+            if parent_id in node_map:
+                for tid in edge.to_node_ids:
+                    if tid in node_map:
+                        node_map[parent_id]["children"].append(node_map[tid])
+                        child_ids.add(tid)
+        
+        # 根节点是那些不在任何 children 里的节点
+        root_nodes = [node for node_id, node in node_map.items() if node_id not in child_ids]
+        
+        return {
+            "work_id": resolved_work_id,
+            "work_name": detail.meta.name,
+            "tree": root_nodes
+        }
+
+    return [read_document_info, patch_document_content, manage_outline, read_work_outline]

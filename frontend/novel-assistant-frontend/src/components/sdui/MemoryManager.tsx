@@ -4,12 +4,13 @@ import { invokePluginOperation } from '@/services/pluginService';
 
 interface Memory {
   id: string;
-  name: string;
+  title: string;
   description?: string;
   enabled: boolean;
   create_at: string;
   type?: string;
-  context?: string;
+  content?: string;
+  tags?: string[];
 }
 
 interface MemoryManagerProps {
@@ -28,10 +29,11 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
+    title: '',
     type: 'LONG_TERM',
     description: '',
-    context: ''
+    content: '',
+    tags: [] as string[]
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -41,7 +43,6 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
       setIsLoading(true);
       const result = await invokePluginOperation(pluginId, 'get_memory_list', {});
       if (result.payload) {
-        // The endpoint returns a List[MemoryMetaResponse], so result.payload is an array.
         setMemories(result.payload as Memory[]);
       }
     } catch (error) {
@@ -51,7 +52,6 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
     }
   }, [pluginId]);
 
-  // Optionally fetch on mount if empty, or just rely on the prop.
   useEffect(() => {
     if (!data?.memories?.length) {
       fetchMemories();
@@ -60,7 +60,6 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
 
   const handleOpenModal = async (memory?: Memory) => {
     if (memory) {
-      // Need to fetch details for context
       try {
         setIsLoading(true);
         const result = await invokePluginOperation(pluginId, 'get_memory_detail', { memory_id: memory.id });
@@ -68,10 +67,11 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
           const detail = result.payload as Memory;
           setEditingMemory(detail);
           setFormData({
-            name: detail.name,
+            title: detail.title,
             type: detail.type || 'LONG_TERM',
             description: detail.description || '',
-            context: detail.context || ''
+            content: detail.content || '',
+            tags: detail.tags || []
           });
           setIsModalOpen(true);
         }
@@ -83,10 +83,11 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
     } else {
       setEditingMemory(null);
       setFormData({
-        name: '',
+        title: '',
         type: 'LONG_TERM',
         description: '',
-        context: ''
+        content: '',
+        tags: []
       });
       setIsModalOpen(true);
     }
@@ -98,7 +99,7 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim() || !formData.context.trim()) return;
+    if (!formData.title.trim() || !formData.content.trim()) return;
 
     try {
       setIsSaving(true);
@@ -106,19 +107,21 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
         await invokePluginOperation(pluginId, 'update_memory', {
           memory_id: editingMemory.id,
           request: {
-            name: formData.name,
+            title: formData.title,
             type: formData.type,
             description: formData.description,
-            context: formData.context
+            content: formData.content,
+            tags: formData.tags
           }
         });
       } else {
         await invokePluginOperation(pluginId, 'create_memory', {
           request: {
-            name: formData.name,
+            title: formData.title,
             type: formData.type,
             description: formData.description,
-            context: formData.context
+            content: formData.content,
+            tags: formData.tags
           }
         });
       }
@@ -133,7 +136,6 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
 
   const handleToggle = async (memory: Memory) => {
     try {
-      // Optimistic update
       setMemories(prev => prev.map(m => m.id === memory.id ? { ...m, enabled: !m.enabled } : m));
       await invokePluginOperation(pluginId, 'update_memory', {
         memory_id: memory.id,
@@ -141,7 +143,6 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
       });
     } catch (error) {
       console.error('Failed to toggle memory:', error);
-      // Revert optimistic update
       setMemories(prev => prev.map(m => m.id === memory.id ? { ...m, enabled: memory.enabled } : m));
     }
   };
@@ -225,7 +226,7 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-1">
                       <h4 className={`font-bold text-base truncate ${memory.enabled ? 'text-gray-900' : 'text-gray-500'}`}>
-                        {memory.name}
+                        {memory.title}
                       </h4>
                       {memory.type && (
                         <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-purple-50 text-purple-600 border border-purple-100">
@@ -245,6 +246,9 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
                     )}
                     <div className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-50 flex items-center gap-4">
                       <span>Created: {new Date(memory.create_at).toLocaleDateString()}</span>
+                      {memory.tags?.map(tag => (
+                        <span key={tag} className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">#{tag}</span>
+                      ))}
                     </div>
                   </div>
                   
@@ -298,11 +302,11 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
             <div className="p-6 overflow-y-auto space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
+                  <label className="text-sm font-medium text-gray-700">Title <span className="text-red-500">*</span></label>
                   <input
                     type="text"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
                     className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all text-sm"
                     placeholder="e.g., User Preferences"
                   />
@@ -334,10 +338,21 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">Context Content <span className="text-red-500">*</span></label>
+                <label className="text-sm font-medium text-gray-700">Tags (Comma Separated)</label>
+                <input
+                  type="text"
+                  value={formData.tags.join(', ')}
+                  onChange={e => setFormData({ ...formData, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all text-sm"
+                  placeholder="e.g., character, plot, important"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Content <span className="text-red-500">*</span></label>
                 <textarea
-                  value={formData.context}
-                  onChange={e => setFormData({ ...formData, context: e.target.value })}
+                  value={formData.content}
+                  onChange={e => setFormData({ ...formData, content: e.target.value })}
                   className="w-full px-3 py-3 bg-white border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all text-sm h-48 resize-none font-mono"
                   placeholder="Enter the actual memory facts or text..."
                 />
@@ -354,7 +369,7 @@ export const MemoryManager: React.FC<MemoryManagerProps> = ({ data, pluginId }) 
               </button>
               <button
                 onClick={handleSave}
-                disabled={!formData.name.trim() || !formData.context.trim() || isSaving}
+                disabled={!formData.title.trim() || !formData.content.trim() || isSaving}
                 className="flex items-center gap-2 px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

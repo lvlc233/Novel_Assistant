@@ -73,7 +73,7 @@ export interface MessagesSendRequest {
   /** 消息类型 (目前仅支持文本) */
   messages_type: 'text';
   /** 用户输入的上下文内容 */
-  context: string;
+  content: string;
 }
 
 /**

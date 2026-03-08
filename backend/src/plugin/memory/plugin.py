@@ -19,30 +19,33 @@ from langchain_core.messages import SystemMessage, HumanMessage
 class MemoryMetaResponse(BaseModel):
     id: UUID
     enabled: bool
-    name: str
+    title: str
     description: str | None = None
     create_at: datetime
 
 class MemoryDetailResponse(BaseModel):
     id: UUID
     enabled: bool
-    name: str
+    title: str
     type: str
     description: str | None = None
     create_at: datetime
-    context: str | None = None
+    content: str | None = None
+    tags: List[str] = []
 
 class MemoryCreateRequest(BaseModel):
-    name: str
-    type: str
+    title: str
+    type: str = "LONG_TERM"
     description: str | None = None
-    context: str | None = None
+    content: str
+    tags: List[str] = []
 
 class MemoryUpdateRequest(BaseModel):
     enabled: bool | None = None
-    name: str | None = None
+    title: str | None = None
     description: str | None = None
-    context: str | None = None
+    content: str | None = None
+    tags: List[str] = None
 
 @plugin_meta(
     name="memory",
@@ -93,7 +96,7 @@ class MemoryPlugin:
         if not memories:
             return "No memories to organize."
             
-        context_text = "\n".join([f"[{m.name}]: {m.context}" for m in memories])
+        context_text = "\n".join([f"[{m.title}]: {m.content}" for m in memories])
         
         if not self.api_key or not self.model_name:
             raise ValueError("LLM Configuration (api_key, model_name) is missing. Please configure it in the plugin settings.")
@@ -115,10 +118,10 @@ class MemoryPlugin:
         # Create summary memory
         new_memory = MemorySQLEntity(
             id=create_uuid(),
-            name=f"Summary {get_now_time().strftime('%Y-%m-%d')}",
+            title=f"Summary {get_now_time().strftime('%Y-%m-%d')}",
             type=MemoryTypeEnum.LONG_TERM.value,
             description="Auto-generated summary",
-            context=summary,
+            content=summary,
             create_at=get_now_time()
         )
         self.session.add(new_memory)
@@ -137,7 +140,7 @@ class MemoryPlugin:
             MemoryMetaResponse(
                 id=memory.id,
                 enabled=memory.enabled,
-                name=memory.name,
+                title=memory.title,
                 description=memory.description,
                 create_at=memory.create_at
             ) for memory in memories
@@ -156,25 +159,29 @@ class MemoryPlugin:
         return MemoryDetailResponse(
             id=memory.id,
             enabled=memory.enabled,
-            name=memory.name,
+            title=memory.title,
             type=memory.type,
             description=memory.description,
             create_at=memory.create_at,
-            context=memory.context
+            content=memory.content,
+            tags=memory.tags
         )
 
     @operation(name="create_memory")
     async def create_memory(self, request: MemoryCreateRequest) -> MemoryMetaResponse:
         """创建记忆."""
         if isinstance(request, dict):
+            # 支持兼容性映射 (LLM 可能会传 title/content 也可能会传旧的 name/context，或者 pydantic 自动处理)
+            # 这里按照新的 schema 处理
             request = MemoryCreateRequest(**request)
             
         memory = MemorySQLEntity(
             id=create_uuid(),
-            name=request.name,
+            title=request.title,
             type=request.type,
             description=request.description,
-            context=request.context or "",
+            content=request.content or "",
+            tags=request.tags or [],
             create_at=get_now_time()
         )
         
@@ -185,7 +192,7 @@ class MemoryPlugin:
         return MemoryMetaResponse(
             id=memory.id,
             enabled=memory.enabled,
-            name=memory.name,
+            title=memory.title,
             description=memory.description,
             create_at=memory.create_at
         )
@@ -203,14 +210,16 @@ class MemoryPlugin:
         if not memory:
             raise ResourceNotFoundError(f"Memory with id {memory_id} not found")
             
-        if request.name is not None:
-            memory.name = request.name
+        if request.title is not None:
+            memory.title = request.title
         if request.description is not None:
             memory.description = request.description
-        if request.context is not None:
-            memory.context = request.context
+        if request.content is not None:
+            memory.content = request.content
         if request.enabled is not None:
             memory.enabled = request.enabled
+        if request.tags is not None:
+            memory.tags = request.tags
             
         await self.session.commit()
 
@@ -226,3 +235,4 @@ class MemoryPlugin:
             
         await self.session.delete(memory)
         await self.session.commit()
+

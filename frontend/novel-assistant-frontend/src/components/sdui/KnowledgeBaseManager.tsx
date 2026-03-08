@@ -16,7 +16,7 @@ interface Chunk {
   chunk_id: string;
   enabled: boolean;
   search_keys?: string[];
-  context: string;
+  content: string;
   create_at: string;
   update_at?: string;
 }
@@ -53,7 +53,7 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
 
   const [isChunkModalOpen, setIsChunkModalOpen] = useState(false);
   const [editingChunk, setEditingChunk] = useState<Chunk | null>(null);
-  const [chunkForm, setChunkForm] = useState({ context: '', search_keys: '' });
+  const [chunkForm, setChunkForm] = useState({ content: '', search_keys: '' });
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -168,16 +168,16 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
   const handleOpenChunkModal = (chunk?: Chunk) => {
     if (chunk) {
       setEditingChunk(chunk);
-      setChunkForm({ context: chunk.context, search_keys: (chunk.search_keys || []).join(', ') });
+      setChunkForm({ content: chunk.content, search_keys: (chunk.search_keys || []).join(', ') });
     } else {
       setEditingChunk(null);
-      setChunkForm({ context: '', search_keys: '' });
+      setChunkForm({ content: '', search_keys: '' });
     }
     setIsChunkModalOpen(true);
   };
 
   const handleSaveChunk = async () => {
-    if (!selectedKbId || !chunkForm.context.trim()) return;
+    if (!selectedKbId || !chunkForm.content.trim()) return;
     const parsedKeys = chunkForm.search_keys.split(',').map(s => s.trim()).filter(Boolean);
 
     try {
@@ -188,7 +188,7 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
           chunk_id: editingChunk.chunk_id,
           request: { 
             enabled: editingChunk.enabled,
-            context: chunkForm.context, 
+            content: chunkForm.content, 
             search_keys: parsedKeys 
           }
         });
@@ -197,7 +197,7 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
           kd_id: selectedKbId,
           request: { 
             chunk_id: crypto.randomUUID(), 
-            context: chunkForm.context, 
+            content: chunkForm.content, 
             search_keys: parsedKeys 
           }
         });
@@ -233,7 +233,7 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
         chunk_id: chunk.chunk_id,
         request: { 
           enabled: !chunk.enabled,
-          context: chunk.context,
+          content: chunk.content,
           search_keys: chunk.search_keys || []
         }
       });
@@ -409,7 +409,7 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
                           </div>
                         </div>
                         <div className="p-4 text-sm text-gray-700 whitespace-pre-wrap font-serif leading-relaxed">
-                          {chunk.context}
+                          {chunk.content}
                         </div>
                       </div>
                     ))}
@@ -505,8 +505,8 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-gray-700">Content <span className="text-red-500">*</span></label>
                 <textarea
-                  value={chunkForm.context}
-                  onChange={e => setChunkForm({ ...chunkForm, context: e.target.value })}
+                  value={chunkForm.content}
+                  onChange={e => setChunkForm({ ...chunkForm, content: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none text-sm h-64 resize-none font-serif leading-relaxed"
                   placeholder="Enter the factual knowledge text..."
                 />
@@ -514,7 +514,7 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({ data
             </div>
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
               <button onClick={() => setIsChunkModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl">Cancel</button>
-              <button onClick={handleSaveChunk} disabled={!chunkForm.context.trim() || isSaving} className="flex flex-row items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={handleSaveChunk} disabled={!chunkForm.content.trim() || isSaving} className="flex flex-row items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Save
               </button>

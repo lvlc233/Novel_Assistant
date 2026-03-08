@@ -52,8 +52,8 @@ export interface MemoryCreateRequest {
   memory_type: MemoryType;
   /** 记忆描述 */
   memory_description?: string;
-  /** 记忆内容 (对应后端的 context) */
-  memory_context?: string;
+  /** 记忆内容 */
+  content?: string;
 }
 
 /**
@@ -68,5 +68,5 @@ export interface MemoryUpdateRequest {
   /** 新的描述 */
   memory_description?: string;
   /** 新的内容 */
-  memory_context?: string;
+  content?: string;
 }

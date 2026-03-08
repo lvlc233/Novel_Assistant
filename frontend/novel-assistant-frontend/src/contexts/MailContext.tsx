@@ -217,7 +217,7 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         agentService.chatStream(
             agentId,
             threadId,
-            { context: content, messages_type: 'text' },
+            { content: content, messages_type: 'text' },
             () => {},
             () => {
                 // On Finish

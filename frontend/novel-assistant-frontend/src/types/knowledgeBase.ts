@@ -14,7 +14,7 @@ export interface KnowledgeBaseChunk {
   /** 分块唯一标识符 */
   chunk_id: string;
   /** 分块内容文本 */
-  context: string;
+  content: string;
   /** 搜索关键词列表 (用于增强检索) */
   search_keys?: string[];
   /** 是否启用该分块 */
@@ -66,7 +66,7 @@ export interface CreateKnowledgeBaseChunkRequest {
    */
   chunk_id: string;
   /** 内容文本 */
-  context: string;
+  content: string;
   /** 搜索关键词列表 */
   search_keys?: string[];
 }
@@ -90,7 +90,7 @@ export interface UpdateKnowledgeBaseRequest {
  */
 export interface UpdateKnowledgeBaseChunkRequest {
   /** 新的内容文本 */
-  context?: string;
+  content?: string;
   /** 新的搜索关键词 */
   search_keys?: string[];
   /** 是否启用 */

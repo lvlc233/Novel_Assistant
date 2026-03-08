@@ -16,7 +16,7 @@ class KDDescriptionResponse(BaseModel):
     chunk_id: UUID
     enabled: bool
     search_keys: List[str]
-    context: str | None = None
+    content: str | None = None
     create_at: datetime | None = None
     update_at: datetime | None = None
 
@@ -27,8 +27,8 @@ class KDCreateRequest(BaseModel):
 
 class KDDescriptionCreateRequest(BaseModel):
     chunk_id: UUID
-    search_keys: List[str]
-    context: str | None = None
+    search_keys: List[str] | None = []
+    content: str | None = None
 
 class KDUpdateRequest(BaseModel):
     enabled: bool
@@ -37,5 +37,5 @@ class KDUpdateRequest(BaseModel):
 
 class KDDescriptionUpdateRequest(BaseModel):
     enabled: bool
-    search_keys: List[str]
-    context: str | None = None
+    search_keys: List[str] | None = None
+    content: str | None = None

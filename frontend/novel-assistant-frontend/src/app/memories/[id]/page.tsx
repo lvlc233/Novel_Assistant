@@ -61,7 +61,7 @@ export default function MemoryDetailPage() {
       await memoryService.updateMemory(memory.memory_id, {
         memory_name: name,
         memory_description: description,
-        memory_context: content,
+        content: content,
         enable: isEnabled
       });
       setIsDirty(false);
