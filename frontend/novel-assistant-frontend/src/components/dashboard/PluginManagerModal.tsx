@@ -7,6 +7,7 @@ import { ConfigRenderer } from './plugin-renderers/ConfigRenderer';
 import { logger } from '@/lib/logger';
 
 import { PluginDetailsInfo } from '../plugins/agent-manager/PluginDetailsInfo';
+import AgentToolManager from '@/components/agents/AgentToolManager';
 import { invokePluginOperation } from '@/services/pluginService';
 
 interface PluginManagerModalProps {
@@ -190,11 +191,7 @@ const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ plugin, onClose
             ) : (
                 isAgentManager ? (
                     <div className="h-full p-6 bg-gray-50/50">
-                        <PluginDetailsInfo 
-                            data={agentData ? agentData.data : null} 
-                            pluginId={plugin.id}
-                            configNode={configNode}
-                        />
+                        <AgentToolManager />
                     </div>
                 ) : (
                     configNode

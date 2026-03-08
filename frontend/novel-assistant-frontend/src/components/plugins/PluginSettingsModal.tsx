@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Database, Settings } from 'lucide-react';
+import { X, Database, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { PluginConfig, PluginInstance, ConfigField } from '@/types/plugin';
 import { getPluginDetail, invokePlugin } from '@/services/pluginService';
 import { SDUIRenderer } from '@/components/common/SDUIRenderer';
@@ -32,6 +32,7 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
   console.log('PluginSettingsModal: Received plugin:', plugin);
   const [configValues, setConfigValues] = useState<Record<string, any>>(plugin.config || {});
   const [isEditingConfig, setIsEditingConfig] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(true);
   
   // Convert configSchema to ConfigField[] for ConfigRenderer
   const configFields: ConfigField[] = useMemo(() => {
@@ -201,7 +202,9 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
           <div className="h-full grid grid-cols-12 gap-6">
             
             {/* Left Column: Configuration Card */}
-            <div className="col-span-4 h-full flex flex-col">
+            <div className={`transition-all duration-300 ease-in-out origin-left flex flex-col h-full ${
+              isConfigOpen ? 'col-span-4 opacity-100' : 'hidden opacity-0 col-span-0 w-0'
+            }`}>
               <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-card-soft overflow-hidden flex flex-col">
                  <div className="p-5 h-full overflow-hidden">
                    <ConfigRenderer 
@@ -217,11 +220,18 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
             </div>
 
             {/* Right Column: Data / Preview Card */}
-            <div className="col-span-8 h-full flex flex-col">
+            <div className={`${isConfigOpen ? 'col-span-8' : 'col-span-12'} transition-all duration-300 h-full flex flex-col`}>
                <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-card-soft overflow-hidden flex flex-col">
                   {/* Card Header */}
-                  <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                  <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => setIsConfigOpen(!isConfigOpen)}
+                          className="p-1 px-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-600 border border-transparent hover:border-gray-200 shadow-sm hover:shadow active:shadow-inner rounded-md transition-all mr-1"
+                          title={isConfigOpen ? "收起配置面板" : "展开配置面板"}
+                        >
+                          {isConfigOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                        </button>
                         <Database className="w-4 h-4 text-gray-400" />
                         <h4 className="font-serif font-bold text-gray-800">Live Preview</h4>
                      </div>
@@ -233,7 +243,7 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
                   </div>
 
                   {/* Card Content */}
-                  <div className="flex-1 overflow-y-auto p-5 relative bg-gray-50">
+                  <div className="flex-1 overflow-hidden p-5 relative bg-gray-50 flex flex-col">
                      {isLoadingData ? (
                        <DataSkeleton />
                      ) : dataError ? (
@@ -246,8 +256,8 @@ export default function PluginSettingsModal({ isOpen, onClose, plugin, onSave }:
                        </div>
                      ) : data ? (
                         uiTarget ? (
-                           <div className="animate-in fade-in zoom-in-95 duration-300">
-                              <SDUIRenderer ui_target={uiTarget} props={data} />
+                           <div className="flex-1 min-h-0 animate-in fade-in zoom-in-95 duration-300">
+                              <SDUIRenderer ui_target={uiTarget} props={{ ...data, pluginId: plugin.id }} />
                            </div>
                         ) : (
                            // Fallback when uiTarget is missing but data exists

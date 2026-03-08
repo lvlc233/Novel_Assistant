@@ -16,6 +16,8 @@ from common.config import settings
 from infrastructure.pg.pg_client import async_session
 from infrastructure.pg.pg_models import AgentsManagerSQLEntity
 from plugin.agent_manager.document_helper.agent.agent import build_agent
+from core.plugin.tool_builder import build_tools_from_plugins
+from core.plugin.runtime import PluginInternalRegistry
 from loguru import logger
 
 async def get_checkpoint() -> AsyncPostgresSaver:
@@ -337,6 +339,15 @@ class DocumentHelperPlugin:
         try:
             async with async_session() as session:
                 await self._ensure_session(session, sid)
+                # 从插件系统构建工具
+                plugin_tools = []
+                registry = PluginInternalRegistry.get_global()
+                if registry:
+                    plugin_tools = await build_tools_from_plugins(
+                        registry=registry,
+                        session=session,
+                        agent_name="文档助手",
+                    )
                 runtime = {
                     "model_name": self.model_name,
                     "api_key": self.api_key,
@@ -345,7 +356,7 @@ class DocumentHelperPlugin:
                     "document_content": document_content,
                     "document_title": document_title,
                     "user_prompt": self.user_prompt,
-                    "tools": [],
+                    "tools": plugin_tools,
                     "session": session,
                     "work_id": work_id,
                     "document_id": document_id,

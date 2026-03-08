@@ -40,42 +40,14 @@ class AgentManagerPlugin:
         self.session = session
         self.checkpoint = checkpoint
     
-    async def _get_email_config(self) -> Dict[str, bool]:
-        """获取AgentManager的邮件配置 (agent_name -> enabled)"""
-        # 注意: 这里 space 必须与 plugin_meta 中的 space 一致
-        # plugin_meta 中 space="system", name="Agent管理器"
-        plugin_id = build_plugin_id("system", "Agent管理器")
-        print(f"[AgentManager] 正在获取插件配置，插件ID: {plugin_id}")
-        
-        stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
-        result = await self.session.execute(stmt)
-        plugin = result.scalar_one_or_none()
-        
-        if not plugin:
-            print(f"[AgentManager] 数据库中未找到ID为 {plugin_id} 的插件")
-            return {}
-        
-        if not plugin.runtime_config:
-            print("[AgentManager] 未找到运行时配置 (runtime_config)")
-            return {}
-        
-        return plugin.runtime_config.get("email_config", {})
+    # 邮箱配置已被废弃，改用工具映射管理
+    # async def _get_email_config(self) -> Dict[str, bool]:
+    #     """获取AgentManager的邮件配置 (agent_name -> enabled)"""
+    #     return {}
 
-    async def _save_email_config(self, config: Dict[str, bool]):
-        """保存AgentManager的邮件配置"""
-        plugin_id = build_plugin_id("system", "Agent管理器")
-        stmt = select(PluginSQLEntity).where(PluginSQLEntity.id == plugin_id)
-        result = await self.session.execute(stmt)
-        plugin = result.scalar_one_or_none()
-        
-        if plugin:
-            current_config = dict(plugin.runtime_config or {})
-            current_config["email_config"] = config
-            plugin.runtime_config = current_config
-            await self.session.commit()
-            print(f"[AgentManager] 配置已保存: {config}")
-        else:
-            print(f"[AgentManager] 保存配置失败: 未找到ID为 {plugin_id} 的插件")
+    # async def _save_email_config(self, config: Dict[str, bool]):
+    #     """保存AgentManager的邮件配置"""
+    #     pass  # 已废弃
 
     async def _sync_agents_from_plugins(self):
         """同步插件中的Agent到Agent管理器"""
@@ -162,6 +134,30 @@ class AgentManagerPlugin:
             agent.sessions = sessions
         config = dict(agent.config or {})
         config["current_session_id"] = session_id
+        agent.config = config
+        await self.session.commit()
+    
+    async def _get_tool_config(self, agent_name: str) -> Dict[str, Any]:
+        """获取指定 Agent 的工具映射配置，返回 dict，若不存在返回空 dict。"""
+        stmt = select(AgentsManagerSQLEntity).where(AgentsManagerSQLEntity.name == agent_name)
+        result = await self.session.execute(stmt)
+        agent = result.scalar_one_or_none()
+        if not agent:
+            return {}
+        return (agent.config or {}).get("tools", {})
+
+    async def _save_tool_config(self, agent_name: str, tool_cfg: Dict[str, Any]) -> None:
+        """保存指定 Agent 的工具映射配置。"""
+        stmt = select(AgentsManagerSQLEntity).where(AgentsManagerSQLEntity.name == agent_name)
+        result = await self.session.execute(stmt)
+        agent = result.scalar_one_or_none()
+        if not agent:
+            # 若不存在则创建一个新的 Agent 记录
+            agent = AgentsManagerSQLEntity(name=agent_name, config={})
+            self.session.add(agent)
+            await self.session.flush()
+        config = dict(agent.config or {})
+        config["tools"] = tool_cfg
         agent.config = config
         await self.session.commit()
 
@@ -252,8 +248,8 @@ class AgentManagerPlugin:
             agents = result.scalars().all()
             print(f"[AgentManager] 数据库中发现 {len(agents)} 个 Agent")
             
-            # 2. 获取邮件配置
-            email_config = await self._get_email_config()
+            # 2. 不再获取邮件配置，保留空字典占位
+            email_config = {}
             
             agent_list = []
             
@@ -274,7 +270,7 @@ class AgentManagerPlugin:
                                 checkpoint_payload = checkpoint_tuple.get("checkpoint", checkpoint_tuple)
                             elif checkpoint_tuple and hasattr(checkpoint_tuple, "checkpoint"):
                                 checkpoint_payload = checkpoint_tuple.checkpoint
-
+                            
                             if isinstance(checkpoint_payload, dict):
                                 channel_values = checkpoint_payload.get("channel_values", {})
                                 raw_messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
@@ -293,7 +289,7 @@ class AgentManagerPlugin:
                     
                     agent_list.append({
                         "agent_name": agent.name,
-                        "on_email": email_config.get(agent.name, False), # 默认为 False
+                        "on_email": email_config.get(agent.name, False), # 保持字段兼容，默认 False
                         "history": history_items,
                         "current_session_id": (agent.config or {}).get("current_session_id")
                     })
@@ -315,34 +311,111 @@ class AgentManagerPlugin:
         trigger = UITrigger.CLICK
     )
     async def get_agent_info_in_card(self):
-        """获取Agent信息"""
+        """获取Agent基础列表，在工具管理卡片中展示"""
         print("[AgentManager] get_agent_info_in_card 被调用")
-        # 复用 get_agent_info 的逻辑
-        data = await self.get_agent_info()
+        stmt = select(AgentsManagerSQLEntity)
+        result = await self.session.execute(stmt)
+        agents = result.scalars().all()
         
-        # 封装为 Home.PluginDetails.Info的字典并返回,其中type选择"AgentMessages"
-        # 根据 Home 定义: Info(name:str ,data: dict, info_type:str)
-        # 这里返回的是构造 Info 组件所需的参数字典
+        agent_list = []
+        for agent in agents:
+            agent_list.append({
+                "agent_name": agent.name,
+                "description": agent.description
+            })
+            
         return {
             "name": "agent_manager",
-            "data": {"agents": data},
-            "info_type": "AgentMessages" # 对应前端 registed key
+            "data": {"agents": agent_list},
+            "info_type": "Info"
         }
     
 
+    
+    @operation(
+        name="get_agent_tool_info",
+        description="获取所有 Agent 及其工具映射配置",
+        with_ui=[Home.PluginExpand.PluginCard.filter(name="agent_manager")],
+        ui_target=Home.PluginDetails.Info,
+        trigger=UITrigger.CLICK
+    )
+    async def get_agent_tool_info(self):
+        """返回所有 Agent 的工具配置（不含历史）"""
+        stmt = select(AgentsManagerSQLEntity)
+        result = await self.session.execute(stmt)
+        agents = result.scalars().all()
+        agent_list = []
+        for agent in agents:
+            tools_cfg = (agent.config or {}).get("tools", {})
+            agent_list.append({
+                "agent_name": agent.name,
+                "description": agent.description,
+                "tools": tools_cfg,
+                "enabled": agent.enabled,
+                "broadcast": agent.broadcast,
+                "context_size": agent.context_size,
+                "is_summary": agent.is_summary,
+                "sessions": agent.sessions,
+                "config": agent.config or {}
+            })
+        return agent_list
+
+    # 已废弃的邮箱状态操作，改为工具映射管理
+    # @operation(
+    #     name="update_agent_email_state",
+    #     description="更新插件中的Agent邮件状态(是否开启)",
+    #     with_ui=[Home.PluginDetails.Info.filter(name="agent_manager")],
+    #     trigger = UITrigger.CLICK
+    # )
+    # async def update_agent_email_state(self, agent_name: str, on_email: bool):
+    #     pass
 
     @operation(
-        name="update_agent_email_state",
-        description="更新插件中的Agent邮件状态(是否开启)",
-        with_ui=[Home.PluginDetails.Info.filter(name="agent_manager")],
-        trigger = UITrigger.CLICK
+        name="list_agent_plugins",
+        description="列出指定 Agent 可用的工具插件及其操作开关状态",
+        trigger=UITrigger.CLICK
     )
-    async def update_agent_email_state(self, agent_name: str, on_email: bool):
-        # 持久化到 AgentManager 插件的配置中
-        email_config = await self._get_email_config()
-        email_config[agent_name] = on_email
-        await self._save_email_config(email_config)
-        return {"success": True, "agent_name": agent_name, "on_email": on_email}
+    async def list_agent_plugins(self, agent_name: str):
+        """返回该 Agent 可用的工具插件列表及每个 operation 的 enabled 状态"""
+        registry = PluginInternalRegistry.get_global()
+        if not registry:
+            return []
+        # 所有工具插件
+        plugins = [p for p in registry.get_plugin_list() if "tool" in p.get("tags", [])]
+        # 当前 Agent 的工具配置
+        tool_cfg = await self._get_tool_config(agent_name)
+        result = []
+        for plug in plugins:
+            plugin_name = plug["name"]
+            wrapper = registry.get_plugin_wrapper(plug["id"])
+            ops = []
+            for op_name, op_info in wrapper.operations.items():
+                key = f"{op_name}_is_tool"
+                enabled = tool_cfg.get(plugin_name, {}).get(key, True)
+                ops.append({
+                    "name": op_name,
+                    "description": op_info.description,
+                    "enabled": enabled
+                })
+            result.append({
+                "plugin_name": plugin_name,
+                "operations": ops
+            })
+        return result
+
+    @operation(
+        name="update_agent_tool_state",
+        description="更新指定 Agent 对某插件某工具的开关状态",
+        trigger=UITrigger.CLICK
+    )
+    async def update_agent_tool_state(self, agent_name: str, plugin_name: str, tool_name: str, enabled: bool):
+        """修改工具开关并持久化"""
+        tool_cfg = await self._get_tool_config(agent_name)
+        plugin_cfg = tool_cfg.get(plugin_name, {})
+        plugin_cfg[f"{tool_name}_is_tool"] = enabled
+        tool_cfg[plugin_name] = plugin_cfg
+        await self._save_tool_config(agent_name, tool_cfg)
+        return {"success": True, "agent_name": agent_name, "plugin_name": plugin_name, "tool_name": tool_name, "enabled": enabled}
 
     @operation(
         name="list_agent_sessions",

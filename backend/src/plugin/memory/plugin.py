@@ -50,7 +50,7 @@ class MemoryUpdateRequest(BaseModel):
     version="0.0.1",
     description="记忆管理插件",
     from_type=PluginFromTypeEnum.OFFICIAL,
-    tags=["memory"]
+    tags=["memory", "tool"]
 )
 class MemoryPlugin:
 

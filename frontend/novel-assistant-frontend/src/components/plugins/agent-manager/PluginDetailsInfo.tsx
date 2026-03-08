@@ -1,190 +1,227 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { invokePluginOperation } from '@/services/pluginService';
 import { logger } from '@/lib/logger';
-import { Mail, MessageSquare, Settings, User } from 'lucide-react';
-// import { Switch } from '@/components/ui/switch'; // Assuming we have a Switch component or check if available
-// If Switch is not available, use input checkbox
-
-interface Message {
-    type: string;
-    content: string;
-}
-
-interface AgentMessageHistoryItem {
-    agent_name?: string;
-    session_id: string;
-    messages: Message[];
-}
+import { Settings, User, Loader2, Wrench } from 'lucide-react';
 
 interface AgentInfo {
-    agent_name: string;
-    on_email: boolean;
-    history: AgentMessageHistoryItem[];
+  agent_name: string;
+  description: string;
+}
+
+interface AgentToolOperation {
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
+interface AgentToolPlugin {
+  plugin_name: string;
+  operations: AgentToolOperation[];
 }
 
 interface PluginDetailsInfoProps {
-  data: { agents: AgentInfo[] } | null;
-  pluginId: string;
-  configNode?: React.ReactNode;
+  data?: { agents?: AgentInfo[] } | null;
+  agents?: AgentInfo[];
+  pluginId?: string;
 }
 
-export const PluginDetailsInfo: React.FC<PluginDetailsInfoProps> = ({ data, pluginId, configNode }) => {
-  const [agents, setAgents] = useState<AgentInfo[]>(data?.agents || []);
-  
-  // Sync state when data changes
-  React.useEffect(() => {
-      if (data?.agents) {
-          setAgents(data.agents);
-      }
-  }, [data]);
+export const PluginDetailsInfo: React.FC<PluginDetailsInfoProps> = ({ data, agents: directAgents, pluginId }) => {
+  console.log("[PluginDetailsInfo] Received props data:", data, directAgents);
+  const agents = directAgents || data?.agents || [];
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [agentTools, setAgentTools] = useState<Record<string, AgentToolPlugin[]>>({});
+  const [loadingTools, setLoadingTools] = useState<Record<string, boolean>>({});
+  const [updatingTool, setUpdatingTool] = useState<string | null>(null);
 
-  const [updating, setUpdating] = useState<string | null>(null);
+  // Initialize selected agent
+  useEffect(() => {
+    if (agents.length > 0 && !selectedAgent) {
+      setSelectedAgent(agents[0].agent_name);
+    }
+  }, [agents, selectedAgent]);
 
-  const handleEmailToggle = async (agentName: string, checked: boolean) => {
-    // ... existing logic ...
-    setUpdating(agentName);
-    try {
-        await invokePluginOperation(pluginId, 'update_agent_email_state', {
-            agent_name: agentName,
-            on_email: checked
+  // Load tools when selected agent changes
+  useEffect(() => {
+    if (!selectedAgent) return;
+    if (agentTools[selectedAgent]) return; // already loaded
+
+    const loadTools = async () => {
+      setLoadingTools(prev => ({ ...prev, [selectedAgent]: true }));
+      try {
+        const result = await invokePluginOperation(pluginId, 'list_agent_plugins', {
+          agent_name: selectedAgent
         });
         
-        setAgents(prev => prev.map(a => 
-            a.agent_name === agentName ? { ...a, on_email: checked } : a
-        ));
+        let toolData = [];
+        if (result && 'payload' in (result as any)) {
+            toolData = (result as any).payload;
+        } else {
+            toolData = result as AgentToolPlugin[];
+        }
 
+        setAgentTools(prev => ({ ...prev, [selectedAgent]: toolData }));
+      } catch (error) {
+        logger.error(`Failed to fetch tools for ${selectedAgent}:`, error);
+      } finally {
+        setLoadingTools(prev => ({ ...prev, [selectedAgent]: false }));
+      }
+    };
+
+    loadTools();
+  }, [selectedAgent, pluginId, agentTools]);
+
+  const handleToolToggle = async (pluginName: string, opName: string, checked: boolean) => {
+    if (!selectedAgent) return;
+    
+    const operationKey = `${selectedAgent}-${pluginName}-${opName}`;
+    setUpdatingTool(operationKey);
+    
+    try {
+      await invokePluginOperation(pluginId, 'update_agent_tool_state', {
+        agent_name: selectedAgent,
+        plugin_name: pluginName,
+        tool_name: opName,
+        enabled: checked
+      });
+      
+      // Update local state
+      setAgentTools(prev => {
+        const currentTools = prev[selectedAgent] || [];
+        const updatedTools = currentTools.map(plugin => {
+          if (plugin.plugin_name === pluginName) {
+            return {
+              ...plugin,
+              operations: plugin.operations.map(op => 
+                op.name === opName ? { ...op, enabled: checked } : op
+              )
+            };
+          }
+          return plugin;
+        });
+        return { ...prev, [selectedAgent]: updatedTools };
+      });
     } catch (error) {
-        logger.error('Failed to update email state:', error);
+      logger.error('Failed to update tool state:', error);
     } finally {
-        setUpdating(null);
+      setUpdatingTool(null);
     }
   };
 
+  const currentTools = selectedAgent ? agentTools[selectedAgent] || [] : [];
+  const isLoading = selectedAgent ? loadingTools[selectedAgent] : false;
+
   return (
-    <div className="flex h-full gap-6">
-        {/* Left: Config Section */}
-        <div className="w-1/3 min-w-[250px] border-r border-gray-100 pr-6 flex flex-col">
-            <div className="flex items-center gap-2 mb-4 text-sm font-bold text-gray-700">
-                <Settings className="w-4 h-4" />
-                <span>配置选项</span>
-            </div>
-            
-            <div className="flex-1 bg-gray-50/50 rounded-xl border border-dashed border-gray-200 overflow-hidden relative">
-                {configNode ? (
-                    <div className="h-full overflow-y-auto p-4">
-                        {configNode}
-                    </div>
-                ) : (
-                    <div className="flex items-center justify-center h-full text-sm text-gray-400">
-                        空
-                    </div>
-                )}
-            </div>
+    <div className="flex absolute inset-0 gap-6">
+      {/* Left: Agent List */}
+      <div className="w-1/3 min-w-[200px] border-r border-gray-100 pr-6 flex flex-col min-h-0">
+        <div className="flex items-center gap-2 mb-4 text-sm font-bold text-gray-700 shrink-0">
+          <User className="w-4 h-4" />
+          <span>可用 Agent 列表</span>
         </div>
-
-        {/* Right: Agent List Section */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 mb-4 text-sm font-bold text-gray-700">
-                <User className="w-4 h-4" />
-                <span>插件数据</span>
-            </div>
-
-            {!agents || agents.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-50/30 rounded-xl border border-dashed border-gray-200">
-                    空
-                </div>
+        
+        <div className="flex-1 relative">
+          <div className="absolute inset-0 overflow-y-auto space-y-2 pr-2">
+            {agents.length === 0 ? (
+              <div className="text-sm text-gray-400 text-center py-8">无可用 Agent</div>
             ) : (
-                <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                    {agents.map((agent) => (
-                        <div key={agent.agent_name} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                            {/* Agent Header */}
-                            <div className="px-4 py-3 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
-                                        {agent.agent_name[0]}
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-medium text-gray-800">{agent.agent_name}</div>
-                                        <div className="text-[10px] text-gray-500 flex items-center gap-1">
-                                            <Mail className="w-3 h-3" />
-                                            <span>邮件通知</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-2">
-                                    {updating === agent.agent_name && (
-                                        <span className="text-[10px] text-blue-500 animate-pulse">更新中...</span>
-                                    )}
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="sr-only peer" 
-                                            checked={agent.on_email}
-                                            disabled={updating === agent.agent_name}
-                                            onChange={(e) => handleEmailToggle(agent.agent_name, e.target.checked)}
-                                        />
-                                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Sessions List */}
-                            <div className="p-4 bg-white">
-                                {(!agent.history || agent.history.length === 0) ? (
-                                    <div className="text-center py-4 text-xs text-gray-400 border border-dashed border-gray-100 rounded-lg">
-                                        暂无会话记录
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {agent.history.map((session, idx) => (
-                                            <div key={idx} className="border border-gray-100 rounded-lg p-3 hover:border-blue-100 transition-colors group">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <div className="text-[10px] font-mono text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 truncate max-w-[200px]" title={session.session_id}>
-                                                        {session.session_id}
-                                                    </div>
-                                                    <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                                                        <MessageSquare className="w-3 h-3" />
-                                                        <span>{session.messages.length}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Visual Bars for Messages */}
-                                                <div className="flex gap-0.5 h-1.5 overflow-hidden rounded-full bg-gray-50">
-                                                    {session.messages.map((msg, mIdx) => (
-                                                        <div 
-                                                            key={mIdx} 
-                                                            className={`w-3 h-full ${
-                                                                msg.type === 'human' ? 'bg-blue-400' : 
-                                                                msg.type === 'ai' ? 'bg-green-400' : 
-                                                                'bg-gray-300'
-                                                            }`}
-                                                            title={`${msg.type}: ${msg.content.substring(0, 50)}`}
-                                                        />
-                                                    ))}
-                                                </div>
-                                                
-                                                {/* Latest Message Preview */}
-                                                {session.messages.length > 0 && (
-                                                    <div className="mt-2 text-[10px] text-gray-600 truncate opacity-80 group-hover:opacity-100 transition-opacity">
-                                                        <span className={`font-bold mr-1 ${
-                                                            session.messages[session.messages.length - 1].type === 'human' ? 'text-blue-600' : 'text-green-600'
-                                                        }`}>
-                                                            {session.messages[session.messages.length - 1].type === 'human' ? 'User' : 'Agent'}:
-                                                        </span>
-                                                        {session.messages[session.messages.length - 1].content}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+              agents.map((agent) => (
+                <button
+                  key={agent.agent_name}
+                  onClick={() => setSelectedAgent(agent.agent_name)}
+                  className={`w-full text-left p-3 rounded-xl border transition-all duration-200 flex items-center gap-3 ${
+                    selectedAgent === agent.agent_name
+                      ? 'bg-blue-50 border-blue-200 shadow-sm'
+                      : 'bg-white border-gray-100 hover:border-blue-100 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${
+                    selectedAgent === agent.agent_name ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {agent.agent_name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-medium truncate ${
+                      selectedAgent === agent.agent_name ? 'text-blue-900' : 'text-gray-800'
+                    }`}>
+                      {agent.agent_name}
+                    </div>
+                    <div className="text-[10px] text-gray-500 truncate mt-0.5">
+                      {agent.description || '无系统描述'}
+                    </div>
+                  </div>
+                </button>
+              ))
             )}
+          </div>
         </div>
+      </div>
+
+      {/* Right: Tool Configuration */}
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="flex items-center gap-2 mb-4 text-sm font-bold text-gray-700 shrink-0">
+          <Wrench className="w-4 h-4" />
+          <span>{selectedAgent ? `${selectedAgent} - 工具配置` : '工具配置'}</span>
+        </div>
+
+        <div className="flex-1 bg-gray-50/50 rounded-xl border border-gray-100 overflow-hidden relative">
+          {isLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
+              <div className="flex flex-col items-center gap-2 text-text-secondary">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                <span className="text-sm">加载工具配置...</span>
+              </div>
+            </div>
+          ) : !selectedAgent ? (
+            <div className="flex items-center justify-center h-full text-sm text-gray-400">
+              请在左侧选择一个 Agent
+            </div>
+          ) : currentTools.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+              <Wrench className="w-8 h-8 opacity-20" />
+              <span className="text-sm">该 Agent 没有可用工具</span>
+            </div>
+          ) : (
+            <div className="absolute inset-0 overflow-y-auto p-4 space-y-6">
+              {currentTools.map((plugin) => (
+                <div key={plugin.plugin_name} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden shrink-0">
+                  <div className="px-4 py-3 bg-gray-50/50 border-b border-gray-100 flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-gray-500" />
+                    <span className="font-bold text-sm text-gray-800">插件: {plugin.plugin_name}</span>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {plugin.operations.map((op) => {
+                      const operationKey = `${selectedAgent}-${plugin.plugin_name}-${op.name}`;
+                      const isUpdating = updatingTool === operationKey;
+                      
+                      return (
+                        <div key={op.name} className="p-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                          <div className="pr-4">
+                            <div className="text-sm font-medium text-gray-800">{op.name}</div>
+                            <div className="text-xs text-gray-500 mt-1">{op.description || '无操作描述'}</div>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            {isUpdating && <Loader2 className="w-3 h-3 animate-spin text-blue-500" />}
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                className="sr-only peer" 
+                                checked={op.enabled}
+                                disabled={isUpdating}
+                                onChange={(e) => handleToolToggle(plugin.plugin_name, op.name, e.target.checked)}
+                              />
+                              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

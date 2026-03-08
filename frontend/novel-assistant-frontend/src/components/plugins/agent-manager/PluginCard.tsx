@@ -23,15 +23,19 @@ export const PluginCard: React.FC<PluginCardProps> = ({ name, pluginId, operatio
     try {
       const result = await invokePluginOperation(pluginId, operationName || 'get_agent_info_in_card', {});
       
-      // Handle response structure: backend returns the data directly
+      console.log("[PluginCard] invokePluginOperation result:", result);
+      
+      // The backend returns PluginOperationInvokeResponse where payload is:
+      // { "name": "...", "data": {"agents": [...]}, "info_type": "Info" }
       if (result) {
-          // If result has payload (from some other structure), use it
-          if ('payload' in result) {
-              setDetailsData((result as any).payload);
-          } else {
-              // Otherwise use result directly
-              setDetailsData(result);
-          }
+          const payloadData = 'payload' in result ? (result as any).payload : result;
+          console.log("[PluginCard] extracted payloadData:", payloadData);
+          
+          // IMPORTANT: payloadData is { name: "...", data: { agents: [...] } }
+          // In AgentManagerModal, we do: <PluginDetailsInfo data={data.data} />
+          // So if we pass payloadData here, data.data will be { agents: [...] }.
+          // This is exactly what PluginDetailsInfo expects.
+          setDetailsData(payloadData);
       } else {
           logger.warn("invokePluginOperation returned empty result");
       }
