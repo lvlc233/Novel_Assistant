@@ -112,3 +112,14 @@ export interface AgentStreamEvent {
   /** 事件数据: JSON 字符串或纯文本(取决于事件类型) */
   data: string;
 }
+
+export interface AgentChatRuntimeEvent {
+  type: 'assistant_chunk' | 'tool_dispatch' | 'tool_result' | 'hitl_interrupt' | 'error' | 'done' | 'other';
+  content?: string;
+  tool_name?: string;
+  args?: unknown;
+  message?: string;
+  payload?: unknown;
+  error_message?: string;
+  raw?: string;
+}

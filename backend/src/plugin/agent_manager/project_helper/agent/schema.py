@@ -1,6 +1,10 @@
+from typing import Annotated, List, TypedDict
+
+from langchain_core.messages import BaseMessage
+from langgraph.graph import add_messages
 from pydantic import BaseModel
+
 from common.model.base_agent import BaseAgentRuntime
-from typing import TypedDict
 
 """
 Agent: 模型
@@ -17,10 +21,9 @@ class ProjectHelperAgentState(TypedDict):
     """
     项目助手智能体状态模型
     """
-    # messages: list  # 消息列表
-    page_id: str  # 项目ID
-    query: str  # 用户输入对话
-    response: str  # AI响应回复
+    messages: Annotated[List[BaseMessage], add_messages]
+    context: str
+    page_id: str
 
 """
 操作相关接口返回

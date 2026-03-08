@@ -285,22 +285,6 @@ class AgentManagerPlugin:
                                     }
                                     for m in raw_messages
                                 ]
-                            if not messages:
-                                agent_config = dict(agent.config or {})
-                                session_histories = agent_config.get("session_histories", {})
-                                if isinstance(session_histories, dict):
-                                    fallback_history = session_histories.get(session_id, [])
-                                    if isinstance(fallback_history, list):
-                                        messages = [
-                                            {
-                                                "type": item.get("role", "unknown"),
-                                                "role": item.get("role", "unknown"),
-                                                "content": item.get("content", "")
-                                            }
-                                            for item in fallback_history
-                                            if isinstance(item, dict)
-                                        ]
-
                             history_items.append({
                                 "agent_name": agent.name,
                                 "session_id": session_id,

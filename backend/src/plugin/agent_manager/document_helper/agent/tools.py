@@ -25,7 +25,25 @@ def build_document_helper_tools(
 
     @tool("read_document_info")
     async def read_document_info(version: str = "current") -> dict:
-        """使用这个工具以获取当前文档的信息"""
+        """读取当前文档上下文快照。
+
+        调用时机:
+        - 当用户询问“当前文档写了什么”“标题是什么”“当前是哪个版本”时必须先调用。
+        - 在执行改写、续写、润色前，若你不确定最新上下文，先调用本工具再决策。
+
+        参数说明:
+        - version: 仅用于标注读取意图，通常传 "current"。
+
+        返回字段:
+        - title: 当前文档标题。
+        - char_count: 当前文档字符数。
+        - content_preview: 文档前300字符预览。
+        - work_id/document_id/version_id: 当前文档定位信息。
+
+        使用规则:
+        - 不要凭空假设文档状态，优先使用本工具读取。
+        - 读取后再生成结论或再决定是否调用写入工具。
+        """
         resolved_document_id = default_document_id
         resolved_version_id = default_version_id
         if resolved_document_id and not resolved_version_id:
@@ -50,7 +68,27 @@ def build_document_helper_tools(
         document_id: Optional[str] = None,
         version_id: Optional[str] = None,
     ) -> dict:
-        """使用这个工具可以修改文档的内容,patch_type=title:修改标题,patch_type= body:修改正文,"""
+        """修改文档标题与正文内容（真实写库）。
+
+        调用时机:
+        - 用户明确要求“改标题”“改正文”“替换某段内容”时调用。
+        - 需要将草稿结果真正写入数据库时调用，而不是仅给建议文本。
+
+        参数说明:
+        - target_range: 本次修改目标描述，建议传自然语言区间，如 "title"、"全文"、"第2段"。
+        - patch_type:
+          - "title": 仅修改标题。
+          - "body": 仅修改正文版本内容。
+          - "title_and_body": 同时更新标题与正文。
+        - new_content: 要写入的新内容。
+        - reason: 修改原因，便于审计与追踪。
+        - document_id/version_id: 可选；不传则使用运行时默认上下文。
+
+        使用规则:
+        - 先确认用户意图再写入，避免无授权改动。
+        - 当 patch_type 包含 body 时，必须保证可解析到 version_id。
+        - 返回 status=success 才表示数据库写入完成。
+        """
         resolved_document_id = document_id or default_document_id
         if not resolved_document_id:
             return {"status": "error", "message": "缺少 document_id，无法执行文档修改"}
@@ -89,7 +127,34 @@ def build_document_helper_tools(
         reason: str,
         work_id: Optional[str] = None,
     ) -> dict:
-        """使用这个工具可以管理文档的目录结构,action=add:添加目录项,action=update:更新目录项,action=delete:删除目录项,action=move:移动目录项"""
+        """管理文档目录树结构（新增/更新/删除/移动）。
+
+        调用时机:
+        - 用户要求调整章节目录、移动章节、删除节点、重命名目录时必须调用本工具。
+        - 当任务属于“结构管理”而非“正文改写”时优先使用本工具。
+
+        参数说明:
+        - action:
+          - "add": 新增目录节点。
+          - "update": 更新节点名称/描述/父节点。
+          - "delete": 删除节点。
+          - "move": 移动节点到新父节点。
+        - node_id:
+          - add 时可传目标父节点或参考节点ID。
+          - update/delete/move 时传要操作的节点ID。
+        - payload: JSON 字符串。
+          - add 示例: {"name":"第二章","description":"冲突升级","type":"document","parent_node_id":"<uuid>"}
+          - update 示例: {"name":"第二章（修订）","description":"新版描述","parent_node_id":"<uuid>"}
+          - move 示例: {"parent_node_id":"<uuid>"}
+          - delete 可传 "{}"。
+        - reason: 操作原因，便于链路追踪。
+        - work_id: add 时可选；不传则使用运行时默认 work_id。
+
+        使用规则:
+        - payload 必须是合法 JSON 字符串，字段名保持英文小写下划线风格。
+        - 目录变更必须通过本工具执行，不要只在回答中口头说明“已调整”。
+        - 返回 status=success 才表示目录写库成功。
+        """
         resolved_work_id = work_id or default_work_id
         payload_data = {}
         if payload:

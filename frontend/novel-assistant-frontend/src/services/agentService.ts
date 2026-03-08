@@ -6,7 +6,8 @@ import {
   AgentUpdateRequest, 
   MessagesSendRequest,
   AgentMessage,
-  AgentCreateRequest
+  AgentCreateRequest,
+  AgentChatRuntimeEvent
 } from '@/types/agent';
 import { ErrorCodes } from '@/lib/error';
 
@@ -65,6 +66,65 @@ const mockAgents: AgentDetail[] = [
 const mockSessions: Record<string, AgentMessage[]> = {};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const mapUnknownToRuntimeEvents = (payload: unknown): AgentChatRuntimeEvent[] => {
+  if (typeof payload === 'string') {
+    return [{ type: 'assistant_chunk', content: payload, raw: payload }];
+  }
+  if (!payload || typeof payload !== 'object') {
+    return [];
+  }
+  const record = payload as Record<string, unknown>;
+  const eventType = String(record.event_type || '').toLowerCase();
+  if (eventType === 'assistant_chunk') {
+    return [{ type: 'assistant_chunk', content: typeof record.content === 'string' ? record.content : '', payload }];
+  }
+  if (eventType === 'tool_dispatch') {
+    return [{
+      type: 'tool_dispatch',
+      tool_name: typeof record.tool_name === 'string' ? record.tool_name : String(record.tool_name || ''),
+      args: record.args,
+      message: typeof record.message === 'string' ? record.message : undefined,
+      payload,
+    }];
+  }
+  if (eventType === 'tool_result') {
+    const content = typeof record.content === 'string' ? record.content : JSON.stringify(record.content ?? '');
+    return [{
+      type: 'tool_result',
+      tool_name: typeof record.tool_name === 'string' ? record.tool_name : String(record.tool_name || ''),
+      content,
+      payload,
+    }];
+  }
+  if (eventType === 'hitl_interrupt') {
+    return [{ type: 'hitl_interrupt', payload }];
+  }
+  if (record.status === 'error' || eventType === 'error') {
+    return [{
+      type: 'error',
+      error_message: typeof record.message === 'string' ? record.message : JSON.stringify(record),
+      payload,
+    }];
+  }
+  if (typeof record.content === 'string') {
+    return [{ type: 'assistant_chunk', content: record.content, payload }];
+  }
+  if (typeof record.output === 'string') {
+    return [{ type: 'assistant_chunk', content: record.output, payload }];
+  }
+  if (Array.isArray(record.messages) && record.messages.length > 0) {
+    const last = record.messages[record.messages.length - 1];
+    if (last && typeof last === 'object' && typeof (last as Record<string, unknown>).content === 'string') {
+      return [{
+        type: 'assistant_chunk',
+        content: String((last as Record<string, unknown>).content),
+        payload,
+      }];
+    }
+  }
+  return [{ type: 'other', payload }];
+};
 
 // Mappers
 const mapAgentResponseToMeta = (res: AgentResponse): AgentMeta => ({
@@ -168,7 +228,8 @@ export const agentService = {
     payload: MessagesSendRequest,
     onMessage: (chunk: string) => void,
     onFinish: () => void,
-    onError: (err: unknown) => void
+    onError: (err: unknown) => void,
+    onEvent?: (event: AgentChatRuntimeEvent) => void
   ) => {
     if (USE_MOCK) {
       // Simulate thinking delay
@@ -181,6 +242,7 @@ export const agentService = {
         const interval = setInterval(() => {
           if (currentIndex >= responseText.length) {
             clearInterval(interval);
+            onEvent?.({ type: 'done' });
             onFinish();
             
             // Save to mock history
@@ -194,6 +256,7 @@ export const agentService = {
           const chunk = responseText.slice(currentIndex, currentIndex + 5); // Send 5 chars at a time
           currentIndex += 5;
           onMessage(chunk);
+          onEvent?.({ type: 'assistant_chunk', content: chunk, raw: chunk });
         }, 50);
       }, 1000);
       return () => {}; // Cleanup function
@@ -242,15 +305,19 @@ export const agentService = {
                  try {
                      // Check if it is the end of stream or valid JSON
                      if (dataStr === '[DONE]') {
+                         onEvent?.({ type: 'done' });
                          onFinish();
                          return;
                      }
                      const data = JSON.parse(dataStr);
-                     // Expected data structure from doc: { message_chunk: str|dict }
-                     if (data.message_chunk) {
-                         const content = typeof data.message_chunk === 'string' ? data.message_chunk : JSON.stringify(data.message_chunk);
-                         onMessage(content);
-                     }
+                     const runtimePayload = data?.message_chunk !== undefined ? data.message_chunk : data;
+                     const events = mapUnknownToRuntimeEvents(runtimePayload);
+                     events.forEach((event) => {
+                       if (event.type === 'assistant_chunk' && event.content) {
+                         onMessage(event.content);
+                       }
+                       onEvent?.(event);
+                     });
                  } catch (e) {
                      console.error('Failed to parse SSE data', e);
                  }
@@ -263,6 +330,7 @@ export const agentService = {
           }
         }
         
+        onEvent?.({ type: 'done' });
         onFinish();
 
       } catch (err) {
@@ -270,6 +338,7 @@ export const agentService = {
             console.log('Stream aborted');
         } else {
             console.error("Agent invoke error:", err);
+            onEvent?.({ type: 'error', error_message: String(err), payload: err });
             onError(err);
         }
       }

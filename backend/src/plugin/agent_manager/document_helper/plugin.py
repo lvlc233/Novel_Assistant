@@ -7,12 +7,22 @@ from core.ui.layout import Editor, Mailbox
 from core.ui.home import Home, DocumentSessionData
 from core.ui.base import Component
 from pydantic import BaseModel
-from langgraph.types import Command
+from langchain_core.messages import HumanMessage
+# from langgraph.types import Command
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-from infrastructure.pg.pg_client import get_session
+from common.config import settings
+from infrastructure.pg.pg_client import async_session
 from infrastructure.pg.pg_models import AgentsManagerSQLEntity
 from plugin.agent_manager.document_helper.agent.agent import build_agent
+from loguru import logger
+
+async def get_checkpoint() -> AsyncPostgresSaver:
+    conn_string = settings.SQLALCHEMY_DATABASE_URI
+    if "postgresql+asyncpg://" in conn_string:
+        conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+    return AsyncPostgresSaver.from_conn_string(conn_string)
 
 class Assistant(Component):
     def __init__(self, title: str = "Document Assistant"):
@@ -40,29 +50,30 @@ class DocumentHelperChatConfigRequest(BaseModel):
 )
 class DocumentHelperPlugin:
     
+    
     @runtime_config
     def __init__(self, 
                 base_url: str = "https://api.openai.com/v1", 
                 api_key: str = "", 
                 model_name: str = "gpt-3.5-turbo",
                 user_prompt: str = "",
-                session: AsyncSession = Inject(get_session)):
+                checkpoint: AsyncPostgresSaver = Inject(get_checkpoint)):
         import os
         self.base_url = base_url or os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
         self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
         self.model_name = model_name or "gpt-3.5-turbo"
         self.user_prompt = user_prompt
-        self.session = session
+        self.checkpoint = checkpoint
 
-    async def _get_agent_entity(self):
+    async def _get_agent_entity(self, session: AsyncSession):
         stmt = select(AgentsManagerSQLEntity).where(
             AgentsManagerSQLEntity.name.in_(["document_helper", "文档助手"])
         )
-        result = await self.session.execute(stmt)
+        result = await session.execute(stmt)
         return result.scalars().first()
 
-    async def _ensure_session(self, session_id: str):
-        entity = await self._get_agent_entity()
+    async def _ensure_session(self, session: AsyncSession, session_id: str):
+        entity = await self._get_agent_entity(session)
         if not entity:
             return
         sessions = list(entity.sessions or [])
@@ -72,41 +83,72 @@ class DocumentHelperPlugin:
         config = dict(entity.config or {})
         config["current_session_id"] = session_id
         entity.config = config
-        await self.session.commit()
+        await session.commit()
 
-    async def _get_session_history(self, session_id: str) -> list[dict]:
-        entity = await self._get_agent_entity()
-        if not entity:
-            return []
-        config = dict(entity.config or {})
-        session_histories = config.get("session_histories", {})
-        if not isinstance(session_histories, dict):
-            return []
-        history = session_histories.get(session_id, [])
-        return history if isinstance(history, list) else []
+    def _message_type_to_role(self, message_type: str) -> str:
+        if message_type == "human":
+            return "user"
+        if message_type == "ai":
+            return "assistant"
+        return message_type or "unknown"
 
-    async def _append_session_turn(self, session_id: str, user_text: str, assistant_text: str):
-        entity = await self._get_agent_entity()
-        if not entity:
-            return
-        sessions = list(entity.sessions or [])
-        if session_id not in sessions:
-            sessions.append(session_id)
-            entity.sessions = sessions
-        config = dict(entity.config or {})
-        config["current_session_id"] = session_id
-        session_histories = config.get("session_histories", {})
-        if not isinstance(session_histories, dict):
-            session_histories = {}
-        history = session_histories.get(session_id, [])
-        if not isinstance(history, list):
-            history = []
-        history.append({"role": "user", "content": user_text})
-        history.append({"role": "assistant", "content": assistant_text})
-        session_histories[session_id] = history[-20:]
-        config["session_histories"] = session_histories
-        entity.config = config
-        await self.session.commit()
+    def _normalize_message_content(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict):
+                    text = item.get("text")
+                    if isinstance(text, str) and text:
+                        parts.append(text)
+            return "".join(parts)
+        return str(content)
+
+    async def _get_checkpoint_messages(self, session_id: str) -> list[dict[str, Any]]:
+        checkpoint_tuple = await self.checkpoint.aget({"configurable": {"thread_id": session_id}})
+        checkpoint_payload = None
+        if isinstance(checkpoint_tuple, dict):
+            checkpoint_payload = checkpoint_tuple.get("checkpoint", checkpoint_tuple)
+        elif checkpoint_tuple and hasattr(checkpoint_tuple, "checkpoint"):
+            checkpoint_payload = checkpoint_tuple.checkpoint
+        if not isinstance(checkpoint_payload, dict):
+            return []
+        channel_values = checkpoint_payload.get("channel_values", {})
+        if not isinstance(channel_values, dict):
+            return []
+        raw_messages = channel_values.get("messages", [])
+        if not isinstance(raw_messages, list):
+            return []
+        normalized_messages: list[dict[str, Any]] = []
+        for message in raw_messages:
+            msg_dict = {}
+            if isinstance(message, dict):
+                message_type = str(message.get("type", ""))
+                content = self._normalize_message_content(message.get("content", ""))
+                msg_dict = message
+            else:
+                message_type = str(getattr(message, "type", ""))
+                content = self._normalize_message_content(getattr(message, "content", ""))
+                # Try to dump model to dict if possible, or extract fields
+                if hasattr(message, "model_dump"):
+                    msg_dict = message.model_dump()
+                else:
+                    msg_dict = message.__dict__ if hasattr(message, "__dict__") else {}
+
+            payload = {
+                "type": message_type,
+                "role": self._message_type_to_role(message_type),
+                "content": content,
+                "id": msg_dict.get("id") or str(uuid4()),
+                "name": msg_dict.get("name"),
+                "tool_call_id": msg_dict.get("tool_call_id"),
+                "tool_calls": msg_dict.get("tool_calls", []),
+            }
+            normalized_messages.append(payload)
+        return normalized_messages
 
     def _extract_current_turn_messages(self, messages: list):
         current_turn = []
@@ -118,13 +160,13 @@ class DocumentHelperPlugin:
         return list(reversed(current_turn))
 
     async def _emit_agent_result_events(self, result: dict):
-        interrupts = result.get("__interrupt__")
-        if interrupts:
-            payload = []
-            for item in interrupts:
-                payload.append(getattr(item, "value", item))
-            yield {"event_type": "hitl_interrupt", "payload": payload}
-            return
+        # interrupts = result.get("__interrupt__")
+        # if interrupts:
+        #     payload = []
+        #     for item in interrupts:
+        #         payload.append(getattr(item, "value", item))
+        #     yield {"event_type": "hitl_interrupt", "payload": payload}
+        #     return
         current_turn_messages = self._extract_current_turn_messages(result.get("messages", []))
         assistant_text_parts: list[str] = []
         for msg in current_turn_messages:
@@ -170,14 +212,6 @@ class DocumentHelperPlugin:
                 if isinstance(chunk_content, str) and chunk_content:
                     assistant_text_parts.append(chunk_content)
                     yield {"event_type": "assistant_chunk", "content": chunk_content}
-                tool_call_chunks = getattr(chunk, "tool_call_chunks", None) or []
-                for item in tool_call_chunks:
-                    tool_name = item.get("name")
-                    tool_args = item.get("args")
-                    dispatch_key = f"{tool_name}:{tool_args}"
-                    if tool_name and dispatch_key not in seen_tool_dispatch:
-                        seen_tool_dispatch.add(dispatch_key)
-                        yield {"event_type": "tool_dispatch", "tool_name": tool_name, "args": tool_args}
                 continue
             if event_name == "on_tool_start":
                 tool_name = event.get("name")
@@ -202,13 +236,13 @@ class DocumentHelperPlugin:
                 final_values = state_snapshot.values
         except Exception:
             final_values = {}
-        interrupts = final_values.get("__interrupt__")
-        if interrupts:
-            payload = []
-            for item in interrupts:
-                payload.append(getattr(item, "value", item))
-            yield {"event_type": "hitl_interrupt", "payload": payload}
-            return
+        # interrupts = final_values.get("__interrupt__")
+        # if interrupts:
+        #     payload = []
+        #     for item in interrupts:
+        #         payload.append(getattr(item, "value", item))
+        #     yield {"event_type": "hitl_interrupt", "payload": payload}
+        #     return
         if not assistant_text_parts and final_values:
             current_turn_messages = self._extract_current_turn_messages(final_values.get("messages", []))
             for msg in current_turn_messages:
@@ -228,6 +262,55 @@ class DocumentHelperPlugin:
     async def editor_assistant(self):
         """文档助手侧边栏"""
         return {"title": "AI Assistant"}
+
+    # @operation(
+    #     name="resume_human_review",
+    #     description="恢复文档助手人工审核流程",
+    #     trigger=UITrigger.CLICK
+    # )
+    # async def resume_human_review(
+    #     self,
+    #     session_id: str,
+    #     decision: str,
+    #     edited_action: Optional[dict] = None,
+    #     document_content: Annotated[str, UIParamSourceEnum.CONTEXT, "document_content"] = "",
+    #     document_title: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "document_title"] = None,
+    #     work_id: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "work_id"] = None,
+    #     document_id: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "document_id"] = None,
+    #     version_id: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "version_id"] = None,
+    # ):
+    #     if not self.api_key:
+    #         yield {"status": "error", "message": "文档助手未配置 API Key"}
+    #         return
+    #     
+    #     async with async_session() as session:
+    #         runtime = {
+    #             "model_name": self.model_name,
+    #             "api_key": self.api_key,
+    #             "base_url": self.base_url,
+    #             "session_id": session_id,
+    #             "document_content": document_content,
+    #             "document_title": document_title,
+    #             "user_prompt": self.user_prompt,
+    #             "tools": [],
+    #             "session": session,
+    #             "work_id": work_id,
+    #             "document_id": document_id,
+    #             "version_id": version_id,
+    #         }
+    #         agent = await build_agent(runtime, self.checkpoint)
+    #         if decision not in {"approve", "edit", "reject"}:
+    #             yield {"status": "error", "message": f"不支持的审核决策: {decision}"}
+    #             return
+    #         decision_payload = {"type": decision}
+    #         if decision == "edit" and edited_action is not None:
+    #             decision_payload["edited_action"] = edited_action
+    #         async for event in self._stream_agent_execution(
+    #             agent,
+    #             Command(resume={"decisions": [decision_payload]}),
+    #             session_id,
+    #         ):
+    #             yield event
 
     @operation(
         name="chat",
@@ -252,87 +335,48 @@ class DocumentHelperPlugin:
             return
         sid = session_id or f"document_helper-{uuid4()}"
         try:
-            await self._ensure_session(sid)
-            runtime = {
-                "model_name": self.model_name,
-                "api_key": self.api_key,
-                "base_url": self.base_url,
-                "session_id": sid,
-                "document_content": document_content,
-                "document_title": document_title,
-                "user_prompt": self.user_prompt,
-                "tools": [],
-                "session": self.session,
-                "work_id": work_id,
-                "document_id": document_id,
-                "version_id": version_id,
-            }
-            agent = await build_agent(runtime)
-            assistant_text_chunks: list[str] = []
-            interrupted = False
-            async for event in self._stream_agent_execution(
-                agent,
-                {"messages": [{"role": "user", "content": message}]},
-                sid,
-            ):
-                if event.get("event_type") == "assistant_chunk":
-                    content = event.get("content")
-                    if isinstance(content, str):
-                        assistant_text_chunks.append(content)
-                if event.get("event_type") == "hitl_interrupt":
-                    interrupted = True
-                yield event
-            if not interrupted:
-                await self._append_session_turn(sid, message, "".join(assistant_text_chunks))
+            async with async_session() as session:
+                await self._ensure_session(session, sid)
+                runtime = {
+                    "model_name": self.model_name,
+                    "api_key": self.api_key,
+                    "base_url": self.base_url,
+                    "session_id": sid,
+                    "document_content": document_content,
+                    "document_title": document_title,
+                    "user_prompt": self.user_prompt,
+                    "tools": [],
+                    "session": session,
+                    "work_id": work_id,
+                    "document_id": document_id,
+                    "version_id": version_id,
+                }
+                async with self.checkpoint as checkpointer:
+                    agent = await build_agent(runtime, checkpointer)
+                    async for event in self._stream_agent_execution(
+                        agent,
+                        {
+                            "messages": [HumanMessage(content=message)],
+                            "context": "",
+                            "pending_tool_calls": [],
+                            "current_tool_call": None,
+                            "step_count": 0,
+                        },
+                        sid,
+                    ):
+                        yield event
         except Exception as e:
             yield {"status": "error", "message": f"文档助手请求失败: {type(e).__name__}: {str(e)}"}
 
     @operation(
-        name="resume_human_review",
-        description="恢复文档助手人工审核流程",
-        trigger=UITrigger.CLICK
+        name="editor_assistant",
+        description="文档助手侧边栏",
+        ui_target=Editor.Sidebar.filter(),
+        with_ui=["AIAssistant"]
     )
-    async def resume_human_review(
-        self,
-        session_id: str,
-        decision: str,
-        edited_action: Optional[dict] = None,
-        document_content: Annotated[str, UIParamSourceEnum.CONTEXT, "document_content"] = "",
-        document_title: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "document_title"] = None,
-        work_id: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "work_id"] = None,
-        document_id: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "document_id"] = None,
-        version_id: Annotated[Optional[str], UIParamSourceEnum.CONTEXT, "version_id"] = None,
-    ):
-        if not self.api_key:
-            yield {"status": "error", "message": "文档助手未配置 API Key"}
-            return
-        runtime = {
-            "model_name": self.model_name,
-            "api_key": self.api_key,
-            "base_url": self.base_url,
-            "session_id": session_id,
-            "document_content": document_content,
-            "document_title": document_title,
-            "user_prompt": self.user_prompt,
-            "tools": [],
-            "session": self.session,
-            "work_id": work_id,
-            "document_id": document_id,
-            "version_id": version_id,
-        }
-        agent = await build_agent(runtime)
-        if decision not in {"approve", "edit", "reject"}:
-            yield {"status": "error", "message": f"不支持的审核决策: {decision}"}
-            return
-        decision_payload = {"type": decision}
-        if decision == "edit" and edited_action is not None:
-            decision_payload["edited_action"] = edited_action
-        async for event in self._stream_agent_execution(
-            agent,
-            Command(resume={"decisions": [decision_payload]}),
-            session_id,
-        ):
-            yield event
+    async def editor_assistant(self):
+        """文档助手侧边栏"""
+        return {"title": "AI Assistant"}
 
     @operation(
         name="agent_sidebar_item",
@@ -367,36 +411,33 @@ class DocumentHelperPlugin:
         ui_target=Home.PluginDetails.Info.filter()
     )
     async def get_document_sessions(self):
-        entity = await self._get_agent_entity()
-        sessions = list(entity.sessions or []) if entity else []
-        config = dict(entity.config or {}) if entity else {}
-        session_histories = config.get("session_histories", {})
-        if not isinstance(session_histories, dict):
-            session_histories = {}
-        session_items = []
-        for sid in sessions:
-            history = session_histories.get(sid, [])
-            if not isinstance(history, list):
-                history = []
-            title = "新会话"
-            for msg in history:
-                if isinstance(msg, dict) and msg.get("role") == "user" and msg.get("content"):
-                    content = str(msg["content"])
-                    title = content[:20] + ("..." if len(content) > 20 else "")
-                    break
-            session_items.append({
-                "id": sid,
-                "title": title,
-                "create_time": "",
-                "message_count": len(history),
-                "tokens": 0,
-                "messages": history,
-            })
-        data: DocumentSessionData = {"documents": [{"id": "default_doc", "title": "当前文档", "sessions": session_items}]}
-        return {
-            "info_type": "DocumentSessionManager",
-            "data": data
-        }
+        async with async_session() as session:
+            entity = await self._get_agent_entity(session)
+            sessions = list(entity.sessions or []) if entity else []
+            session_items = []
+            for sid in sessions:
+                history = await self._get_checkpoint_messages(sid)
+                title = "新会话"
+                for msg in history:
+                    if msg.get("role") == "user" and msg.get("content"):
+                        content = str(msg["content"])
+                        title = content[:20] + ("..." if len(content) > 20 else "")
+                        break
+                session_items.append(
+                    {
+                        "id": sid,
+                        "title": title,
+                        "create_time": "",
+                        "message_count": len(history),
+                        "tokens": 0,
+                        "messages": history,
+                    }
+                )
+            data: DocumentSessionData = {"documents": [{"id": "default_doc", "title": "当前文档", "sessions": session_items}]}
+            return {
+                "info_type": "DocumentSessionManager",
+                "data": data
+            }
 
     @operation(
         name="list_sessions",
@@ -404,14 +445,15 @@ class DocumentHelperPlugin:
         trigger = UITrigger.CLICK
     )
     async def list_sessions(self):
-        entity = await self._get_agent_entity()
-        if not entity:
-            return {"agent_name": "document_helper", "sessions": [], "current_session_id": None}
-        return {
-            "agent_name": "document_helper",
-            "sessions": list(entity.sessions or []),
-            "current_session_id": (entity.config or {}).get("current_session_id")
-        }
+        async with async_session() as session:
+            entity = await self._get_agent_entity(session)
+            if not entity:
+                return {"agent_name": "document_helper", "sessions": [], "current_session_id": None}
+            return {
+                "agent_name": "document_helper",
+                "sessions": list(entity.sessions or []),
+                "current_session_id": (entity.config or {}).get("current_session_id")
+            }
 
     @operation(
         name="create_session",
@@ -420,8 +462,9 @@ class DocumentHelperPlugin:
     )
     async def create_session(self, session_id: str | None = None):
         sid = session_id or f"document_helper-{uuid4()}"
-        await self._ensure_session(sid)
-        return {"agent_name": "document_helper", "session_id": sid}
+        async with async_session() as session:
+            await self._ensure_session(session, sid)
+            return {"agent_name": "document_helper", "session_id": sid}
 
     @operation(
         name="switch_session",
@@ -429,8 +472,9 @@ class DocumentHelperPlugin:
         trigger = UITrigger.CLICK
     )
     async def switch_session(self, session_id: str):
-        await self._ensure_session(session_id)
-        return {"agent_name": "document_helper", "session_id": session_id}
+        async with async_session() as session:
+            await self._ensure_session(session, session_id)
+            return {"agent_name": "document_helper", "session_id": session_id}
 
     @operation(
         name="delete_session",
@@ -438,14 +482,15 @@ class DocumentHelperPlugin:
         trigger = UITrigger.CLICK
     )
     async def delete_session(self, session_id: str):
-        entity = await self._get_agent_entity()
-        if not entity:
-            return {"agent_name": "document_helper", "deleted": False, "session_id": session_id}
-        sessions = [sid for sid in (entity.sessions or []) if sid != session_id]
-        entity.sessions = sessions
-        config = dict(entity.config or {})
-        if config.get("current_session_id") == session_id:
-            config["current_session_id"] = sessions[-1] if sessions else None
-        entity.config = config
-        await self.session.commit()
-        return {"agent_name": "document_helper", "deleted": True, "session_id": session_id}
+        async with async_session() as session:
+            entity = await self._get_agent_entity(session)
+            if not entity:
+                return {"agent_name": "document_helper", "deleted": False, "session_id": session_id}
+            sessions = [sid for sid in (entity.sessions or []) if sid != session_id]
+            entity.sessions = sessions
+            config = dict(entity.config or {})
+            if config.get("current_session_id") == session_id:
+                config["current_session_id"] = sessions[-1] if sessions else None
+            entity.config = config
+            await session.commit()
+            return {"agent_name": "document_helper", "deleted": True, "session_id": session_id}

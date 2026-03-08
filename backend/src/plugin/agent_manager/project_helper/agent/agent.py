@@ -1,4 +1,7 @@
+from typing import Any
 
+from langchain_core.messages import AIMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 from langgraph.runtime import Runtime
 from langgraph.graph import StateGraph
 from plugin.agent_manager.project_helper.agent.schema import ProjectHelperAgentRuntime, ProjectHelperAgentState
@@ -6,30 +9,27 @@ from plugin.agent_manager.project_helper.agent.schema import ProjectHelperAgentR
 """
 项目节点
 """
-async def call_llm(state: ProjectHelperAgentState, runtime: Runtime[ProjectHelperAgentRuntime]) -> ProjectHelperAgentState:
+async def call_llm(
+    state: ProjectHelperAgentState,
+    runtime: Runtime[ProjectHelperAgentRuntime],
+) -> dict[str, Any]:
     """
     项目助手智能体
     """
     context = runtime.context
-    model_name = context.get("model_name")
-    base_url = context.get("base_url")
-    api_key = context.get("api_key")
-    
-    # 显式指定 model_provider="openai" 以支持 OpenAI 兼容的 API (如 SiliconFlow)
-    # 尝试直接使用 ChatOpenAI 以确保 base_url 正确传递
-    from langchain_openai import ChatOpenAI
     llm = ChatOpenAI(
-        model=model_name,
-        api_key=api_key,
-        base_url=base_url,
+        model=context["model_name"],
+        api_key=context["api_key"],
+        base_url=context["base_url"],
     )
-    
-    response = await llm.ainvoke(state["query"])
-    return {"response": response.content}
+    messages = list(state.get("messages", []))
+    response = await llm.ainvoke([SystemMessage(content="你是项目助手。"), *messages])
+    if not isinstance(response, AIMessage):
+        response = AIMessage(content=str(getattr(response, "content", response)))
+    return {"messages": [response], "context": state.get("context", "")}
 
 
 # graph
 graph = StateGraph(ProjectHelperAgentState, context_schema=ProjectHelperAgentRuntime)
 graph.add_node(call_llm).set_entry_point("call_llm").set_finish_point("call_llm")
-
 

@@ -158,6 +158,14 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     logger.info(`New mail message from ${senderId}`, { id: newMessage.id });
   };
+  const mapRuntimeEventToText = (event: { type: string; content?: string; tool_name?: string; error_message?: string }) => {
+    if (event.type === 'assistant_chunk') return event.content || '';
+    if (event.type === 'tool_dispatch') return `[工具调度] ${event.tool_name || 'unknown_tool'}`;
+    if (event.type === 'tool_result') return `[工具结果] ${event.tool_name || 'tool'}: ${event.content || ''}`;
+    if (event.type === 'hitl_interrupt') return '[人工介入] 需要审核工具调用';
+    if (event.type === 'error') return `[错误] ${event.error_message || 'unknown error'}`;
+    return '';
+  };
 
   // Real interaction with Agent
   const sendToAgent = async (agentId: string, content: string) => {
@@ -180,14 +188,37 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 3. Invoke Agent
         // We use chatStream but since backend isn't streaming, onMessage receives full text once.
+        const assistantMessageId = `${agentId}-${Date.now()}`;
+        let hasCreatedAssistantMessage = false;
+        const appendAssistantText = (text: string) => {
+          if (!text) return;
+          setMessages((prev) => {
+            const existingIndex = prev.findIndex((item) => item.id === assistantMessageId);
+            if (existingIndex === -1) {
+              const created: MailMessage = {
+                id: assistantMessageId,
+                senderId: agentId,
+                content: text,
+                timestamp: Date.now(),
+                isRead: false,
+                type: 'text',
+              };
+              hasCreatedAssistantMessage = true;
+              return [created, ...prev];
+            }
+            const next = [...prev];
+            next[existingIndex] = {
+              ...next[existingIndex],
+              content: `${next[existingIndex].content}${text}`,
+            };
+            return next;
+          });
+        };
         agentService.chatStream(
             agentId,
             threadId,
             { context: content, messages_type: 'text' },
-            (responseText) => {
-                // On Response
-                sendMessage(agentId, responseText, 'text');
-            },
+            () => {},
             () => {
                 // On Finish
                 logger.debug(`Agent ${agentId} finished replying`);
@@ -196,7 +227,24 @@ export const MailProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // On Error
                 logger.error(`Error invoking agent ${agentId}`, err);
                 sendMessage('system', `调用 ${agentId} 失败: ${String(err)}`, 'notification');
-            }
+            },
+            (event) => {
+              const text = mapRuntimeEventToText(event);
+              if (!text) return;
+              appendAssistantText(text);
+              if (hasCreatedAssistantMessage) {
+                const created = {
+                  id: assistantMessageId,
+                  senderId: agentId,
+                  content: '',
+                  timestamp: Date.now(),
+                  isRead: false,
+                  type: 'text' as const,
+                };
+                setLatestNotification(created);
+                hasCreatedAssistantMessage = false;
+              }
+            },
         );
 
     } catch (error) {

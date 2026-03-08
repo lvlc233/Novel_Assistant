@@ -1,4 +1,5 @@
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langchain_core.messages import HumanMessage
 
 from common.enums import UITrigger, PluginFromTypeEnum
 from core.ui.home import Home, ProjectSessionData, ProjectSessionItem
@@ -11,6 +12,7 @@ from sqlmodel import select
 from typing import List, Any
 from uuid import uuid4
 from infrastructure.pg.pg_models import AgentsManagerSQLEntity
+from loguru import logger 
 
 
 from plugin.agent_manager.project_helper.agent.agent import graph
@@ -45,14 +47,14 @@ async def get_checkpoint() -> AsyncPostgresSaver:
         conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
     return AsyncPostgresSaver.from_conn_string(conn_string)
 
-@plugin_meta(
-    name="project_helper",
-    space="official", 
-    version="0.0.1",
-    description="项目助手",
-    from_type=PluginFromTypeEnum.SYSTEM,
-    tags=["agent"]
-)
+# @plugin_meta(
+#     name="project_helper",
+#     space="official", 
+#     version="0.0.1",
+#     description="项目助手",
+#     from_type=PluginFromTypeEnum.SYSTEM,
+#     tags=["agent"]
+# )
 class ProjectHelperPlugin:
 
 
@@ -347,52 +349,75 @@ class ProjectHelperPlugin:
         yield:
             项目助手智能体的响应流
         """
-        query = message
         page_id = session_id
-
-        async with self.checkpoint as checkpointer:
-            agent = await build_agent(graph=graph, checkpoint=checkpointer)
-            
-            # 配置项
-            config = {
-                "configurable": {
-                    "thread_id": page_id
-                }
-            }
-            runtime = ProjectHelperAgentRuntime(
-                base_url=self.base_url,
-                api_key=self.api_key,
-                model_name=self.model_name,
-            )
-            
-            async for event in agent.astream(
-                {"query": query, "page_id": page_id},
-                config=config,
-                context=runtime,
-                stream_mode="messages",
+        config = {"configurable": {"thread_id": page_id}}
+        runtime = ProjectHelperAgentRuntime(
+            base_url=self.base_url,
+            api_key=self.api_key,
+            model_name=self.model_name,
+        )
+        try:
+            async with self.checkpoint as checkpointer:
+                agent = await build_agent(graph=graph, checkpoint=checkpointer)
+                assistant_text_parts: list[str] = []
+                seen_tool_dispatch: set[str] = set()
+                seen_tool_result: set[str] = set()
+                async for event in agent.astream_events(
+                    {
+                        "messages": [HumanMessage(content=message)],
+                        "context": "",
+                        "page_id": page_id,
+                    },
+                    config=config,
+                    context=runtime,
+                    version="v2",
                 ):
-                # print("测试:"+str(event)) # Debug log
-                # Handle tuple (message, metadata) from stream_mode="messages"
-                if isinstance(event, tuple):
-                    msg = event[0]
-                    # metadata = event[1]
-                    if hasattr(msg, "content"):
-                        data = {"content": msg.content, "type": getattr(msg, "type", "message")}
-                        if hasattr(msg, "id"):
-                            data["id"] = msg.id
-                        yield data
+                    event_name = str(event.get("event", ""))
+                    event_data = event.get("data") or {}
+                    if event_name == "on_chat_model_stream":
+                        chunk = event_data.get("chunk")
+                        chunk_content = getattr(chunk, "content", "")
+                        if isinstance(chunk_content, str) and chunk_content:
+                            assistant_text_parts.append(chunk_content)
+                            yield {"event_type": "assistant_chunk", "content": chunk_content}
                         continue
-                
-                # Handle direct message object
-                if hasattr(event, "content"):
-                    # 提取主要内容
-                    data = {"content": event.content, "type": getattr(event, "type", "message")}
-                    if hasattr(event, "id"):
-                        data["id"] = event.id
-                    yield data
-                elif isinstance(event, dict):
-                    yield event
-                else:
-                    # 兜底：转字符串
-                    yield {"type": "raw", "content": str(event)}
+                    if event_name == "on_tool_start":
+                        tool_name = event.get("name")
+                        tool_input = event_data.get("input")
+                        dispatch_key = f"{tool_name}:{tool_input}"
+                        if tool_name and dispatch_key not in seen_tool_dispatch:
+                            seen_tool_dispatch.add(dispatch_key)
+                            yield {"event_type": "tool_dispatch", "tool_name": tool_name, "args": tool_input}
+                        continue
+                    if event_name == "on_tool_end":
+                        tool_name = event.get("name")
+                        tool_output = event_data.get("output")
+                        result_key = f"{tool_name}:{tool_output}"
+                        if result_key not in seen_tool_result:
+                            seen_tool_result.add(result_key)
+                            yield {"event_type": "tool_result", "tool_name": tool_name, "content": str(tool_output)}
+                        continue
+
+                if not assistant_text_parts:
+                    state_snapshot = await agent.aget_state(config)
+                    if state_snapshot and isinstance(state_snapshot.values, dict):
+                        messages = state_snapshot.values.get("messages", [])
+                        if isinstance(messages, list):
+                            for msg in messages:
+                                msg_type = getattr(msg, "type", "") or (
+                                    msg.get("type", "")
+                                    if isinstance(msg, dict)
+                                    else ""
+                                )
+                                if msg_type != "ai":
+                                    continue
+                                content = getattr(msg, "content", "") or (
+                                    msg.get("content", "")
+                                    if isinstance(msg, dict)
+                                    else ""
+                                )
+                                if isinstance(content, str) and content:
+                                    yield {"event_type": "assistant_chunk", "content": content}
+        except Exception as e:
+            yield {"status": "error", "message": f"项目助手请求失败: {type(e).__name__}: {str(e)}"}
             

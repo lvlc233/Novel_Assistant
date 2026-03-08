@@ -30,6 +30,7 @@ export default function AgentChatPage() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<() => void>(() => {});
+  const activeRunRef = useRef<string>('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -58,6 +59,14 @@ export default function AgentChatPage() {
         init();
     }
   }, [id]);
+  const mapRuntimeEventToText = (event: { type: string; content?: string; tool_name?: string; error_message?: string }) => {
+    if (event.type === 'assistant_chunk') return event.content || '';
+    if (event.type === 'tool_dispatch') return `[工具调度] ${event.tool_name || 'unknown_tool'}`;
+    if (event.type === 'tool_result') return `[工具结果] ${event.tool_name || 'tool'}: ${event.content || ''}`;
+    if (event.type === 'hitl_interrupt') return '[人工介入] 需要审核工具调用';
+    if (event.type === 'error') return `[错误] ${event.error_message || 'unknown error'}`;
+    return '';
+  };
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -79,25 +88,21 @@ export default function AgentChatPage() {
       content: '',
       timestamp: new Date().toISOString()
     }]);
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    activeRunRef.current = runId;
+    const isCurrentRun = () => activeRunRef.current === runId;
 
     const stop = agentService.chatStream(
       agent.agent_id,
       sessionId,
       { messages_type: 'text', context: userMessage.content },
-      (chunk) => {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          const lastMsg = newMessages[newMessages.length - 1];
-          if (lastMsg.role === 'assistant') {
-            lastMsg.content += chunk;
-          }
-          return newMessages;
-        });
-      },
+      () => {},
       () => {
+        if (!isCurrentRun()) return;
         setIsStreaming(false);
       },
       (err) => {
+        if (!isCurrentRun()) return;
         console.error('Stream error:', err);
         setIsStreaming(false);
         setMessages(prev => [...prev, {
@@ -105,15 +110,32 @@ export default function AgentChatPage() {
             content: 'Error: Failed to receive response.',
             timestamp: new Date().toISOString()
         }]);
-      }
+      },
+      (event) => {
+        if (!isCurrentRun() || event.type === 'done') return;
+        const text = mapRuntimeEventToText(event);
+        if (!text) return;
+        setMessages(prev => {
+          const next = [...prev];
+          const lastMsg = next[next.length - 1];
+          if (lastMsg.role === 'assistant') {
+            lastMsg.content += text;
+          }
+          return next;
+        });
+      },
     );
 
-    stopStreamRef.current = stop;
+    stopStreamRef.current = () => {
+      activeRunRef.current = '';
+      stop();
+    };
   };
 
   const handleStop = () => {
     if (stopStreamRef.current) {
       stopStreamRef.current();
+      activeRunRef.current = '';
       setIsStreaming(false);
     }
   };
