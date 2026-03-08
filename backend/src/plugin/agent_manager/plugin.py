@@ -319,9 +319,29 @@ class AgentManagerPlugin:
         
         agent_list = []
         for agent in agents:
+            # 基础 session 信息
+            sessions_info = []
+            if agent.sessions:
+                for sid in agent.sessions:
+                    sessions_info.append({
+                        "id": sid,
+                        "title": sid  # 初始使用 ID 作为标题，前端会进一步优化
+                    })
+            
+            # 如果是 文档助手 等，补充会话列表
+            if agent.name in ["document_helper", "文档助手"]:
+                try:
+                    delegated = await self._try_delegate_session_operation(agent.name, "list_sessions", {"agent_name": agent.name})
+                    if isinstance(delegated, dict) and "sessions" in delegated:
+                        sessions_info = [{"id": sid, "title": sid} for sid in delegated["sessions"]]
+                except Exception as e:
+                    print(f"[AgentManager] 获取代理会话列表失败: {e}")
+
             agent_list.append({
                 "agent_name": agent.name,
-                "description": agent.description
+                "description": agent.description,
+                "sessions": sessions_info,
+                "current_session_id": (agent.config or {}).get("current_session_id")
             })
             
         return {

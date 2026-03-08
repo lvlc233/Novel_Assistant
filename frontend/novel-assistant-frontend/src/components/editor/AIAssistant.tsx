@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useReducer } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Settings, Plus, Send, MoreHorizontal, User, Bot, ChevronLeft, StopCircle, Trash2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Settings, Plus, Send, MoreHorizontal, User, Bot, ChevronLeft, StopCircle, Trash2, Clock, MessageSquare, Check, ChevronDown } from 'lucide-react';
 import { agentService } from '@/services/agentService';
 import { invokePluginOperation, getPluginsFromShop } from '@/services/pluginService';
 import { config } from '@/config';
@@ -52,7 +53,9 @@ interface DocumentHelperContextPayload {
 
 interface AgentHistoryItem {
   session_id: string;
-  messages?: Array<{ type?: string; content?: string }>;
+  title?: string;
+  updated_at?: string;
+  messages?: Array<{ type?: string; content?: string; role?: string }>;
 }
 
 interface AgentInfo {
@@ -73,8 +76,14 @@ interface NormalizedAgentEvent {
   errorMessage?: string;
 }
 
+interface SessionInfo {
+  id: string;
+  title: string;
+  updated_at?: string;
+}
+
 interface AgentSessionStore {
-  sessionsByAgent: Record<string, string[]>;
+  sessionsByAgent: Record<string, SessionInfo[]>;
   currentSessionByAgent: Record<string, string>;
   messagesByAgentSession: Record<string, Message[]>;
 }
@@ -88,7 +97,7 @@ type AgentSessionAction =
       type: 'hydrate_agent_snapshot';
       payload: {
         agentName: string;
-        sessions: string[];
+        sessions: SessionInfo[];
         currentSession?: string;
         messagesBySession: Record<string, Message[]>;
       };
@@ -99,7 +108,7 @@ type AgentSessionAction =
     }
   | {
       type: 'upsert_session';
-      payload: { agentName: string; sessionId: string; messages?: Message[] };
+      payload: { agentName: string; session: SessionInfo; messages?: Message[] };
     }
   | {
       type: 'delete_session';
@@ -108,6 +117,10 @@ type AgentSessionAction =
   | {
       type: 'set_messages_for_session';
       payload: { agentName: string; sessionId: string; messages: Message[] };
+    }
+  | {
+      type: 'update_session_title';
+      payload: { agentName: string; sessionId: string; title: string };
     };
 
 const INITIAL_AGENT_SESSION_STORE: AgentSessionStore = {
@@ -123,6 +136,7 @@ function reduceAgentSessionStore(state: AgentSessionStore, action: AgentSessionA
   if (action.type === 'hydrate_agent_snapshot') {
     const { agentName, sessions, currentSession, messagesBySession } = action.payload;
     return {
+      ...state,
       sessionsByAgent: { ...state.sessionsByAgent, [agentName]: sessions },
       currentSessionByAgent: currentSession
         ? { ...state.currentSessionByAgent, [agentName]: currentSession }
@@ -140,11 +154,14 @@ function reduceAgentSessionStore(state: AgentSessionStore, action: AgentSessionA
     };
   }
   if (action.type === 'upsert_session') {
-    const { agentName, sessionId, messages } = action.payload;
+    const { agentName, session, messages } = action.payload;
     const existing = state.sessionsByAgent[agentName] || [];
-    const nextSessions = existing.includes(sessionId) ? existing : [...existing, sessionId];
+    const exists = existing.some(s => s.id === session.id);
+    const nextSessions = exists 
+        ? existing.map(s => s.id === session.id ? { ...s, ...session } : s)
+        : [session, ...existing]; // Put new session at the top
     const nextMessages = messages
-      ? { ...state.messagesByAgentSession, [`${agentName}::${sessionId}`]: messages }
+      ? { ...state.messagesByAgentSession, [`${agentName}::${session.id}`]: messages }
       : state.messagesByAgentSession;
     return {
       ...state,
@@ -154,23 +171,37 @@ function reduceAgentSessionStore(state: AgentSessionStore, action: AgentSessionA
   }
   if (action.type === 'delete_session') {
     const { agentName, sessionId, fallbackSessionId } = action.payload;
-    const nextSessions = (state.sessionsByAgent[agentName] || []).filter((item) => item !== sessionId);
+    const nextSessions = (state.sessionsByAgent[agentName] || []).filter((item) => item.id !== sessionId);
     const nextMessages = { ...state.messagesByAgentSession };
     delete nextMessages[`${agentName}::${sessionId}`];
     return {
+      ...state,
       sessionsByAgent: { ...state.sessionsByAgent, [agentName]: nextSessions },
       currentSessionByAgent: { ...state.currentSessionByAgent, [agentName]: fallbackSessionId },
       messagesByAgentSession: nextMessages,
     };
   }
-  const { agentName, sessionId, messages } = action.payload;
-  return {
-    ...state,
-    messagesByAgentSession: {
-      ...state.messagesByAgentSession,
-      [`${agentName}::${sessionId}`]: messages,
-    },
-  };
+  if (action.type === 'set_messages_for_session') {
+    const { agentName, sessionId, messages } = action.payload;
+    return {
+      ...state,
+      messagesByAgentSession: {
+        ...state.messagesByAgentSession,
+        [`${agentName}::${sessionId}`]: messages,
+      },
+    };
+  }
+  if (action.type === 'update_session_title') {
+    const { agentName, sessionId, title } = action.payload;
+    const nextSessions = (state.sessionsByAgent[agentName] || []).map(s => 
+      s.id === sessionId ? { ...s, title } : s
+    );
+    return {
+      ...state,
+      sessionsByAgent: { ...state.sessionsByAgent, [agentName]: nextSessions }
+    };
+  }
+  return state;
 }
 
 interface AIAssistantProps {
@@ -196,6 +227,8 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
           return m.id === n.id && m.role === n.role && m.content === n.content;
       });
   };
+  const [showAgentMenu, setShowAgentMenu] = useState(false);
+  const [showSessionMenu, setShowSessionMenu] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>(INITIAL_WELCOME_MESSAGES);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -332,17 +365,22 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
       }
       return { type: 'other', payload: data };
   };
-  const reconstructArtifactsFromHistory = (historyMessages: any[], sessionKey: string) => {
+  const reconstructArtifactsFromHistory = (historyMessages: any[], sessionKey: string): { 
+      messages: Message[], 
+      artifacts: Record<string, StreamArtifact[]>, 
+      segments: Record<string, MessageSegment[]>, 
+      firstUserContent: string | null 
+  } => {
       const messages: Message[] = [];
       const artifacts: Record<string, StreamArtifact[]> = {};
       const segments: Record<string, MessageSegment[]> = {};
       
       let lastAssistantMsgId: string | null = null;
+      let firstUserContent: string | null = null;
       
       historyMessages.forEach((msg, index) => {
           const role = String(msg.role || '').toLowerCase();
           const type = String(msg.type || '').toLowerCase();
-          // Fix: Ensure content is string, handle JSON objects
           let content = '';
           if (typeof msg.content === 'string') {
               content = msg.content;
@@ -358,13 +396,15 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
           const isToolMessage = role === 'tool' || type === 'tool';
 
           if (isUserMessage) {
+              if (firstUserContent === null && content.trim()) {
+                  firstUserContent = content.trim();
+              }
               const msgId = `${sessionKey}-${index}-${Date.now()}`;
               messages.push({ id: msgId, role: 'user', content });
               lastAssistantMsgId = null;
           } else {
-              // Assistant or Tool
+              // ... Assistant or Tool logic remains same
               if (isToolMessage) {
-                   // Tool Result - attach to last assistant message
                    if (lastAssistantMsgId) {
                        const artifactId = `${lastAssistantMsgId}-result-${index}`;
                        const artifact: StreamArtifact = {
@@ -375,20 +415,12 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                        };
                        if (!artifacts[lastAssistantMsgId]) artifacts[lastAssistantMsgId] = [];
                        artifacts[lastAssistantMsgId].push(artifact);
-                       
-                       // Add segment
                        if (!segments[lastAssistantMsgId]) segments[lastAssistantMsgId] = [];
-                       segments[lastAssistantMsgId].push({
-                           id: `${artifactId}-segment`,
-                           type: 'artifact',
-                           artifactId: artifactId
-                       });
+                       segments[lastAssistantMsgId].push({ id: `${artifactId}-segment`, type: 'artifact', artifactId });
                    } else {
-                       // Orphaned tool result - create new container message
                        const msgId = `${sessionKey}-${index}-${Date.now()}`;
                        messages.push({ id: msgId, role: 'assistant', content: '' }); 
                        lastAssistantMsgId = msgId;
-                       
                        const artifactId = `${msgId}-result-${index}`;
                        const artifact: StreamArtifact = {
                            id: artifactId,
@@ -400,44 +432,29 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                        segments[msgId] = [{ id: `${artifactId}-segment`, type: 'artifact', artifactId }];
                    }
               } else {
-                  // Assistant Message
                   const msgId = `${sessionKey}-${index}-${Date.now()}`;
                   lastAssistantMsgId = msgId;
                   messages.push({ id: msgId, role: 'assistant', content });
-                  
-                  // Initialize segments with text content if exists
                   if (content) {
                       segments[msgId] = [{ id: `${msgId}-text-init`, type: 'text', content }];
                   } else {
                       segments[msgId] = [];
                   }
-
-                  // Handle Tool Calls (Dispatch)
                   const toolCalls = msg.tool_calls || [];
                   if (Array.isArray(toolCalls) && toolCalls.length > 0) {
                       if (!artifacts[msgId]) artifacts[msgId] = [];
                       if (!segments[msgId]) segments[msgId] = [];
-                      
                       toolCalls.forEach((call: any, callIdx: number) => {
                           const artifactId = `${msgId}-dispatch-${callIdx}`;
-                          const artifact: StreamArtifact = {
-                              id: artifactId,
-                              type: 'tool_dispatch',
-                              toolName: call.name,
-                              args: call.args,
-                          };
+                          const artifact: StreamArtifact = { id: artifactId, type: 'tool_dispatch', toolName: call.name, args: call.args };
                           artifacts[msgId].push(artifact);
-                          segments[msgId].push({
-                              id: `${artifactId}-segment`,
-                              type: 'artifact',
-                              artifactId
-                          });
+                          segments[msgId].push({ id: `${artifactId}-segment`, type: 'artifact', artifactId });
                       });
                   }
               }
           }
       });
-      return { messages, artifacts, segments };
+      return { messages, artifacts, segments, firstUserContent };
   };
 
   const syncAgentHistorySnapshot = async (agentName: string) => {
@@ -467,26 +484,52 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
 
       const history = Array.isArray(targetAgent.history) ? targetAgent.history : [];
       const currentSession = targetAgent.current_session_id || history.at(-1)?.session_id || '';
-      const sessionIds = history.map((item: any) => item?.session_id).filter(Boolean);
+      const sessionInfos: SessionInfo[] = [];
       const messagesBySession: Record<string, Message[]> = {};
       
       const allArtifacts: Record<string, StreamArtifact[]> = {};
       const allSegments: Record<string, MessageSegment[]> = {};
 
       history.forEach((item: any) => {
-          const sid = item?.session_id;
+          const sid = item?.session_id || item?.id;
           if (!sid) return;
           const sessionKey = makeAgentSessionKey(agentName, sid);
-          const { messages, artifacts, segments } = reconstructArtifactsFromHistory(Array.isArray(item.messages) ? item.messages : [], sessionKey);
+          const { messages, artifacts, segments, firstUserContent } = reconstructArtifactsFromHistory(Array.isArray(item.messages) ? item.messages : [], sessionKey);
           
+          let title = item.title || sid;
+          if ((!item.title || item.title === sid) && firstUserContent) {
+              title = firstUserContent.length > 20 ? firstUserContent.slice(0, 20) + '...' : firstUserContent;
+          }
+          
+          sessionInfos.push({ id: sid, title, updated_at: item.updated_at });
           messagesBySession[sessionKey] = messages.length > 0 ? messages : INITIAL_WELCOME_MESSAGES;
           Object.assign(allArtifacts, artifacts);
           Object.assign(allSegments, segments);
       });
+
+      // Backend now also provides 'sessions' summary for Document Helper - merge them
+      const summarySessions = Array.isArray(targetAgent.sessions) ? targetAgent.sessions : [];
+      summarySessions.forEach((s: any) => {
+          if (!s?.id) return;
+          if (!sessionInfos.some(exists => exists.id === s.id)) {
+              sessionInfos.push({ id: s.id, title: s.title || s.id, updated_at: s.updated_at });
+              const sessionKey = makeAgentSessionKey(agentName, s.id);
+              if (!messagesBySession[sessionKey]) {
+                  messagesBySession[sessionKey] = INITIAL_WELCOME_MESSAGES;
+              }
+          }
+      });
+      
+      // Sort by updated_at descending if available
+      sessionInfos.sort((a, b) => {
+          const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+          const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+          return timeB - timeA;
+      });
       
       console.log('[AIAssistant] Hydrating snapshot:', {
           agentName,
-          sessions: sessionIds,
+          sessions: sessionInfos.map(s => s.id),
           currentSession,
           messagesCountBySession: Object.fromEntries(Object.entries(messagesBySession).map(([k, v]) => [k, v.length])),
           artifactsCount: Object.keys(allArtifacts).length
@@ -498,7 +541,7 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
 
       dispatchAgentSession({
           type: 'hydrate_agent_snapshot',
-          payload: { agentName, sessions: sessionIds, currentSession, messagesBySession },
+          payload: { agentName, sessions: sessionInfos, currentSession, messagesBySession },
       });
       if (currentSession) {
           setSessionId(currentSession);
@@ -571,7 +614,7 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
               if (loadedAgents.length > 0) {
                   setSelectedAgent(loadedAgents[0]);
                   const now = Date.now();
-                  const nextSessionsByAgent: Record<string, string[]> = {};
+                  const nextSessionsByAgent: Record<string, SessionInfo[]> = {};
                   const nextCurrentSessionByAgent: Record<string, string> = {};
                   const nextMessagesByAgentSession: Record<string, Message[]> = {};
                   const nextArtifacts: Record<string, StreamArtifact[]> = {};
@@ -581,27 +624,39 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
                       const agentName = agent.name;
                       const history = agent.history || [];
                       const sessionIds = history.map(h => h.session_id).filter(Boolean);
-                      const fallbackSession = `session-${now}-${idx}`;
-                      const currentSession = agent.current_session_id || sessionIds[sessionIds.length - 1] || fallbackSession;
-                      const mergedSessions = sessionIds.includes(currentSession) ? sessionIds : [...sessionIds, currentSession];
-
-                      nextSessionsByAgent[agentName] = mergedSessions;
-                      nextCurrentSessionByAgent[agentName] = currentSession;
+                      const fallbackSessionId = `session-${now}-${idx}`;
+                      const currentSessionId = agent.current_session_id || sessionIds[sessionIds.length - 1] || fallbackSessionId;
+                      
+                      const currentSessions: SessionInfo[] = [];
 
                       history.forEach(h => {
                           const sid = h.session_id;
                           if (!sid) return;
                           const sessionKey = makeAgentSessionKey(agentName, sid);
-                          const { messages, artifacts, segments } = reconstructArtifactsFromHistory(
+                          const { messages, artifacts, segments, firstUserContent } = reconstructArtifactsFromHistory(
                               h.messages || [],
                               sessionKey
                           );
+                          
+                          let title = h.title || sid;
+                          if (sid.startsWith('session-') && firstUserContent) {
+                              title = firstUserContent.length > 20 ? firstUserContent.slice(0, 20) + '...' : firstUserContent;
+                          }
+                          
+                          currentSessions.push({ id: sid, title, updated_at: h.updated_at });
                           nextMessagesByAgentSession[sessionKey] = messages.length > 0 ? messages : INITIAL_WELCOME_MESSAGES;
                           Object.assign(nextArtifacts, artifacts);
                           Object.assign(nextSegments, segments);
                       });
 
-                      const currentKey = makeAgentSessionKey(agentName, currentSession);
+                      if (!currentSessions.some(s => s.id === currentSessionId)) {
+                          currentSessions.push({ id: currentSessionId, title: '新会话' });
+                      }
+
+                      nextSessionsByAgent[agentName] = currentSessions;
+                      nextCurrentSessionByAgent[agentName] = currentSessionId;
+
+                      const currentKey = makeAgentSessionKey(agentName, currentSessionId);
                       if (!nextMessagesByAgentSession[currentKey]) {
                           nextMessagesByAgentSession[currentKey] = INITIAL_WELCOME_MESSAGES;
                       }
@@ -723,12 +778,13 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
               console.error('Failed to create session on backend:', e);
           }
       }
+      const newSessionInfo: SessionInfo = { id: newSessionId, title: '新会话' };
       if (createdByBackend) {
           await syncAgentHistorySnapshot(agentName);
       }
       dispatchAgentSession({
           type: 'upsert_session',
-          payload: { agentName, sessionId: newSessionId, messages: INITIAL_WELCOME_MESSAGES },
+          payload: { agentName, session: newSessionInfo, messages: INITIAL_WELCOME_MESSAGES },
       });
       dispatchAgentSession({ type: 'set_current_session', payload: { agentName, sessionId: newSessionId } });
       setSessionId(newSessionId);
@@ -761,8 +817,8 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
               console.error('Failed to delete session on backend:', e);
           }
       }
-      const nextList = currentList.filter((item) => item !== deletingSessionId);
-      const fallbackSessionId = nextList[nextList.length - 1] || '';
+      const nextList = currentList.filter((item) => item.id !== deletingSessionId);
+      const fallbackSessionId = nextList[nextList.length - 1]?.id || '';
       dispatchAgentSession({
           type: 'delete_session',
           payload: { agentName, sessionId: deletingSessionId, fallbackSessionId },
@@ -1025,7 +1081,7 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
         setSessionId(activeSessionId);
         dispatchAgentSession({
             type: 'upsert_session',
-            payload: { agentName: activeAgentName, sessionId: activeSessionId },
+            payload: { agentName: activeAgentName, session: { id: activeSessionId, title: '新会话' } },
         });
         dispatchAgentSession({
             type: 'set_current_session',
@@ -1274,7 +1330,7 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
         activeSessionId,
         { 
             messages_type: 'text', 
-            context: input
+            content: input
         },
         () => {},
         () => {
@@ -1324,80 +1380,132 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
   const isHitlBlocked = Boolean(activeHitlState);
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200 shadow-sm relative z-20">
+    <div className="flex flex-col h-full bg-white border-l border-gray-100 shadow-sm relative z-20">
       {/* Header */}
-      <div className="h-14 border-b border-gray-100 flex items-center justify-between px-4 bg-gray-50/50 shrink-0">
-        <div className="flex items-center gap-2 overflow-hidden flex-1 max-w-[calc(100%-80px)]">
-            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white shrink-0">
-                <Settings size={16} />
+      <div className="h-14 border-b border-gray-100 flex items-center justify-between px-4 bg-stone-50/50 relative z-30 shrink-0">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Agent Selector Icon */}
+            <div className="w-8 h-8 rounded-lg bg-stone-800 flex items-center justify-center text-white shadow-sm shrink-0">
+                <Bot size={18} />
             </div>
             
-            {/* Agent Selector */}
-            {agents.length > 0 ? (
-                <div className="relative group flex-1">
-                    <select 
-                        className="appearance-none bg-transparent font-serif font-bold text-gray-800 outline-none text-sm cursor-pointer hover:text-black py-1 pr-4 pl-1 rounded transition-colors w-full truncate"
-                        value={selectedAgent?.id || ''}
-                        onChange={(e) => {
-                            const agent = agents.find(a => a.id === e.target.value);
-                            if (agent) setSelectedAgent(agent);
-                        }}
+            <div className="flex flex-col min-w-0 flex-1">
+                {/* Agent Selector */}
+                <div className="relative group">
+                    <button 
+                        className="flex items-center gap-1.5 text-sm font-bold text-stone-900 hover:text-stone-600 transition-colors truncate w-full"
+                        onClick={() => setShowAgentMenu(!showAgentMenu)}
                     >
-                        {agents.map(a => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                    </select>
-                    {/* Custom Arrow */}
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                        <ChevronLeft size={14} className="-rotate-90" />
-                    </div>
+                        {selectedAgent?.name || '选择智能体'}
+                        <ChevronDown size={14} className={`text-stone-400 transition-transform duration-200 ${showAgentMenu ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    <AnimatePresence>
+                        {showAgentMenu && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowAgentMenu(false)} />
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    className="absolute left-0 mt-2 w-56 bg-white border border-stone-100 rounded-xl shadow-xl z-50 p-2 overflow-hidden ring-1 ring-black/5"
+                                >
+                                    {agents.map(a => (
+                                        <button 
+                                            key={a.id} 
+                                            onClick={() => { setSelectedAgent(a); setShowAgentMenu(false); }}
+                                            className={`w-full flex flex-col items-start px-3 py-2 rounded-lg transition-all ${selectedAgent?.id === a.id ? 'bg-stone-900 text-white' : 'hover:bg-stone-50 text-stone-600'}`}
+                                        >
+                                            <span className="text-xs font-bold">{a.name}</span>
+                                            <span className={`text-[10px] truncate w-full italic ${selectedAgent?.id === a.id ? 'text-stone-400' : 'text-stone-400'}`}>{a.description || '高效辅助创作'}</span>
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
                 </div>
-            ) : (
-                <span className="font-serif font-bold text-gray-800 truncate">小说助手(未连接)</span>
-            )}
-            {selectedAgent && (
-                <div className="flex items-center gap-1 ml-1">
-                    <div className="relative">
-                        <select
-                            className="appearance-none bg-white border border-gray-200 text-[11px] rounded px-2 py-1 pr-5 text-gray-600 max-w-[120px] truncate"
-                            value={currentSessionByAgent[selectedAgent.name] || ''}
-                            onChange={(e) => handleSwitchSession(e.target.value)}
+
+                {/* Session Selector */}
+                {selectedAgent && (
+                    <div className="relative mt-0.5">
+                        <button 
+                            className="flex items-center gap-1 text-[11px] text-stone-400 hover:text-stone-800 transition-colors max-w-full"
+                            onClick={() => setShowSessionMenu(!showSessionMenu)}
                         >
-                            {(sessionsByAgent[selectedAgent.name] || []).map(sid => (
-                                <option key={sid} value={sid}>{sid}</option>
-                            ))}
-                        </select>
-                        <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                            <ChevronLeft size={12} className="-rotate-90" />
-                        </div>
+                            <Clock size={10} />
+                            <span className="truncate">
+                                {sessionsByAgent[selectedAgent.name]?.find(s => s.id === (currentSessionByAgent[selectedAgent.name]))?.title || '新会话'}
+                            </span>
+                            <ChevronDown size={10} />
+                        </button>
+
+                        <AnimatePresence>
+                            {showSessionMenu && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowSessionMenu(false)} />
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 5 }}
+                                        className="absolute left-0 mt-2 w-64 bg-white border border-stone-100 rounded-xl shadow-xl z-50 overflow-hidden ring-1 ring-black/5"
+                                    >
+                                        <div className="p-3 border-b border-stone-50 bg-stone-50/50 flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-stone-400 tracking-wider uppercase">History</span>
+                                            <button 
+                                                onClick={() => { handleCreateSession(); setShowSessionMenu(false); }}
+                                                className="p-1 px-2 rounded-lg bg-stone-800 text-white text-[10px] font-bold shadow-sm hover:bg-stone-700 flex items-center gap-1 transition-colors"
+                                            >
+                                                <Plus size={10} /> NEW
+                                            </button>
+                                        </div>
+                                        <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
+                                            {(sessionsByAgent[selectedAgent.name] || []).map(session => (
+                                                <div key={session.id} className="group relative">
+                                                    <button 
+                                                        onClick={() => { handleSwitchSession(session.id); setShowSessionMenu(false); }}
+                                                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${currentSessionByAgent[selectedAgent.name] === session.id ? 'bg-stone-900 text-white' : 'hover:bg-stone-50 text-stone-600'}`}
+                                                    >
+                                                        <MessageSquare size={14} className="shrink-0 opacity-50" />
+                                                        <div className="flex flex-col items-start min-w-0 flex-1">
+                                                            <span className="text-xs font-bold truncate w-full">{session.title || '无标题会话'}</span>
+                                                            <span className={`text-[9px] ${currentSessionByAgent[selectedAgent.name] === session.id ? 'text-stone-400' : 'text-stone-400'}`}>{session.updated_at ? new Date(session.updated_at).toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '刚刚'}</span>
+                                                        </div>
+                                                        {currentSessionByAgent[selectedAgent.name] === session.id && <Check size={12} className="shrink-0" />}
+                                                    </button>
+                                                    
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
+                                                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${currentSessionByAgent[selectedAgent.name] === session.id ? 'text-stone-400 hover:text-red-300 hover:bg-red-400/20' : 'text-stone-300 hover:text-red-500 hover:bg-red-50'}`}
+                                                        title="删除"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {(!sessionsByAgent[selectedAgent.name] || sessionsByAgent[selectedAgent.name].length === 0) && (
+                                                <div className="px-3 py-4 text-center text-xs text-stone-400 italic">No history found</div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>
                     </div>
-                    <button
-                        onClick={handleCreateSession}
-                        className="p-1 rounded border border-gray-200 text-gray-500 hover:text-black hover:border-gray-300"
-                        title="新建会话"
-                    >
-                        <Plus size={12} />
-                    </button>
-                    <button
-                        onClick={handleDeleteSession}
-                        className="p-1 rounded border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-300"
-                        title="删除当前会话"
-                    >
-                        <Trash2 size={12} />
-                    </button>
-                </div>
-            )}
+                )}
+            </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-            <button className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                <MoreHorizontal size={20} className="text-gray-500" />
+
+        <div className="flex items-center gap-2 shrink-0">
+            <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-900">
+                <MoreHorizontal size={18} />
             </button>
             <button 
                 onClick={onToggle}
-                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-                title="收起助手"
+                className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-900"
+                title="关闭侧边栏"
             >
-                <ChevronLeft size={20} className="text-gray-500" />
+                <ChevronLeft size={20} />
             </button>
         </div>
       </div>
