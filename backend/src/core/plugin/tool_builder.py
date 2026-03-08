@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Annotated, get_type_hints, get_origin, get_args
 from uuid import UUID
 
 from langchain_core.tools import BaseTool, StructuredTool
@@ -18,7 +18,7 @@ from core.plugin.runtime import PluginInternalRegistry
 from infrastructure.pg.pg_models import AgentsManagerSQLEntity
 
 
-def _build_args_model(op_name: str, input_schema: Dict[str, Any]) -> Type[BaseModel]:
+def _build_args_model(op_name: str, input_schema: Dict[str, Any], func: Any = None) -> Type[BaseModel]:
     """
     从 operation 的 input_schema 动态生成 Pydantic Model 作为工具的 args_schema。
 
@@ -26,14 +26,36 @@ def _build_args_model(op_name: str, input_schema: Dict[str, Any]) -> Type[BaseMo
     过滤掉 CONTEXT / PROPS 类型的参数（这些由前端/运行时注入，不应让 Agent 填写）。
     """
     fields: Dict[str, Any] = {}
+    
+    # 获取原始函数签名用于判断 BaseModel
+    hints = {}
+    if func:
+        hints = get_type_hints(func)
 
     for param_name, param_info in input_schema.items():
         # 过滤非用户输入参数
         source = param_info.get("source", "input")
         if source != "input":
             continue
+            
+        # 检查是否是 Pydantic 模型
+        hint = hints.get(param_name, Any)
+        if get_origin(hint) is Annotated:
+            hint = get_args(hint)[0]
+            
+        if isinstance(hint, type) and issubclass(hint, BaseModel):
+            # 将 BaseModel 字段扁平化展开
+            for field_name, model_field in hint.model_fields.items():
+                fields[field_name] = (
+                    model_field.annotation,
+                    Field(
+                        default=model_field.default,
+                        description=model_field.description or f"{param_name}.{field_name}"
+                    )
+                )
+            continue
 
-        # 映射 JSON schema 类型到 Python 类型
+        # 普通参数映射 JSON schema 类型到 Python 类型
         json_type = param_info.get("type", "string")
         python_type = _json_type_to_python(json_type)
 
@@ -54,6 +76,7 @@ def _build_args_model(op_name: str, input_schema: Dict[str, Any]) -> Type[BaseMo
 
     model_name = f"ToolArgs_{op_name}"
     return create_model(model_name, **fields)
+
 
 
 def _json_type_to_python(json_type: str) -> type:
@@ -134,7 +157,7 @@ async def build_tools_from_plugins(
 
             # 构建 args_schema
             input_schema = op_info.input_schema or {}
-            args_model = _build_args_model(op_name, input_schema)
+            args_model = _build_args_model(op_name, input_schema, func=op_info.func)
 
             # 构建工具名称（加插件前缀避免冲突）
             tool_name = f"{plugin_name}_{op_name}"
@@ -144,14 +167,42 @@ async def build_tools_from_plugins(
             _plugin_id = plugin_id
             _op_name = op_name
             _registry = registry
+            _op_func = op_info.func
 
             async def _invoke_tool(
                 _pid=_plugin_id,
                 _on=_op_name,
                 _reg=_registry,
+                _func=_op_func,
                 **kwargs,
             ) -> Any:
                 """通过 PluginService 调用插件操作"""
+                # 重新打包被扁平化的 BaseModel 参数
+                packed_kwargs = {}
+                hints = get_type_hints(_func)
+                
+                sig = inspect.signature(_func)
+                for param_name in sig.parameters:
+                    if param_name == 'self':
+                        continue
+                        
+                    hint = hints.get(param_name, Any)
+                    if get_origin(hint) is Annotated:
+                        hint = get_args(hint)[0]
+                        
+                    if isinstance(hint, type) and issubclass(hint, BaseModel):
+                        model_kwargs = {}
+                        for field_name in hint.model_fields.keys():
+                            if field_name in kwargs:
+                                model_kwargs[field_name] = kwargs.pop(field_name)
+                        packed_kwargs[param_name] = model_kwargs
+                    else:
+                        if param_name in kwargs:
+                            packed_kwargs[param_name] = kwargs.pop(param_name)
+                            
+                # 剩下的放进去
+                packed_kwargs.update(kwargs)
+
                 # 延迟导入避免循环依赖
                 from services.plugin.service import PluginService
 
@@ -159,7 +210,7 @@ async def build_tools_from_plugins(
                 result = await service.invoke_plugin_operation(
                     plugin_id=_pid,
                     operation_name=_on,
-                    params=kwargs,
+                    params=packed_kwargs,
                     registry=_reg,
                 )
                 # 如果是 PluginOperationInvokeResponse，提取 payload

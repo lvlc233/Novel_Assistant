@@ -46,9 +46,9 @@ const TiptapEditor = ({ content, onChange, editable = true }: TiptapEditorProps)
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-        if (editor.isEmpty && content) {
-            editor.commands.setContent(content)
-        }
+        // Update content when it changes externally (e.g. by Agent)
+        // Set emitUpdate to false to avoid feedback loop
+        editor.commands.setContent(content, false)
     }
   }, [content, editor])
 
