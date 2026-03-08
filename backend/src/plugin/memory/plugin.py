@@ -55,8 +55,17 @@ class MemoryUpdateRequest(BaseModel):
 class MemoryPlugin:
 
     @runtime_config
-    def __init__(self, session: AsyncSession = Inject(get_session)):
+    def __init__(
+        self, 
+        session: AsyncSession = Inject(get_session),
+        base_url: str = "",
+        api_key: str = "",
+        model_name: str = ""
+    ):
         self.session = session
+        self.base_url = base_url
+        self.api_key = api_key
+        self.model_name = model_name
 
     @operation(
         name="manage_memories",
@@ -86,7 +95,16 @@ class MemoryPlugin:
             
         context_text = "\n".join([f"[{m.name}]: {m.context}" for m in memories])
         
-        model = load_chat_model_with_env("memory_organizer")
+        if not self.api_key or not self.model_name:
+            raise ValueError("LLM Configuration (api_key, model_name) is missing. Please configure it in the plugin settings.")
+            
+        from langchain_openai import ChatOpenAI
+        model = ChatOpenAI(
+            base_url=self.base_url if self.base_url else None,
+            api_key=self.api_key,
+            model=self.model_name
+        )
+        
         response = await model.ainvoke([
             SystemMessage(content="You are a memory manager. Summarize the following memory contexts into a single cohesive summary."),
             HumanMessage(content=context_text)
@@ -148,6 +166,9 @@ class MemoryPlugin:
     @operation(name="create_memory")
     async def create_memory(self, request: MemoryCreateRequest) -> MemoryMetaResponse:
         """创建记忆."""
+        if isinstance(request, dict):
+            request = MemoryCreateRequest(**request)
+            
         memory = MemorySQLEntity(
             id=create_uuid(),
             name=request.name,
@@ -172,6 +193,9 @@ class MemoryPlugin:
     @operation(name="update_memory")
     async def update_memory(self, memory_id: str, request: MemoryUpdateRequest) -> None:
         """更新记忆."""
+        if isinstance(request, dict):
+            request = MemoryUpdateRequest(**request)
+            
         stmt = select(MemorySQLEntity).where(MemorySQLEntity.id == memory_id)
         result = await self.session.execute(stmt)
         memory = result.scalar_one_or_none()
@@ -188,4 +212,17 @@ class MemoryPlugin:
         if request.enabled is not None:
             memory.enabled = request.enabled
             
+        await self.session.commit()
+
+    @operation(name="delete_memory")
+    async def delete_memory(self, memory_id: str) -> None:
+        """删除记忆."""
+        stmt = select(MemorySQLEntity).where(MemorySQLEntity.id == memory_id)
+        result = await self.session.execute(stmt)
+        memory = result.scalar_one_or_none()
+        
+        if not memory:
+            raise ResourceNotFoundError(f"Memory with id {memory_id} not found")
+            
+        await self.session.delete(memory)
         await self.session.commit()

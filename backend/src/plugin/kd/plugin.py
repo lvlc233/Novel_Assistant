@@ -10,6 +10,8 @@ from common.enums import PluginFromTypeEnum, UITrigger
 from sqlalchemy import delete, select
 from sqlalchemy import desc
 from core.ui.home import Home
+from core.plugin.di import Inject
+from infrastructure.pg.pg_client import get_session
 
 @plugin_meta(
     name="kd",
@@ -22,7 +24,7 @@ from core.ui.home import Home
 class KDPlugin:
     
     @runtime_config
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession = Inject(get_session)):
         self.session = session
 
     @operation(
@@ -62,6 +64,9 @@ class KDPlugin:
     @operation
     async def create_kd(self, request: KDCreateRequest) -> KDMetaResponse:
         """知识库构建."""
+        if isinstance(request, dict):
+            request = KDCreateRequest(**request)
+            
         entity = KnowledgeBaseSQLEntity(
             title=request.title, # Fix: use title instead of name
             description=request.description,
@@ -108,6 +113,9 @@ class KDPlugin:
     @operation
     async def update_kd(self, kd_id: str, request: KDUpdateRequest) -> None:
         """知识库元数据修改."""
+        if isinstance(request, dict):
+            request = KDUpdateRequest(**request)
+            
         stmt = select(KnowledgeBaseSQLEntity).where(KnowledgeBaseSQLEntity.id == kd_id)
         result = await self.session.execute(stmt)
         entity = result.scalar_one_or_none()
@@ -142,6 +150,9 @@ class KDPlugin:
     @operation
     async def create_kd_chunk(self, kd_id: str, request: KDDescriptionCreateRequest) -> KDDescriptionResponse:
         """知识库(知识点创建)."""
+        if isinstance(request, dict):
+            request = KDDescriptionCreateRequest(**request)
+            
         # Verify KB exists
         stmt = select(KnowledgeBaseSQLEntity).where(KnowledgeBaseSQLEntity.id == kd_id)
         result = await self.session.execute(stmt)
@@ -170,6 +181,9 @@ class KDPlugin:
     @operation
     async def update_kd_chunk(self, kd_id: str, chunk_id: str, request: KDDescriptionUpdateRequest) -> None:
         """知识库(知识点修改)."""
+        if isinstance(request, dict):
+            request = KDDescriptionUpdateRequest(**request)
+            
         stmt = select(KnowledgeChunkSQLEntity).where(
             KnowledgeChunkSQLEntity.id == chunk_id,
             KnowledgeChunkSQLEntity.kb_id == kd_id
@@ -190,6 +204,7 @@ class KDPlugin:
             
         await self.session.commit()
 
+    @operation
     async def delete_kd_chunk(self, kd_id: str, chunk_id: str) -> None:
         """知识库(知识点删除)."""
         stmt = select(KnowledgeChunkSQLEntity).where(
