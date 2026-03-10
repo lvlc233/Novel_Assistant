@@ -3,8 +3,6 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
-from alembic import command
-from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -23,11 +21,24 @@ from core.plugin.runtime import PluginInternalRegistry, PluginManager
 
 
 async def _run_migrations() -> None:
+    import subprocess, sys
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     alembic_ini = os.path.abspath(os.path.join(base_dir, "..", "alembic.ini"))
-    config = Config(alembic_ini)
-    config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
-    await asyncio.to_thread(command.upgrade, config, "head")
+    
+    def _do_upgrade():
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "-c", alembic_ini, "upgrade", "head"],
+            cwd=os.path.dirname(alembic_ini),
+            capture_output=True,
+            text=True,
+            env={**os.environ, "SQLALCHEMY_DATABASE_URI": settings.SQLALCHEMY_DATABASE_URI},
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Alembic migration failed:\n{result.stderr}")
+        if result.stdout:
+            logger.info(result.stdout.strip())
+    
+    await asyncio.to_thread(_do_upgrade)
 
 
 @asynccontextmanager

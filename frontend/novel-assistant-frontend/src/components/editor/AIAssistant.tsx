@@ -463,10 +463,20 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
           console.warn('[AIAssistant] syncAgentHistorySnapshot aborted: No agentManagerId');
           return;
       }
-      const response = await invokePluginOperation(agentManagerId, 'get_agent_info_in_card', {});
+      const response = await invokePluginOperation(agentManagerId, 'get_agent_info', {});
       const payload = (response?.payload || response) as Record<string, unknown>;
-      const payloadData = (payload?.data as Record<string, unknown> | undefined) || undefined;
-      const agentsList = payloadData?.agents || payload?.agents;
+      // get_agent_info might return an array directly, or { data: [...] }, or { data: { agents: [...] } } depending on the exact backend wrapping
+      let agentsList: any[] | undefined = undefined;
+      if (Array.isArray(payload)) {
+          agentsList = payload as any[];
+      } else if (Array.isArray(payload?.data)) {
+          agentsList = payload.data as any[];
+      } else {
+          const payloadData = (payload?.data as Record<string, unknown> | undefined) || undefined;
+          const extractedAgents = payloadData?.agents || payload?.agents;
+          agentsList = Array.isArray(extractedAgents) ? extractedAgents : undefined;
+      }
+
       if (!Array.isArray(agentsList)) {
           console.warn('[AIAssistant] syncAgentHistorySnapshot aborted: No agents list in response', response);
           return;
@@ -476,8 +486,9 @@ export default function AIAssistant({ isExpanded, onToggle, documentId, workId }
           console.warn('[AIAssistant] syncAgentHistorySnapshot aborted: Target agent not found', agentName);
           return;
       }
+      console.log('[AIAssistant] syncAgentHistorySnapshot found agent raw payload:', targetAgent);
       console.log('[AIAssistant] syncAgentHistorySnapshot found agent:', { 
-          name: targetAgent.name, 
+          name: targetAgent.agent_name || targetAgent.name, 
           historyLen: targetAgent.history?.length,
           currentSession: targetAgent.current_session_id 
       });
